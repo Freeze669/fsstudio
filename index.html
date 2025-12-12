@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FS STUDIO - Radio Web</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="background-blur"></div>
+    
+    <div class="container">
+        <header class="header">
+            <div class="status-bar">
+                <span class="time" id="currentTime">20:49</span>
+                <div class="status-icons">
+                    <span class="signal">●●●</span>
+                    <span class="battery"></span>
+                </div>
+            </div>
+        </header>
+
+        <main class="main-content">
+            <div class="player-card">
+                <div class="album-art">
+                    <div class="vinyl-record">
+                        <div class="vinyl-center"></div>
+                    </div>
+                </div>
+                <div class="player-info">
+                    <p class="station-label">En ce moment sur FS STUDIO :</p>
+                    <h2 class="track-title" id="trackTitle">EN DIRECT</h2>
+                </div>
+                <button class="play-pause-btn" id="playPauseBtn">
+                    <svg class="pause-icon" viewBox="0 0 24 24" fill="white">
+                        <rect x="6" y="4" width="4" height="16"></rect>
+                        <rect x="14" y="4" width="4" height="16"></rect>
+                    </svg>
+                    <svg class="play-icon" viewBox="0 0 24 24" fill="white" style="display: none;">
+                        <path d="M8 5v14l11-7z"></path>
+                    </svg>
+                </button>
+            </div>
+        </main>
+    </div>
+
+    <!-- Chat Public Sidebar -->
+    <div class="public-chat" id="publicChat">
+        <div class="chat-header">
+            <div class="chat-icon">💬</div>
+            <h3>Chat Public</h3>
+            <div class="online-indicator" id="onlineIndicator">
+                <span class="online-dot"></span>
+                <span id="onlineCount">0</span>
+            </div>
+        </div>
+        
+        <!-- Formulaire de connexion (si pas de pseudo) -->
+        <div class="chat-login" id="chatLogin" style="display: none;">
+            <div class="login-form">
+                <p>Choisissez un pseudo pour participer au chat</p>
+                <input type="text" id="usernameInput" placeholder="Votre pseudo" maxlength="20">
+                <button id="loginBtn">Rejoindre</button>
+            </div>
+        </div>
+        
+        <div class="chat-messages" id="chatMessages">
+            <div class="chat-message system">
+                <span class="message-time">00:00</span>
+                <span class="message-content">Connexion au chat...</span>
+            </div>
+        </div>
+        
+        <div class="chat-input-container" id="chatInputContainer" style="display: none;">
+            <div class="chat-input-wrapper">
+                <input type="text" id="messageInput" placeholder="Tapez votre message..." maxlength="500">
+                <button id="sendBtn">
+                    <svg viewBox="0 0 24 24" fill="white" width="20" height="20">
+                        <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        
+        <div class="chat-status">
+            <span class="status-text" id="chatStatus">Connexion...</span>
+        </div>
+    </div>
+
+    <audio id="audioPlayer" preload="none"></audio>
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    
+    <!-- Configuration Firebase -->
+    <script src="firebase-config.js"></script>
+    
+    <!-- Script principal -->
+    <script src="script.js"></script>
+</body>
+</html>
+

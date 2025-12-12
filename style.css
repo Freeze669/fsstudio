@@ -1,0 +1,542 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    overflow: hidden;
+    height: 100vh;
+    position: relative;
+    background: linear-gradient(135deg, #000000 0%, #1a1a1a 50%, #ffffff 100%);
+}
+
+.background-blur {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, 
+        rgba(0, 0, 0, 0.8) 0%, 
+        rgba(26, 26, 26, 0.6) 30%,
+        rgba(128, 128, 128, 0.4) 60%,
+        rgba(255, 255, 255, 0.6) 100%);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    z-index: 0;
+}
+
+.container {
+    position: relative;
+    z-index: 1;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+}
+
+/* Status Bar */
+.header {
+    padding: 10px 20px;
+    color: white;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.status-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.time {
+    font-weight: 600;
+}
+
+.status-icons {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+}
+
+.signal {
+    font-size: 10px;
+    letter-spacing: 2px;
+}
+
+.network {
+    font-weight: 500;
+}
+
+.battery {
+    font-size: 14px;
+}
+
+/* Main Content */
+.main-content {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    margin-right: 350px; /* Espace pour le chat public */
+}
+
+.player-card {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(30px);
+    -webkit-backdrop-filter: blur(30px);
+    border-radius: 24px;
+    padding: 24px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    max-width: 600px;
+    width: 100%;
+    animation: fadeIn 0.5s ease-in;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.album-art {
+    flex-shrink: 0;
+}
+
+.vinyl-record {
+    width: 80px;
+    height: 80px;
+    background: linear-gradient(135deg, #000000 0%, #333333 50%, #ffffff 100%);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    position: relative;
+    overflow: hidden;
+}
+
+.vinyl-record::before {
+    content: '';
+    position: absolute;
+    width: 60%;
+    height: 60%;
+    background: #1a1a1a;
+    border-radius: 50%;
+    border: 2px solid #333;
+}
+
+.vinyl-center {
+    width: 20px;
+    height: 20px;
+    background: white;
+    border-radius: 50%;
+    z-index: 2;
+    position: relative;
+}
+
+.player-info {
+    flex: 1;
+    color: white;
+}
+
+.station-label {
+    font-size: 12px;
+    opacity: 0.9;
+    margin-bottom: 8px;
+    font-weight: 500;
+}
+
+.track-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: white;
+    line-height: 1.3;
+}
+
+.play-pause-btn {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.25);
+    backdrop-filter: blur(10px);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    flex-shrink: 0;
+}
+
+.play-pause-btn:hover {
+    background: rgba(255, 255, 255, 0.35);
+    transform: scale(1.05);
+}
+
+.play-pause-btn:active {
+    transform: scale(0.95);
+}
+
+.play-pause-btn svg {
+    width: 24px;
+    height: 24px;
+}
+
+
+/* Responsive */
+@media (max-width: 480px) {
+    .player-card {
+        flex-direction: column;
+        text-align: center;
+        padding: 20px;
+    }
+
+    .player-info {
+        text-align: center;
+    }
+
+    .track-title {
+        font-size: 16px;
+    }
+
+    .vinyl-record {
+        width: 100px;
+        height: 100px;
+    }
+
+    .url {
+        font-size: 12px;
+    }
+}
+
+/* Animation pour le vinyle qui tourne */
+.vinyl-record.playing {
+    animation: rotate 3s linear infinite;
+}
+
+@keyframes rotate {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Chat Public Sidebar */
+.public-chat {
+    position: fixed;
+    right: 0;
+    top: 0;
+    width: 320px;
+    height: 100vh;
+    background: rgba(30, 30, 30, 0.95);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-left: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    flex-direction: column;
+    z-index: 100;
+    box-shadow: -4px 0 20px rgba(0, 0, 0, 0.3);
+}
+
+.chat-header {
+    padding: 16px;
+    background: rgba(0, 0, 0, 0.3);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: white;
+}
+
+.chat-icon {
+    font-size: 20px;
+}
+
+.chat-header h3 {
+    flex: 1;
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0;
+}
+
+.online-indicator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: #43b581;
+}
+
+.online-dot {
+    width: 8px;
+    height: 8px;
+    background: #43b581;
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+}
+
+/* Formulaire de connexion */
+.chat-login {
+    padding: 20px;
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.login-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.login-form p {
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 14px;
+    margin-bottom: 8px;
+}
+
+.login-form input {
+    padding: 10px 12px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    color: white;
+    font-size: 14px;
+    outline: none;
+    transition: all 0.3s;
+}
+
+.login-form input:focus {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.4);
+}
+
+.login-form input::placeholder {
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.login-form button {
+    padding: 10px 16px;
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 8px;
+    color: white;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.login-form button:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: translateY(-1px);
+}
+
+.login-form button:active {
+    transform: translateY(0);
+}
+
+/* Zone de saisie de message */
+.chat-input-container {
+    padding: 12px;
+    background: rgba(0, 0, 0, 0.3);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.chat-input-wrapper {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.chat-input-wrapper input {
+    flex: 1;
+    padding: 10px 12px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    color: white;
+    font-size: 14px;
+    outline: none;
+    transition: all 0.3s;
+}
+
+.chat-input-wrapper input:focus {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.4);
+}
+
+.chat-input-wrapper input::placeholder {
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.chat-input-wrapper button {
+    width: 40px;
+    height: 40px;
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 8px;
+    color: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s;
+    flex-shrink: 0;
+}
+
+.chat-input-wrapper button:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: scale(1.05);
+}
+
+.chat-input-wrapper button:active {
+    transform: scale(0.95);
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+.chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.chat-messages::-webkit-scrollbar {
+    width: 6px;
+}
+
+.chat-messages::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.chat-messages::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 3px;
+}
+
+.chat-message {
+    display: flex;
+    flex-direction: column;
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    color: white;
+    font-size: 13px;
+    line-height: 1.4;
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.chat-message.system {
+    background: rgba(114, 137, 218, 0.2);
+    border-left: 3px solid #7289da;
+}
+
+.chat-message .message-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.message-author {
+    font-weight: 600;
+    color: #fff;
+}
+
+.message-author.own-message {
+    color: #43b581;
+}
+
+.message-time {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.5);
+    margin-bottom: 4px;
+}
+
+.message-content {
+    color: rgba(255, 255, 255, 0.9);
+    word-wrap: break-word;
+}
+
+.chat-status {
+    padding: 12px 16px;
+    background: rgba(0, 0, 0, 0.3);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 12px;
+    text-align: center;
+}
+
+.status-text {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.status-text::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #f04747;
+    animation: pulse 2s infinite;
+}
+
+.status-text.connected::before {
+    background: #43b581;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .public-chat {
+        width: 100%;
+        height: 40vh;
+        bottom: 0;
+        top: auto;
+        border-left: none;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .main-content {
+        margin-right: 0;
+        margin-bottom: 40vh;
+    }
+}
+
