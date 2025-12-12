@@ -444,14 +444,32 @@ function initRadioEvents() {
             let targetPeak = 0.7; // Niveau cible (70% pour éviter la saturation)
             
             scriptProcessor.onaudioprocess = (event) => {
-                if (!isStreaming) return;
+                if (!isStreaming) {
+                    // Même si pas en streaming, copier l'input vers l'output pour éviter les erreurs
+                    const inputData = event.inputBuffer.getChannelData(0);
+                    const outputData = event.outputBuffer.getChannelData(0);
+                    for (let i = 0; i < inputData.length; i++) {
+                        outputData[i] = inputData[i];
+                    }
+                    return;
+                }
                 
                 const now = Date.now();
-                if (now - lastSendTime < sendInterval) return; // Limiter l'envoi
+                if (now - lastSendTime < sendInterval) {
+                    // Copier quand même l'input vers l'output
+                    const inputData = event.inputBuffer.getChannelData(0);
+                    const outputData = event.outputBuffer.getChannelData(0);
+                    for (let i = 0; i < inputData.length; i++) {
+                        outputData[i] = inputData[i];
+                    }
+                    return; // Limiter l'envoi
+                }
                 lastSendTime = now;
                 
                 const inputData = event.inputBuffer.getChannelData(0);
                 const outputData = event.outputBuffer.getChannelData(0);
+                
+                console.log('📤 ScriptProcessor déclenché, données reçues:', inputData.length, 'échantillons');
                 
                 // Traitement audio amélioré
                 let maxAmplitude = 0;
@@ -505,6 +523,15 @@ function initRadioEvents() {
                 const base64Audio = btoa(binary);
                 const timestamp = Date.now();
                 
+                // Vérifier qu'il y a du son (pas seulement du silence)
+                if (maxAmplitude < noiseGateThreshold) {
+                    // Pas de son, ne pas envoyer
+                    for (let i = 0; i < inputData.length; i++) {
+                        outputData[i] = processedData[i];
+                    }
+                    return;
+                }
+                
                 // Envoyer le chunk audio à Firebase
                 database.ref(`radio/audioChunks/${timestamp}`).set({
                     data: base64Audio,
@@ -523,6 +550,8 @@ function initRadioEvents() {
                         lastSent.textContent = timeStr;
                     }
                     
+                    console.log(`✅ Chunk ${chunksSentCount} envoyé: ${base64Audio.length} chars, amplitude: ${maxAmplitude.toFixed(3)}`);
+                    
                     // Nettoyer les anciens chunks (plus de 3 secondes)
                     if (chunksSentCount % 20 === 0) {
                         const cleanupTime = Date.now() - 3000;
@@ -537,13 +566,19 @@ function initRadioEvents() {
                     }
                 }).catch((error) => {
                     console.error('❌ Erreur envoi chunk:', error);
+                    voiceStatusText.textContent = '❌ Erreur Firebase - Vérifiez la connexion';
                 });
             };
             
+            // Créer un gainNode avec volume 0 pour éviter l'écho mais activer le scriptProcessor
+            const silentGain = audioContext.createGain();
+            silentGain.gain.value = 0; // Volume à 0 pour éviter l'écho
+            
             // Connecter le script processor après le compressor (pour capturer l'audio traité)
-            // NE PAS connecter à destination pour éviter l'écho/feedback
             compressor.connect(scriptProcessor);
-            // scriptProcessor.connect(audioContext.destination); // DÉSACTIVÉ pour éviter l'écho
+            // Connecter à destination via un gain silencieux (nécessaire pour activer scriptProcessor)
+            scriptProcessor.connect(silentGain);
+            silentGain.connect(audioContext.destination);
             
             console.log('✅ Filtres audio activés: High-pass (80Hz), Low-pass (8kHz), Compresseur');
             
