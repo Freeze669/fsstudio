@@ -219,19 +219,23 @@ function startListeningToAudio() {
     // Écouter les nouveaux chunks en temps réel
     chunksRef.orderByKey().on('child_added', (snapshot) => {
         const chunkData = snapshot.val();
-        if (chunkData && chunkData.data) {
-            const chunkTimestamp = chunkData.timestamp || parseInt(snapshot.key);
-            const age = Date.now() - chunkTimestamp;
-            
-            // Ne jouer que les chunks récents (moins de 5 secondes)
-            if (chunkTimestamp > lastChunkTimestamp && age < 5000) {
-                lastChunkTimestamp = chunkTimestamp;
-                console.log(`🎵 Chunk reçu: ${chunkTimestamp}, âge: ${age}ms`);
-                playAudioChunk(chunkData.data, chunkData.mimeType || 'audio/webm');
-            } else {
-                console.log(`⏭️ Chunk ignoré (trop vieux): ${age}ms`);
+            if (chunkData && chunkData.data) {
+                const chunkTimestamp = chunkData.timestamp || parseInt(snapshot.key);
+                const age = Date.now() - chunkTimestamp;
+                
+                // Ne jouer que les chunks récents (moins de 5 secondes)
+                if (chunkTimestamp > lastChunkTimestamp && age < 5000) {
+                    lastChunkTimestamp = chunkTimestamp;
+                    console.log(`🎵 Chunk reçu: ${chunkTimestamp}, âge: ${age}ms, format: ${chunkData.format || 'pcm16'}`);
+                    playAudioChunk(chunkData.data, {
+                        format: chunkData.format || 'pcm16',
+                        sampleRate: chunkData.sampleRate || 44100,
+                        bufferSize: chunkData.bufferSize || 4096
+                    });
+                } else {
+                    console.log(`⏭️ Chunk ignoré (trop vieux): ${age}ms`);
+                }
             }
-        }
     });
     
     // Écouter aussi les changements pour récupérer les chunks manqués
@@ -255,7 +259,11 @@ function startListeningToAudio() {
                 console.log(`📥 Récupération de ${chunkEntries.length} chunks manqués`);
                 chunkEntries.forEach(chunk => {
                     lastChunkTimestamp = chunk.timestamp;
-                    playAudioChunk(chunk.data, chunk.mimeType || 'audio/webm');
+                    playAudioChunk(chunk.data, {
+                        format: chunk.format || 'pcm16',
+                        sampleRate: chunk.sampleRate || 44100,
+                        bufferSize: chunk.bufferSize || 4096
+                    });
                 });
             }
         }
@@ -319,7 +327,7 @@ function stopListeningToAudio() {
 }
 
 // Jouer un chunk audio
-function playAudioChunk(base64Data, mimeType) {
+function playAudioChunk(base64Data, chunkInfo) {
     try {
         chunksReceivedCount++;
         lastReceivedTime = new Date();
@@ -327,15 +335,20 @@ function playAudioChunk(base64Data, mimeType) {
         // Mettre à jour le statut visuel
         updateAudioStatus(true);
         
-        // Ajouter à la queue pour une lecture plus fluide
-        audioChunksQueue.push({ data: base64Data, mimeType: mimeType || 'audio/webm' });
+        // Ajouter à la queue avec les informations du chunk
+        audioChunksQueue.push({ 
+            data: base64Data, 
+            format: chunkInfo.format || 'pcm16',
+            sampleRate: chunkInfo.sampleRate || 44100,
+            bufferSize: chunkInfo.bufferSize || 4096
+        });
         
         // Si c'est le premier chunk, démarrer la lecture
         if (audioChunksQueue.length === 1) {
             processAudioQueue();
         }
         
-        console.log(`🎵 Chunk reçu et ajouté à la queue (total: ${chunksReceivedCount})`);
+        console.log(`🎵 Chunk reçu et ajouté à la queue (total: ${chunksReceivedCount}, format: ${chunkInfo.format || 'pcm16'})`);
         
     } catch (error) {
         console.error('Erreur traitement chunk audio:', error);
@@ -403,6 +416,16 @@ async function processAudioQueue() {
                 bytes[i] = binaryString.charCodeAt(i);
             }
             
+            // Vérifier que la taille est correcte (doit être multiple de 2 pour Int16)
+            if (bytes.length % 2 !== 0) {
+                console.warn('⚠️ Taille de données invalide, ignoré');
+                isProcessingBuffer = false;
+                if (audioChunksQueue.length > 0) {
+                    setTimeout(() => processAudioQueue(), 10);
+                }
+                return;
+            }
+            
             // Convertir en Int16Array
             const int16Data = new Int16Array(bytes.buffer);
             
@@ -428,14 +451,15 @@ async function processAudioQueue() {
             source.connect(audioContextListener.destination);
             
             updateAudioStatus(true, `Lecture: ${chunksReceivedCount} chunks`);
-            console.log(`🔊 Chunk PCM décodé et joué (${float32Data.length} échantillons, ${chunk.sampleRate}Hz)`);
+            const duration = audioBuffer.duration;
+            console.log(`🔊 Chunk PCM décodé et joué (${float32Data.length} échantillons, ${chunk.sampleRate}Hz, ${duration.toFixed(3)}s)`);
             
             // Quand la lecture est terminée
             source.onended = () => {
                 isProcessingBuffer = false;
                 // Continuer avec le prochain chunk immédiatement
                 if (audioChunksQueue.length > 0) {
-                    processAudioQueue();
+                    setTimeout(() => processAudioQueue(), 5);
                 } else {
                     updateAudioStatus(true, 'En attente de nouveaux chunks...');
                     isProcessingBuffer = false;
@@ -444,19 +468,18 @@ async function processAudioQueue() {
             
             source.start(0);
             
-            // Timeout de sécurité
-            const duration = (float32Data.length / chunk.sampleRate) * 1000;
+            // Timeout de sécurité (un peu plus long que la durée réelle)
+            const durationMs = duration * 1000;
             setTimeout(() => {
-                if (!isProcessingBuffer) return;
                 isProcessingBuffer = false;
                 if (audioChunksQueue.length > 0) {
                     processAudioQueue();
                 }
-            }, duration + 100);
+            }, durationMs + 50);
             
         } else {
             // Format inconnu, ignorer
-            console.warn('⚠️ Format audio inconnu:', chunk.format);
+            console.warn('⚠️ Format audio inconnu:', chunk.format, chunk);
             isProcessingBuffer = false;
             if (audioChunksQueue.length > 0) {
                 setTimeout(() => processAudioQueue(), 10);

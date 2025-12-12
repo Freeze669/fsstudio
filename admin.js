@@ -49,6 +49,7 @@ let audioChunks = [];
 let streamInterval = null;
 let chunksSentCount = 0;
 let lastSentTime = null;
+let scriptProcessor = null;
 
 // Vérifier si déjà connecté
 function checkAuth() {
@@ -410,10 +411,17 @@ function initRadioEvents() {
             
             // Utiliser ScriptProcessorNode pour capturer l'audio brut et le convertir en PCM
             const bufferSize = 4096;
-            const scriptProcessor = audioContext.createScriptProcessor(bufferSize, 1, 1);
+            scriptProcessor = audioContext.createScriptProcessor(bufferSize, 1, 1);
+            
+            let lastSendTime = 0;
+            const sendInterval = 100; // Envoyer toutes les 100ms
             
             scriptProcessor.onaudioprocess = (event) => {
                 if (!isStreaming) return;
+                
+                const now = Date.now();
+                if (now - lastSendTime < sendInterval) return; // Limiter l'envoi
+                lastSendTime = now;
                 
                 const inputData = event.inputBuffer.getChannelData(0);
                 const outputData = event.outputBuffer.getChannelData(0);
@@ -431,8 +439,13 @@ function initRadioEvents() {
                     int16Data[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
                 }
                 
-                // Convertir en base64
-                const base64Audio = btoa(String.fromCharCode.apply(null, new Uint8Array(int16Data.buffer)));
+                // Convertir en base64 (méthode plus fiable)
+                const uint8Array = new Uint8Array(int16Data.buffer);
+                let binary = '';
+                for (let i = 0; i < uint8Array.length; i++) {
+                    binary += String.fromCharCode(uint8Array[i]);
+                }
+                const base64Audio = btoa(binary);
                 const timestamp = Date.now();
                 
                 // Envoyer le chunk audio à Firebase
@@ -440,7 +453,8 @@ function initRadioEvents() {
                     data: base64Audio,
                     timestamp: timestamp,
                     sampleRate: audioContext.sampleRate,
-                    format: 'pcm16'
+                    format: 'pcm16',
+                    bufferSize: inputData.length
                 }).then(() => {
                     chunksSentCount++;
                     lastSentTime = new Date();
@@ -453,7 +467,7 @@ function initRadioEvents() {
                     }
                     
                     // Nettoyer les anciens chunks (plus de 3 secondes)
-                    if (chunksSentCount % 10 === 0) {
+                    if (chunksSentCount % 20 === 0) {
                         const cleanupTime = Date.now() - 3000;
                         database.ref('radio/audioChunks').orderByKey().once('value', (snapshot) => {
                             snapshot.forEach((child) => {
@@ -474,12 +488,14 @@ function initRadioEvents() {
             scriptProcessor.connect(audioContext.destination);
             
             console.log('✅ ScriptProcessor initialisé pour capture audio PCM');
+            console.log(`   Sample rate: ${audioContext.sampleRate}Hz, Buffer: ${bufferSize}`);
             
             // Mettre à jour l'état dans Firebase
             database.ref(FIREBASE_RADIO_STATUS_PATH).set({
                 isLive: true,
                 startedAt: new Date().toISOString(),
-                mimeType: options.mimeType
+                sampleRate: audioContext.sampleRate,
+                format: 'pcm16'
             });
             
             // Afficher les contrôles
@@ -507,7 +523,15 @@ function initRadioEvents() {
 
     // Arrêter la diffusion vocale
     stopVoiceBtn.addEventListener('click', () => {
-        // ScriptProcessor s'arrêtera automatiquement quand isStreaming = false
+        // Déconnecter le script processor
+        if (scriptProcessor) {
+            try {
+                scriptProcessor.disconnect();
+                scriptProcessor = null;
+            } catch (e) {
+                console.error('Erreur déconnexion scriptProcessor:', e);
+            }
+        }
         
         if (mediaStream) {
             mediaStream.getTracks().forEach(track => track.stop());
