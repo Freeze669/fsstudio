@@ -444,66 +444,72 @@ function initRadioEvents() {
             let targetPeak = 0.7; // Niveau cible (70% pour éviter la saturation)
             
             scriptProcessor.onaudioprocess = (event) => {
+                const inputData = event.inputBuffer.getChannelData(0);
+                const outputData = event.outputBuffer.getChannelData(0);
+                
+                // Toujours mettre du silence en output pour éviter l'écho
+                for (let i = 0; i < outputData.length; i++) {
+                    outputData[i] = 0;
+                }
+                
                 if (!isStreaming) {
-                    // Même si pas en streaming, copier l'input vers l'output pour éviter les erreurs
-                    const inputData = event.inputBuffer.getChannelData(0);
-                    const outputData = event.outputBuffer.getChannelData(0);
-                    for (let i = 0; i < inputData.length; i++) {
-                        outputData[i] = inputData[i];
-                    }
                     return;
                 }
                 
                 const now = Date.now();
                 if (now - lastSendTime < sendInterval) {
-                    // Copier quand même l'input vers l'output
-                    const inputData = event.inputBuffer.getChannelData(0);
-                    const outputData = event.outputBuffer.getChannelData(0);
-                    for (let i = 0; i < inputData.length; i++) {
-                        outputData[i] = inputData[i];
-                    }
                     return; // Limiter l'envoi
                 }
                 lastSendTime = now;
-                
-                const inputData = event.inputBuffer.getChannelData(0);
-                const outputData = event.outputBuffer.getChannelData(0);
-                
-                console.log('📤 ScriptProcessor déclenché, données reçues:', inputData.length, 'échantillons');
                 
                 // Traitement audio amélioré
                 let maxAmplitude = 0;
                 const processedData = new Float32Array(inputData.length);
                 
-                // 1. Suppression de bruit (noise gate)
+                // 1. Calculer l'amplitude maximale d'abord
                 for (let i = 0; i < inputData.length; i++) {
-                    const absValue = Math.abs(inputData[i]);
-                    if (absValue > noiseGateThreshold) {
-                        processedData[i] = inputData[i];
-                        maxAmplitude = Math.max(maxAmplitude, absValue);
-                    } else {
-                        processedData[i] = 0; // Supprimer le bruit de fond
-                    }
+                    maxAmplitude = Math.max(maxAmplitude, Math.abs(inputData[i]));
                 }
                 
-                // 2. Normalisation dynamique (éviter la saturation)
-                if (maxAmplitude > 0) {
-                    // Ajuster le niveau pour éviter la saturation
-                    const gain = Math.min(targetPeak / maxAmplitude, 2.0); // Gain max 2x
-                    
-                    for (let i = 0; i < processedData.length; i++) {
-                        processedData[i] *= gain;
-                        // Limiter à -1.0 / 1.0 (hard limiter pour éviter la saturation)
-                        processedData[i] = Math.max(-1.0, Math.min(1.0, processedData[i]));
-                    }
-                    
-                    // Mettre à jour le niveau de crête pour la normalisation adaptative
-                    peakLevel = maxAmplitude * gain;
+                // 2. Si pas assez de son, ne pas traiter
+                if (maxAmplitude < noiseGateThreshold * 2) {
+                    return; // Pas assez de son, ignorer
                 }
                 
-                // Copier vers l'output
-                for (let i = 0; i < processedData.length; i++) {
-                    outputData[i] = processedData[i];
+                // 3. Traitement audio amélioré
+                // Normalisation douce (éviter la saturation)
+                const gain = Math.min(targetPeak / maxAmplitude, 1.5); // Gain max 1.5x pour éviter la distorsion
+                
+                for (let i = 0; i < inputData.length; i++) {
+                    let sample = inputData[i];
+                    
+                    // Suppression de bruit douce (pas de gate brutal)
+                    const absValue = Math.abs(sample);
+                    if (absValue < noiseGateThreshold) {
+                        // Réduire progressivement au lieu de couper brutalement
+                        sample *= (absValue / noiseGateThreshold) * 0.3;
+                    }
+                    
+                    // Appliquer le gain
+                    sample *= gain;
+                    
+                    // Soft limiter (plus doux que hard limiter)
+                    if (sample > 0.95) {
+                        sample = 0.95 + (sample - 0.95) * 0.1; // Compression douce
+                    } else if (sample < -0.95) {
+                        sample = -0.95 + (sample + 0.95) * 0.1;
+                    }
+                    
+                    // Limiter final (sécurité)
+                    processedData[i] = Math.max(-1.0, Math.min(1.0, sample));
+                }
+                
+                peakLevel = maxAmplitude * gain;
+                
+                // NE PAS copier vers l'output pour éviter l'écho
+                // Remplir avec du silence
+                for (let i = 0; i < outputData.length; i++) {
+                    outputData[i] = 0; // Silence pour éviter l'écho
                 }
                 
                 // Convertir les données PCM traitées en Int16 pour transmission
@@ -514,21 +520,32 @@ function initRadioEvents() {
                     int16Data[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
                 }
                 
-                // Convertir en base64 (méthode plus fiable)
+                // Convertir en base64 (méthode optimisée pour grandes chaînes)
                 const uint8Array = new Uint8Array(int16Data.buffer);
-                let binary = '';
-                for (let i = 0; i < uint8Array.length; i++) {
-                    binary += String.fromCharCode(uint8Array[i]);
-                }
-                const base64Audio = btoa(binary);
                 const timestamp = Date.now();
                 
-                // Vérifier qu'il y a du son (pas seulement du silence)
-                if (maxAmplitude < noiseGateThreshold) {
-                    // Pas de son, ne pas envoyer
-                    for (let i = 0; i < inputData.length; i++) {
-                        outputData[i] = processedData[i];
+                // Utiliser une méthode plus efficace pour la conversion base64
+                let base64Audio;
+                try {
+                    // Méthode optimisée pour grandes chaînes
+                    const chunkSize = 8192; // Traiter par chunks pour éviter les erreurs
+                    let binary = '';
+                    
+                    for (let i = 0; i < uint8Array.length; i += chunkSize) {
+                        const chunk = uint8Array.slice(i, i + chunkSize);
+                        binary += String.fromCharCode.apply(null, chunk);
                     }
+                    
+                    base64Audio = btoa(binary);
+                } catch (btoaError) {
+                    console.error('❌ Erreur conversion base64:', btoaError);
+                    // Fallback : méthode alternative
+                    base64Audio = btoa(String.fromCharCode.apply(null, uint8Array));
+                }
+                
+                // Vérifier qu'il y a du son (pas seulement du silence)
+                if (maxAmplitude < noiseGateThreshold * 2) {
+                    // Pas assez de son, ne pas envoyer
                     return;
                 }
                 
@@ -570,13 +587,13 @@ function initRadioEvents() {
                 });
             };
             
-            // Créer un gainNode avec volume 0 pour éviter l'écho mais activer le scriptProcessor
+            // Créer un gainNode silencieux pour activer le scriptProcessor sans écho
             const silentGain = audioContext.createGain();
-            silentGain.gain.value = 0; // Volume à 0 pour éviter l'écho
+            silentGain.gain.value = 0.0001; // Volume presque à 0 (mais pas 0 pour activer le node)
             
             // Connecter le script processor après le compressor (pour capturer l'audio traité)
             compressor.connect(scriptProcessor);
-            // Connecter à destination via un gain silencieux (nécessaire pour activer scriptProcessor)
+            // Connecter à un gain silencieux puis à destination (nécessaire pour activer scriptProcessor)
             scriptProcessor.connect(silentGain);
             silentGain.connect(audioContext.destination);
             

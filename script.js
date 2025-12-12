@@ -496,7 +496,7 @@ async function processAudioQueue() {
                 await audioContextListener.resume();
             }
             
-            // S'assurer que le gainNode existe
+            // S'assurer que le gainNode existe et est connecté
             if (!gainNode) {
                 gainNode = audioContextListener.createGain();
                 gainNode.gain.value = currentVolume;
@@ -504,14 +504,21 @@ async function processAudioQueue() {
                 console.log('✅ GainNode créé avec volume:', currentVolume);
             }
             
+            // Vérifier que le gainNode est bien connecté
+            if (gainNode.gain.value === 0) {
+                gainNode.gain.value = currentVolume;
+                console.log('⚠️ Volume était à 0, réglé à:', currentVolume);
+            }
+            
             // Créer une source audio et jouer via le gainNode (pour le volume)
             const source = audioContextListener.createBufferSource();
             source.buffer = audioBuffer;
-            source.connect(gainNode); // Connecter au gainNode au lieu de destination directement
+            source.connect(gainNode);
             
             updateAudioStatus(true, `Lecture: ${chunksReceivedCount} chunks`);
             const duration = audioBuffer.duration;
-            console.log(`🔊 Chunk PCM décodé et joué (${float32Data.length} échantillons, ${chunk.sampleRate}Hz, ${duration.toFixed(3)}s)`);
+            console.log(`🔊 Chunk PCM décodé (${float32Data.length} échantillons, ${chunk.sampleRate}Hz, ${duration.toFixed(3)}s)`);
+            console.log(`   Volume: ${(currentVolume * 100).toFixed(0)}%, GainNode: ${gainNode.gain.value}`);
             
             // Quand la lecture est terminée
             source.onended = () => {
@@ -535,29 +542,39 @@ async function processAudioQueue() {
             };
             
             try {
-                // Vérifier que le contexte est prêt
-                if (audioContextListener.state === 'running') {
-                    source.start(0);
-                    console.log('✅ Source audio démarrée (contexte running)');
-                } else {
-                    // Attendre que le contexte soit prêt
-                    audioContextListener.resume().then(() => {
+                // Toujours essayer de démarrer
+                source.start(0);
+                console.log('✅ Source audio démarrée, durée:', duration.toFixed(3), 's');
+                
+                // Vérifier après un court délai si ça joue vraiment
+                setTimeout(() => {
+                    if (audioContextListener.state !== 'running') {
+                        console.warn('⚠️ Contexte audio suspendu, tentative de reprise...');
+                        audioContextListener.resume();
+                    }
+                }, 100);
+                
+            } catch (startError) {
+                console.error('❌ Erreur démarrage source:', startError);
+                // Essayer de reprendre le contexte et réessayer
+                audioContextListener.resume().then(() => {
+                    try {
                         source.start(0);
-                        console.log('✅ Source audio démarrée (contexte résumé)');
-                    }).catch(err => {
-                        console.error('❌ Erreur résumé contexte:', err);
+                        console.log('✅ Source démarrée après reprise');
+                    } catch (retryError) {
+                        console.error('❌ Erreur même après reprise:', retryError);
                         isProcessingBuffer = false;
                         if (audioChunksQueue.length > 0) {
                             setTimeout(() => processAudioQueue(), 10);
                         }
-                    });
-                }
-            } catch (startError) {
-                console.error('❌ Erreur démarrage source:', startError);
-                isProcessingBuffer = false;
-                if (audioChunksQueue.length > 0) {
-                    setTimeout(() => processAudioQueue(), 10);
-                }
+                    }
+                }).catch(err => {
+                    console.error('❌ Erreur résumé contexte:', err);
+                    isProcessingBuffer = false;
+                    if (audioChunksQueue.length > 0) {
+                        setTimeout(() => processAudioQueue(), 10);
+                    }
+                });
             }
             
             // Timeout de sécurité (un peu plus long que la durée réelle)
