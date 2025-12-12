@@ -173,10 +173,13 @@ function startListeningToAudio() {
     
     console.log('🎧 Démarrage de l\'écoute de la diffusion vocale...');
     
-    // Créer/réinitialiser le contexte audio pour la lecture
+    // Créer/réinitialiser le contexte audio pour la lecture avec qualité optimale
     if (!audioContextListener || audioContextListener.state === 'closed') {
-        audioContextListener = new (window.AudioContext || window.webkitAudioContext)();
-        console.log('✅ Nouveau contexte audio créé, état:', audioContextListener.state);
+        audioContextListener = new (window.AudioContext || window.webkitAudioContext)({
+            sampleRate: 48000, // Qualité supérieure (48kHz comme les appels)
+            latencyHint: 'interactive' // Latence minimale
+        });
+        console.log('✅ Nouveau contexte audio créé:', audioContextListener.sampleRate, 'Hz, état:', audioContextListener.state);
     }
     
     // Créer le gainNode si nécessaire
@@ -481,11 +484,13 @@ async function processAudioQueue() {
                 float32Data[i] = int16Data[i] / 32768.0;
             }
             
-            // Créer un AudioBuffer
+            // Créer un AudioBuffer avec qualité optimale
+            // Utiliser le sample rate du chunk ou celui du contexte (48kHz)
+            const targetSampleRate = chunk.sampleRate || audioContextListener.sampleRate;
             const audioBuffer = audioContextListener.createBuffer(
                 1, // 1 canal (mono)
                 float32Data.length,
-                chunk.sampleRate
+                targetSampleRate
             );
             
             // Copier les données

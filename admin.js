@@ -388,13 +388,21 @@ function initRadioEvents() {
     // Démarrer la diffusion vocale
     startVoiceBtn.addEventListener('click', async () => {
         try {
-            // Demander l'accès au microphone
+            // Demander l'accès au microphone avec qualité optimale
             mediaStream = await navigator.mediaDevices.getUserMedia({ 
                 audio: {
                     echoCancellation: true,
                     noiseSuppression: true,
                     autoGainControl: true,
-                    sampleRate: 44100
+                    sampleRate: 48000, // Qualité supérieure (48kHz comme les appels)
+                    channelCount: 1, // Mono pour la voix
+                    latency: 0.01, // Latence minimale
+                    googEchoCancellation: true,
+                    googAutoGainControl: true,
+                    googNoiseSuppression: true,
+                    googHighpassFilter: true,
+                    googTypingNoiseDetection: true,
+                    googNoiseReduction: true
                 } 
             });
             
@@ -407,41 +415,65 @@ function initRadioEvents() {
             const bufferLength = analyser.frequencyBinCount;
             dataArray = new Uint8Array(bufferLength);
             
-            // Créer des filtres audio pour améliorer la qualité
+            // Créer des filtres audio professionnels pour qualité vocale optimale
             const compressor = audioContext.createDynamicsCompressor();
-            compressor.threshold.value = -24; // Seuil de compression
+            compressor.threshold.value = -20; // Seuil ajusté pour voix
             compressor.knee.value = 30; // Zone de transition douce
-            compressor.ratio.value = 12; // Ratio de compression (12:1)
-            compressor.attack.value = 0.003; // Temps d'attaque rapide
-            compressor.release.value = 0.25; // Temps de relâchement
+            compressor.ratio.value = 4; // Ratio modéré (4:1) pour son naturel
+            compressor.attack.value = 0.001; // Attaque très rapide
+            compressor.release.value = 0.15; // Relâchement rapide
             
+            // High-pass filter pour supprimer les basses (bruit, vent, vibrations)
             const highPassFilter = audioContext.createBiquadFilter();
             highPassFilter.type = 'highpass';
-            highPassFilter.frequency.value = 80; // Supprimer les basses fréquences (bruit)
-            highPassFilter.Q.value = 1; // Qualité du filtre
+            highPassFilter.frequency.value = 100; // Fréquence optimale pour voix
+            highPassFilter.Q.value = 0.7; // Qualité douce
             
+            // Low-pass filter pour supprimer les hautes fréquences (bruit, sifflements)
             const lowPassFilter = audioContext.createBiquadFilter();
             lowPassFilter.type = 'lowpass';
-            lowPassFilter.frequency.value = 8000; // Supprimer les hautes fréquences (bruit)
-            lowPassFilter.Q.value = 1; // Qualité du filtre
+            lowPassFilter.frequency.value = 12000; // Garder plus de fréquences vocales
+            lowPassFilter.Q.value = 0.7; // Qualité douce
             
-            // Connecter les filtres en chaîne : microphone -> highpass -> lowpass -> compressor -> analyser
-            microphone.connect(highPassFilter);
-            highPassFilter.connect(lowPassFilter);
-            lowPassFilter.connect(compressor);
+            // Égaliseur pour améliorer la clarté vocale (fréquences 300Hz - 3.4kHz)
+            const eq1 = audioContext.createBiquadFilter(); // Boost fréquences vocales
+            eq1.type = 'peaking';
+            eq1.frequency.value = 2000; // Fréquence centrale de la voix
+            eq1.gain.value = 3; // Légère amplification des fréquences vocales
+            eq1.Q.value = 1.5;
+            
+            const eq2 = audioContext.createBiquadFilter(); // Réduction des fréquences problématiques
+            eq2.type = 'notch';
+            eq2.frequency.value = 60; // Supprimer le ronflement 50/60Hz
+            eq2.Q.value = 10;
+            
+            const eq3 = audioContext.createBiquadFilter(); // Amélioration des aigus
+            eq3.type = 'highshelf';
+            eq3.frequency.value = 5000;
+            eq3.gain.value = 2; // Légère amélioration des aigus pour clarté
+            eq3.Q.value = 0.7;
+            
+            // Connecter les filtres en chaîne optimisée pour qualité vocale
+            microphone.connect(eq2); // D'abord supprimer le ronflement 60Hz
+            eq2.connect(highPassFilter); // Ensuite high-pass
+            highPassFilter.connect(eq1); // Boost fréquences vocales
+            eq1.connect(lowPassFilter); // Low-pass
+            lowPassFilter.connect(eq3); // Amélioration aigus
+            eq3.connect(compressor); // Compression finale
             compressor.connect(analyser);
             
-            // Utiliser ScriptProcessorNode pour capturer l'audio brut et le convertir en PCM
-            const bufferSize = 4096;
+            // Utiliser ScriptProcessorNode avec buffer optimisé pour qualité vocale
+            const bufferSize = 2048; // Buffer plus petit pour latence réduite
             scriptProcessor = audioContext.createScriptProcessor(bufferSize, 1, 1);
             
             let lastSendTime = 0;
-            const sendInterval = 100; // Envoyer toutes les 100ms
+            const sendInterval = 80; // Envoyer toutes les 80ms pour meilleure qualité
             
-            // Variables pour la normalisation et suppression de bruit
-            let noiseGateThreshold = 0.01; // Seuil pour supprimer le bruit de fond
+            // Variables pour la normalisation et suppression de bruit (optimisées pour voix)
+            let noiseGateThreshold = 0.005; // Seuil plus bas pour capturer la voix douce
             let peakLevel = 0;
-            let targetPeak = 0.7; // Niveau cible (70% pour éviter la saturation)
+            let targetPeak = 0.75; // Niveau cible optimisé (75% pour qualité vocale)
+            let adaptiveGain = 1.0; // Gain adaptatif pour normalisation douce
             
             scriptProcessor.onaudioprocess = (event) => {
                 const inputData = event.inputBuffer.getChannelData(0);
@@ -466,42 +498,51 @@ function initRadioEvents() {
                 let maxAmplitude = 0;
                 const processedData = new Float32Array(inputData.length);
                 
-                // 1. Calculer l'amplitude maximale d'abord
+                // 1. Calculer l'amplitude RMS (Root Mean Square) pour meilleure détection
+                let sumSquares = 0;
                 for (let i = 0; i < inputData.length; i++) {
+                    sumSquares += inputData[i] * inputData[i];
                     maxAmplitude = Math.max(maxAmplitude, Math.abs(inputData[i]));
                 }
+                const rms = Math.sqrt(sumSquares / inputData.length);
                 
                 // 2. Si pas assez de son, ne pas traiter
-                if (maxAmplitude < noiseGateThreshold * 2) {
+                if (rms < noiseGateThreshold && maxAmplitude < noiseGateThreshold * 3) {
                     return; // Pas assez de son, ignorer
                 }
                 
-                // 3. Traitement audio amélioré
-                // Normalisation douce (éviter la saturation)
-                const gain = Math.min(targetPeak / maxAmplitude, 1.5); // Gain max 1.5x pour éviter la distorsion
+                // 3. Gain adaptatif (s'ajuste progressivement)
+                const targetGain = targetPeak / Math.max(maxAmplitude, 0.1);
+                adaptiveGain = adaptiveGain * 0.9 + targetGain * 0.1; // Lissage du gain
+                const gain = Math.min(adaptiveGain, 1.8); // Gain max 1.8x
                 
+                // 4. Traitement audio haute qualité pour voix
                 for (let i = 0; i < inputData.length; i++) {
                     let sample = inputData[i];
                     
-                    // Suppression de bruit douce (pas de gate brutal)
+                    // Suppression de bruit adaptative (basée sur RMS)
                     const absValue = Math.abs(sample);
                     if (absValue < noiseGateThreshold) {
-                        // Réduire progressivement au lieu de couper brutalement
-                        sample *= (absValue / noiseGateThreshold) * 0.3;
+                        // Réduction progressive du bruit
+                        const reduction = Math.pow(absValue / noiseGateThreshold, 2) * 0.2;
+                        sample *= reduction;
                     }
                     
-                    // Appliquer le gain
+                    // Appliquer le gain adaptatif
                     sample *= gain;
                     
-                    // Soft limiter (plus doux que hard limiter)
-                    if (sample > 0.95) {
-                        sample = 0.95 + (sample - 0.95) * 0.1; // Compression douce
-                    } else if (sample < -0.95) {
-                        sample = -0.95 + (sample + 0.95) * 0.1;
+                    // Soft knee limiter (transition douce)
+                    const threshold = 0.85;
+                    if (sample > threshold) {
+                        const excess = sample - threshold;
+                        sample = threshold + excess / (1 + excess * 5); // Compression douce
+                    } else if (sample < -threshold) {
+                        const excess = Math.abs(sample) - threshold;
+                        sample = -(threshold + excess / (1 + excess * 5));
                     }
                     
-                    // Limiter final (sécurité)
-                    processedData[i] = Math.max(-1.0, Math.min(1.0, sample));
+                    // Limiter final (sécurité absolue)
+                    processedData[i] = Math.max(-0.98, Math.min(0.98, sample));
                 }
                 
                 peakLevel = maxAmplitude * gain;
@@ -597,7 +638,12 @@ function initRadioEvents() {
             scriptProcessor.connect(silentGain);
             silentGain.connect(audioContext.destination);
             
-            console.log('✅ Filtres audio activés: High-pass (80Hz), Low-pass (8kHz), Compresseur');
+            console.log('✅ Filtres audio professionnels activés:');
+            console.log('   - High-pass: 100Hz (suppression basses)');
+            console.log('   - Low-pass: 12kHz (conservation fréquences vocales)');
+            console.log('   - Égaliseur: Boost 2kHz, Amélioration aigus 5kHz');
+            console.log('   - Compresseur: Ratio 4:1 (son naturel)');
+            console.log('   - Sample rate: 48kHz (qualité appel)');
             
             console.log('✅ ScriptProcessor initialisé pour capture audio PCM');
             console.log(`   Sample rate: ${audioContext.sampleRate}Hz, Buffer: ${bufferSize}`);
