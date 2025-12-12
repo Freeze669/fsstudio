@@ -35,6 +35,7 @@ let loadedMessageIds = new Set();
 // Variables Radio/Streaming (initialisées après chargement)
 let startVoiceBtn, stopVoiceBtn;
 let voiceInfo, audioLevel, voiceStatusText, radioStatusIndicator, radioStatusText, listenersCount;
+let streamStats, chunksSent, lastSent;
 
 let mediaStream = null;
 let audioContext = null;
@@ -46,6 +47,8 @@ let isStreaming = false;
 let mediaRecorder = null;
 let audioChunks = [];
 let streamInterval = null;
+let chunksSentCount = 0;
+let lastSentTime = null;
 
 // Vérifier si déjà connecté
 function checkAuth() {
@@ -80,6 +83,9 @@ function showAdmin() {
     radioStatusIndicator = document.getElementById('radioStatusIndicator');
     radioStatusText = document.getElementById('radioStatusText');
     listenersCount = document.getElementById('listenersCount');
+    streamStats = document.getElementById('streamStats');
+    chunksSent = document.getElementById('chunksSent');
+    lastSent = document.getElementById('lastSent');
     
     connectToFirebase();
     initRadio();
@@ -448,7 +454,17 @@ function initRadioEvents() {
                                 timestamp: timestamp,
                                 mimeType: options.mimeType || 'audio/webm'
                             }).then(() => {
-                                console.log(`✅ Chunk envoyé: ${timestamp}, taille: ${base64Audio.length} chars`);
+                                chunksSentCount++;
+                                lastSentTime = new Date();
+                                
+                                // Mettre à jour les stats
+                                if (chunksSent) chunksSent.textContent = chunksSentCount;
+                                if (lastSent) {
+                                    const timeStr = lastSentTime.toLocaleTimeString();
+                                    lastSent.textContent = timeStr;
+                                }
+                                
+                                console.log(`✅ Chunk envoyé: ${timestamp}, taille: ${base64Audio.length} chars, total: ${chunksSentCount}`);
                                 
                                 // Nettoyer les anciens chunks (plus de 3 secondes)
                                 const cleanupTime = Date.now() - 3000;
@@ -462,6 +478,7 @@ function initRadioEvents() {
                                 });
                             }).catch((error) => {
                                 console.error('❌ Erreur envoi chunk:', error);
+                                voiceStatusText.textContent = '❌ Erreur d\'envoi - Vérifiez la connexion Firebase';
                             });
                         } catch (error) {
                             console.error('❌ Erreur traitement chunk:', error);
@@ -496,7 +513,9 @@ function initRadioEvents() {
             startVoiceBtn.style.display = 'none';
             stopVoiceBtn.style.display = 'inline-flex';
             voiceInfo.style.display = 'block';
+            streamStats.style.display = 'block';
             isStreaming = true;
+            chunksSentCount = 0;
             
             // Démarrer l'animation du niveau audio
             updateAudioLevel();

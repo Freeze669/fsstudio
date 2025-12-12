@@ -647,6 +647,34 @@ body {
     line-height: 1.6;
 }
 
+.stream-stats {
+    margin-top: 12px;
+    padding: 12px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 6px;
+    font-size: 12px;
+}
+
+.stat-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 6px;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.stat-row:last-child {
+    margin-bottom: 0;
+}
+
+.stat-row span:first-child {
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.stat-row span:last-child {
+    font-weight: 600;
+    color: #43b581;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     .admin-header {

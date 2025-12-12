@@ -88,6 +88,8 @@ let isPlayingAudio = false;
 let lastChunkTimestamp = 0;
 let audioContextListener = null;
 let audioSource = null;
+let chunksReceivedCount = 0;
+let lastReceivedTime = null;
 
 // Charger et jouer les chunks audio depuis Firebase
 function loadRadioStream() {
@@ -205,6 +207,8 @@ function startListeningToAudio() {
         }
     });
     
+    chunksReceivedCount = 0;
+    updateAudioStatus(false, 'En attente des chunks...');
     console.log('✅ Écoute de la diffusion vocale démarrée');
 }
 
@@ -240,6 +244,12 @@ function stopListeningToAudio() {
 // Jouer un chunk audio
 function playAudioChunk(base64Data, mimeType) {
     try {
+        chunksReceivedCount++;
+        lastReceivedTime = new Date();
+        
+        // Mettre à jour le statut visuel
+        updateAudioStatus(true);
+        
         // Ajouter à la queue pour une lecture plus fluide
         audioChunksQueue.push({ data: base64Data, mimeType: mimeType || 'audio/webm' });
         
@@ -248,14 +258,39 @@ function playAudioChunk(base64Data, mimeType) {
             processAudioQueue();
         }
         
+        console.log(`🎵 Chunk reçu et ajouté à la queue (total: ${chunksReceivedCount})`);
+        
     } catch (error) {
         console.error('Erreur traitement chunk audio:', error);
+        updateAudioStatus(false, 'Erreur traitement');
+    }
+}
+
+// Mettre à jour le statut audio visuel
+function updateAudioStatus(isReceiving, message = null) {
+    const audioStatus = document.getElementById('audioStatus');
+    const statusDot = document.getElementById('statusDot');
+    const audioStatusText = document.getElementById('audioStatusText');
+    
+    if (!audioStatus || !statusDot || !audioStatusText) return;
+    
+    audioStatus.style.display = 'flex';
+    
+    if (isReceiving) {
+        statusDot.style.background = '#43b581';
+        audioStatusText.textContent = message || `Reçu: ${chunksReceivedCount} chunks`;
+    } else {
+        statusDot.style.background = '#f04747';
+        audioStatusText.textContent = message || 'Aucun signal';
     }
 }
 
 // Traiter la queue audio
 function processAudioQueue() {
-    if (audioChunksQueue.length === 0) return;
+    if (audioChunksQueue.length === 0) {
+        updateAudioStatus(false, 'Queue vide - En attente...');
+        return;
+    }
     
     const chunk = audioChunksQueue.shift();
     
@@ -276,31 +311,48 @@ function processAudioQueue() {
         // Volume à 100%
         audio.volume = 1.0;
         
+        // Gérer les erreurs de format
+        audio.addEventListener('error', (e) => {
+            console.error('❌ Erreur format audio:', e, 'Type:', chunk.mimeType);
+            URL.revokeObjectURL(audioUrl);
+            updateAudioStatus(false, 'Erreur format audio');
+            // Continuer avec le prochain chunk
+            if (audioChunksQueue.length > 0) {
+                setTimeout(() => processAudioQueue(), 50);
+            }
+        });
+        
         // Jouer le chunk
         audio.play().then(() => {
+            updateAudioStatus(true, `Lecture: ${chunksReceivedCount} chunks reçus`);
+            console.log('🔊 Chunk audio joué');
+            
             // Quand le chunk est terminé, jouer le suivant
             audio.addEventListener('ended', () => {
                 URL.revokeObjectURL(audioUrl);
                 // Continuer avec le prochain chunk
                 if (audioChunksQueue.length > 0) {
-                    setTimeout(() => processAudioQueue(), 50); // Petit délai pour fluidité
+                    setTimeout(() => processAudioQueue(), 10); // Délai réduit pour fluidité
+                } else {
+                    updateAudioStatus(false, 'En attente de nouveaux chunks...');
                 }
             });
             
-            // Si le chunk ne se termine pas (problème de format), passer au suivant après 600ms
+            // Si le chunk ne se termine pas (problème de format), passer au suivant après 500ms
             setTimeout(() => {
-                if (!audio.ended) {
+                if (!audio.ended && audio.readyState >= 2) {
                     audio.pause();
                     URL.revokeObjectURL(audioUrl);
                     if (audioChunksQueue.length > 0) {
                         processAudioQueue();
                     }
                 }
-            }, 600);
+            }, 500);
             
         }).catch(err => {
-            console.error('Erreur lecture chunk:', err);
+            console.error('❌ Erreur lecture chunk:', err);
             URL.revokeObjectURL(audioUrl);
+            updateAudioStatus(false, 'Erreur de lecture');
             // Continuer avec le prochain chunk même en cas d'erreur
             if (audioChunksQueue.length > 0) {
                 setTimeout(() => processAudioQueue(), 50);
@@ -308,7 +360,8 @@ function processAudioQueue() {
         });
         
     } catch (error) {
-        console.error('Erreur traitement chunk:', error);
+        console.error('❌ Erreur traitement chunk:', error);
+        updateAudioStatus(false, 'Erreur traitement');
         // Continuer avec le prochain chunk
         if (audioChunksQueue.length > 0) {
             setTimeout(() => processAudioQueue(), 50);
