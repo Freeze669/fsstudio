@@ -90,6 +90,8 @@ let audioContextListener = null;
 let audioSource = null;
 let chunksReceivedCount = 0;
 let lastReceivedTime = null;
+let gainNode = null; // Pour contrôler le volume
+let currentVolume = 1.0; // Volume par défaut à 100%
 
 // Charger et jouer les chunks audio depuis Firebase
 function loadRadioStream() {
@@ -174,6 +176,13 @@ function startListeningToAudio() {
     // Créer/réinitialiser le contexte audio pour la lecture
     if (!audioContextListener || audioContextListener.state === 'closed') {
         audioContextListener = new (window.AudioContext || window.webkitAudioContext)();
+        
+        // Créer un GainNode pour contrôler le volume
+        gainNode = audioContextListener.createGain();
+        gainNode.gain.value = currentVolume;
+        gainNode.connect(audioContextListener.destination);
+        
+        console.log('✅ Contexte audio créé avec contrôle de volume');
     }
     
     // Reprendre le contexte si suspendu (nécessaire après interaction utilisateur)
@@ -181,6 +190,13 @@ function startListeningToAudio() {
         audioContextListener.resume().then(() => {
             console.log('✅ Contexte audio repris');
         });
+    }
+    
+    // S'assurer que le gainNode existe
+    if (!gainNode) {
+        gainNode = audioContextListener.createGain();
+        gainNode.gain.value = currentVolume;
+        gainNode.connect(audioContextListener.destination);
     }
     
     // Initialiser MediaSource pour le streaming
@@ -271,6 +287,21 @@ function startListeningToAudio() {
     
     chunksReceivedCount = 0;
     updateAudioStatus(false, 'En attente des chunks...');
+    
+    // S'assurer que le contexte audio est actif (nécessaire pour certains navigateurs)
+    if (audioContextListener.state === 'suspended') {
+        // Activer le contexte avec une interaction utilisateur
+        const resumeAudio = () => {
+            audioContextListener.resume().then(() => {
+                console.log('✅ Contexte audio activé');
+                document.removeEventListener('click', resumeAudio);
+                document.removeEventListener('touchstart', resumeAudio);
+            });
+        };
+        document.addEventListener('click', resumeAudio, { once: true });
+        document.addEventListener('touchstart', resumeAudio, { once: true });
+    }
+    
     console.log('✅ Écoute de la diffusion vocale démarrée');
 }
 
@@ -445,10 +476,22 @@ async function processAudioQueue() {
             // Copier les données
             audioBuffer.getChannelData(0).set(float32Data);
             
-            // Créer une source audio et jouer
+            // S'assurer que le contexte est actif
+            if (audioContextListener.state === 'suspended') {
+                await audioContextListener.resume();
+            }
+            
+            // S'assurer que le gainNode existe
+            if (!gainNode) {
+                gainNode = audioContextListener.createGain();
+                gainNode.gain.value = currentVolume;
+                gainNode.connect(audioContextListener.destination);
+            }
+            
+            // Créer une source audio et jouer via le gainNode (pour le volume)
             const source = audioContextListener.createBufferSource();
             source.buffer = audioBuffer;
-            source.connect(audioContextListener.destination);
+            source.connect(gainNode); // Connecter au gainNode au lieu de destination directement
             
             updateAudioStatus(true, `Lecture: ${chunksReceivedCount} chunks`);
             const duration = audioBuffer.duration;
@@ -466,7 +509,16 @@ async function processAudioQueue() {
                 }
             };
             
-            source.start(0);
+            try {
+                source.start(0);
+                console.log('✅ Source audio démarrée');
+            } catch (startError) {
+                console.error('❌ Erreur démarrage source:', startError);
+                isProcessingBuffer = false;
+                if (audioChunksQueue.length > 0) {
+                    setTimeout(() => processAudioQueue(), 10);
+                }
+            }
             
             // Timeout de sécurité (un peu plus long que la durée réelle)
             const durationMs = duration * 1000;
@@ -495,6 +547,55 @@ async function processAudioQueue() {
             setTimeout(() => processAudioQueue(), 10);
         }
     }
+}
+
+// ============================================
+// CONTRÔLE DE VOLUME
+// ============================================
+
+const volumeBtn = document.getElementById('volumeBtn');
+const volumeSliderContainer = document.getElementById('volumeSliderContainer');
+const volumeSlider = document.getElementById('volumeSlider');
+const volumeValue = document.getElementById('volumeValue');
+
+// Charger le volume sauvegardé
+const savedVolume = localStorage.getItem('radioVolume');
+if (savedVolume !== null) {
+    currentVolume = parseFloat(savedVolume);
+    if (volumeSlider) volumeSlider.value = currentVolume * 100;
+    if (volumeValue) volumeValue.textContent = Math.round(currentVolume * 100) + '%';
+}
+
+// Toggle affichage du slider
+if (volumeBtn) {
+    volumeBtn.addEventListener('click', () => {
+        if (volumeSliderContainer) {
+            const isVisible = volumeSliderContainer.style.display !== 'none';
+            volumeSliderContainer.style.display = isVisible ? 'none' : 'flex';
+        }
+    });
+}
+
+// Changer le volume
+if (volumeSlider) {
+    volumeSlider.addEventListener('input', (e) => {
+        currentVolume = e.target.value / 100;
+        
+        // Mettre à jour le gainNode
+        if (gainNode) {
+            gainNode.gain.value = currentVolume;
+        }
+        
+        // Sauvegarder
+        localStorage.setItem('radioVolume', currentVolume);
+        
+        // Mettre à jour l'affichage
+        if (volumeValue) {
+            volumeValue.textContent = Math.round(currentVolume * 100) + '%';
+        }
+        
+        console.log(`🔊 Volume: ${Math.round(currentVolume * 100)}%`);
+    });
 }
 
 // Initialisation
