@@ -409,17 +409,33 @@ function initRadioEvents() {
             microphone.connect(analyser);
             
             // Créer le MediaRecorder pour capturer l'audio
-            const options = {
-                mimeType: 'audio/webm;codecs=opus',
-                audioBitsPerSecond: 128000
+            // Utiliser un format simple et bien supporté
+            let options = {
+                audioBitsPerSecond: 64000
             };
             
-            // Essayer différents formats
-            if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-                options.mimeType = 'audio/webm';
-                if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-                    options.mimeType = 'audio/mp4';
+            // Essayer les formats dans l'ordre de préférence
+            const supportedTypes = [
+                'audio/webm;codecs=opus',  // Meilleur pour la qualité
+                'audio/webm',              // Fallback WebM
+                'audio/ogg;codecs=opus',   // Alternative
+                ''                          // Laisser le navigateur choisir
+            ];
+            
+            let formatFound = false;
+            for (const mimeType of supportedTypes) {
+                if (!mimeType || MediaRecorder.isTypeSupported(mimeType)) {
+                    if (mimeType) {
+                        options.mimeType = mimeType;
+                    }
+                    console.log(`✅ Format sélectionné: ${mimeType || 'par défaut'}`);
+                    formatFound = true;
+                    break;
                 }
+            }
+            
+            if (!formatFound) {
+                console.warn('⚠️ Utilisation du format par défaut du navigateur');
             }
             
             mediaRecorder = new MediaRecorder(mediaStream, options);
@@ -466,8 +482,8 @@ function initRadioEvents() {
                                 
                                 console.log(`✅ Chunk envoyé: ${timestamp}, taille: ${base64Audio.length} chars, total: ${chunksSentCount}`);
                                 
-                                // Nettoyer les anciens chunks (plus de 3 secondes)
-                                const cleanupTime = Date.now() - 3000;
+                                // Nettoyer les anciens chunks (plus de 5 secondes)
+                                const cleanupTime = Date.now() - 5000;
                                 database.ref('radio/audioChunks').orderByKey().once('value', (snapshot) => {
                                     snapshot.forEach((child) => {
                                         const chunkTime = parseInt(child.key);
@@ -499,8 +515,9 @@ function initRadioEvents() {
                 console.error('❌ Erreur MediaRecorder:', event);
             };
             
-            // Démarrer l'enregistrement avec des chunks toutes les 500ms
-            mediaRecorder.start(500);
+            // Démarrer l'enregistrement avec des chunks toutes les 1000ms (1 seconde)
+            // Des chunks plus longs sont plus faciles à décoder
+            mediaRecorder.start(1000);
             
             // Mettre à jour l'état dans Firebase
             database.ref(FIREBASE_RADIO_STATUS_PATH).set({

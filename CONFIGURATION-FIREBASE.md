@@ -27,6 +27,22 @@
     "publicChat": {
       ".read": true,
       ".write": true
+    },
+    "radio": {
+      ".read": true,
+      ".write": true,
+      "audioChunks": {
+        ".read": true,
+        ".write": true
+      },
+      "status": {
+        ".read": true,
+        ".write": true
+      },
+      "listeners": {
+        ".read": true,
+        ".write": true
+      }
     }
   }
 }

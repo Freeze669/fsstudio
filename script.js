@@ -159,6 +159,18 @@ function startListeningToAudio() {
     
     console.log('🎧 Démarrage de l\'écoute de la diffusion vocale...');
     
+    // Créer/réinitialiser le contexte audio pour la lecture
+    if (!audioContextListener || audioContextListener.state === 'closed') {
+        audioContextListener = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    
+    // Reprendre le contexte si suspendu (nécessaire après interaction utilisateur)
+    if (audioContextListener.state === 'suspended') {
+        audioContextListener.resume().then(() => {
+            console.log('✅ Contexte audio repris');
+        });
+    }
+    
     // Écouter tous les nouveaux chunks audio
     const chunksRef = database.ref('radio/audioChunks');
     
@@ -169,8 +181,8 @@ function startListeningToAudio() {
             const chunkTimestamp = chunkData.timestamp || parseInt(snapshot.key);
             const age = Date.now() - chunkTimestamp;
             
-            // Ne jouer que les chunks récents (moins de 3 secondes)
-            if (chunkTimestamp > lastChunkTimestamp && age < 3000) {
+            // Ne jouer que les chunks récents (moins de 5 secondes)
+            if (chunkTimestamp > lastChunkTimestamp && age < 5000) {
                 lastChunkTimestamp = chunkTimestamp;
                 console.log(`🎵 Chunk reçu: ${chunkTimestamp}, âge: ${age}ms`);
                 playAudioChunk(chunkData.data, chunkData.mimeType || 'audio/webm');
@@ -193,7 +205,7 @@ function startListeningToAudio() {
                 }))
                 .filter(chunk => {
                     const age = now - chunk.timestamp;
-                    return chunk.timestamp > lastChunkTimestamp && age < 3000 && chunk.data;
+                    return chunk.timestamp > lastChunkTimestamp && age < 5000 && chunk.data;
                 })
                 .sort((a, b) => a.timestamp - b.timestamp);
             
@@ -285,85 +297,172 @@ function updateAudioStatus(isReceiving, message = null) {
     }
 }
 
-// Traiter la queue audio
-function processAudioQueue() {
+// Buffer audio continu pour créer un stream
+let audioBufferQueue = [];
+let isProcessingBuffer = false;
+
+// Traiter la queue audio avec accumulation de buffer
+async function processAudioQueue() {
     if (audioChunksQueue.length === 0) {
-        updateAudioStatus(false, 'Queue vide - En attente...');
+        if (audioBufferQueue.length === 0) {
+            updateAudioStatus(false, 'Queue vide - En attente...');
+        }
         return;
     }
     
-    const chunk = audioChunksQueue.shift();
+    // Accumuler plusieurs chunks avant de décoder (pour avoir un fichier complet)
+    while (audioChunksQueue.length > 0 && audioBufferQueue.length < 3) {
+        audioBufferQueue.push(audioChunksQueue.shift());
+    }
+    
+    // Si on n'a pas assez de chunks, attendre
+    if (audioBufferQueue.length < 2) {
+        setTimeout(() => processAudioQueue(), 100);
+        return;
+    }
+    
+    if (isProcessingBuffer) return;
+    isProcessingBuffer = true;
     
     try {
-        // Convertir base64 en ArrayBuffer
-        const binaryString = atob(chunk.data);
-        const bytes = new Uint8Array(binaryString.length);
-        for (let i = 0; i < binaryString.length; i++) {
-            bytes[i] = binaryString.charCodeAt(i);
-        }
+        // Combiner les chunks en un seul blob
+        const chunks = audioBufferQueue.splice(0, 3); // Prendre jusqu'à 3 chunks
+        const mimeType = chunks[0].mimeType || 'audio/webm';
         
-        // Créer un blob et le jouer
-        const blob = new Blob([bytes], { type: chunk.mimeType });
-        const audioUrl = URL.createObjectURL(blob);
-        
-        const audio = new Audio(audioUrl);
-        
-        // Volume à 100%
-        audio.volume = 1.0;
-        
-        // Gérer les erreurs de format
-        audio.addEventListener('error', (e) => {
-            console.error('❌ Erreur format audio:', e, 'Type:', chunk.mimeType);
-            URL.revokeObjectURL(audioUrl);
-            updateAudioStatus(false, 'Erreur format audio');
-            // Continuer avec le prochain chunk
-            if (audioChunksQueue.length > 0) {
-                setTimeout(() => processAudioQueue(), 50);
+        // Convertir tous les chunks en blobs
+        const blobs = chunks.map(chunk => {
+            const binaryString = atob(chunk.data);
+            const bytes = new Uint8Array(binaryString.length);
+            for (let i = 0; i < binaryString.length; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
             }
+            return new Blob([bytes], { type: mimeType });
         });
         
-        // Jouer le chunk
-        audio.play().then(() => {
-            updateAudioStatus(true, `Lecture: ${chunksReceivedCount} chunks reçus`);
-            console.log('🔊 Chunk audio joué');
-            
-            // Quand le chunk est terminé, jouer le suivant
-            audio.addEventListener('ended', () => {
-                URL.revokeObjectURL(audioUrl);
-                // Continuer avec le prochain chunk
-                if (audioChunksQueue.length > 0) {
-                    setTimeout(() => processAudioQueue(), 10); // Délai réduit pour fluidité
-                } else {
-                    updateAudioStatus(false, 'En attente de nouveaux chunks...');
-                }
-            });
-            
-            // Si le chunk ne se termine pas (problème de format), passer au suivant après 500ms
-            setTimeout(() => {
-                if (!audio.ended && audio.readyState >= 2) {
-                    audio.pause();
-                    URL.revokeObjectURL(audioUrl);
-                    if (audioChunksQueue.length > 0) {
+        // Combiner les blobs
+        const combinedBlob = new Blob(blobs, { type: mimeType });
+        
+        // Essayer de décoder avec Web Audio API
+        if (audioContextListener && audioContextListener.state !== 'closed') {
+            try {
+                const arrayBuffer = await combinedBlob.arrayBuffer();
+                const audioBuffer = await audioContextListener.decodeAudioData(arrayBuffer.slice(0));
+                
+                // Créer une source audio
+                const source = audioContextListener.createBufferSource();
+                source.buffer = audioBuffer;
+                source.connect(audioContextListener.destination);
+                
+                updateAudioStatus(true, `Lecture: ${chunksReceivedCount} chunks`);
+                console.log(`🔊 ${chunks.length} chunks décodés et joués (durée: ${audioBuffer.duration.toFixed(2)}s)`);
+                
+                // Quand la lecture est terminée
+                source.onended = () => {
+                    isProcessingBuffer = false;
+                    // Continuer avec les prochains chunks
+                    if (audioChunksQueue.length > 0 || audioBufferQueue.length > 0) {
+                        setTimeout(() => processAudioQueue(), 10);
+                    } else {
+                        updateAudioStatus(false, 'En attente de nouveaux chunks...');
+                    }
+                };
+                
+                source.start(0);
+                
+                // Timeout de sécurité
+                const duration = audioBuffer.duration * 1000;
+                setTimeout(() => {
+                    isProcessingBuffer = false;
+                    if (audioChunksQueue.length > 0 || audioBufferQueue.length > 0) {
                         processAudioQueue();
                     }
-                }
-            }, 500);
-            
-        }).catch(err => {
-            console.error('❌ Erreur lecture chunk:', err);
+                }, duration + 200);
+                
+                return;
+            } catch (decodeError) {
+                console.warn('⚠️ Erreur décodage Web Audio:', decodeError);
+                console.warn('   Taille blob:', combinedBlob.size, 'Type:', mimeType);
+            }
+        }
+        
+        // Fallback: essayer avec Audio HTML
+        const audioUrl = URL.createObjectURL(combinedBlob);
+        const audio = new Audio(audioUrl);
+        audio.volume = 1.0;
+        audio.preload = 'auto';
+        
+        // Gérer les erreurs
+        audio.addEventListener('error', (e) => {
+            console.error('❌ Erreur lecture Audio HTML:', e);
+            console.error('   Code:', audio.error?.code, 'Message:', audio.error?.message);
+            console.error('   Type:', mimeType, 'Taille:', combinedBlob.size);
             URL.revokeObjectURL(audioUrl);
-            updateAudioStatus(false, 'Erreur de lecture');
-            // Continuer avec le prochain chunk même en cas d'erreur
-            if (audioChunksQueue.length > 0) {
+            isProcessingBuffer = false;
+            updateAudioStatus(false, 'Erreur format audio');
+            // Continuer avec les prochains chunks
+            if (audioChunksQueue.length > 0 || audioBufferQueue.length > 0) {
                 setTimeout(() => processAudioQueue(), 50);
             }
         });
         
+        // Attendre que l'audio soit prêt
+        audio.addEventListener('canplaythrough', () => {
+            audio.play().then(() => {
+                updateAudioStatus(true, `Lecture: ${chunksReceivedCount} chunks`);
+                console.log(`🔊 ${chunks.length} chunks joués via Audio HTML`);
+            }).catch(err => {
+                console.error('❌ Erreur play:', err);
+                URL.revokeObjectURL(audioUrl);
+                isProcessingBuffer = false;
+                if (audioChunksQueue.length > 0 || audioBufferQueue.length > 0) {
+                    setTimeout(() => processAudioQueue(), 50);
+                }
+            });
+        });
+        
+        // Si canplaythrough ne se déclenche pas, essayer quand même après un délai
+        setTimeout(() => {
+            if (audio.readyState >= 2) {
+                audio.play().catch(err => {
+                    console.error('❌ Erreur play (timeout):', err);
+                    URL.revokeObjectURL(audioUrl);
+                    isProcessingBuffer = false;
+                    if (audioChunksQueue.length > 0 || audioBufferQueue.length > 0) {
+                        setTimeout(() => processAudioQueue(), 50);
+                    }
+                });
+            }
+        }, 200);
+        
+        // Quand le chunk est terminé
+        audio.addEventListener('ended', () => {
+            URL.revokeObjectURL(audioUrl);
+            isProcessingBuffer = false;
+            if (audioChunksQueue.length > 0 || audioBufferQueue.length > 0) {
+                setTimeout(() => processAudioQueue(), 10);
+            } else {
+                updateAudioStatus(false, 'En attente de nouveaux chunks...');
+            }
+        });
+        
+        // Timeout de sécurité
+        setTimeout(() => {
+            if (!audio.ended) {
+                audio.pause();
+                URL.revokeObjectURL(audioUrl);
+                isProcessingBuffer = false;
+                if (audioChunksQueue.length > 0 || audioBufferQueue.length > 0) {
+                    processAudioQueue();
+                }
+            }
+        }, 2000);
+        
     } catch (error) {
-        console.error('❌ Erreur traitement chunk:', error);
+        console.error('❌ Erreur traitement buffer:', error);
+        isProcessingBuffer = false;
         updateAudioStatus(false, 'Erreur traitement');
-        // Continuer avec le prochain chunk
-        if (audioChunksQueue.length > 0) {
+        // Continuer avec les prochains chunks
+        if (audioChunksQueue.length > 0 || audioBufferQueue.length > 0) {
             setTimeout(() => processAudioQueue(), 50);
         }
     }
