@@ -422,32 +422,64 @@ function initRadioEvents() {
             // Quand on reçoit des données audio
             mediaRecorder.ondataavailable = (event) => {
                 if (event.data && event.data.size > 0) {
+                    console.log(`📤 Chunk audio reçu: ${event.data.size} bytes, type: ${event.data.type}`);
+                    
                     // Convertir en base64 pour Firebase
                     const reader = new FileReader();
                     reader.onloadend = () => {
-                        const base64Audio = reader.result.split(',')[1];
-                        const timestamp = Date.now();
-                        
-                        // Envoyer le chunk audio à Firebase
-                        database.ref(`radio/audioChunks/${timestamp}`).set({
-                            data: base64Audio,
-                            timestamp: timestamp,
-                            mimeType: options.mimeType
-                        }).then(() => {
-                            // Supprimer les anciens chunks (garder seulement les 5 derniers)
-                            database.ref('radio/audioChunks').orderByKey().limitToFirst(1).once('value', (snapshot) => {
-                                snapshot.forEach((child) => {
-                                    if (Date.now() - parseInt(child.key) > 5000) {
-                                        child.ref.remove();
-                                    }
+                        try {
+                            const result = reader.result;
+                            if (!result || !result.includes(',')) {
+                                console.error('❌ Format base64 invalide');
+                                return;
+                            }
+                            
+                            const base64Audio = result.split(',')[1];
+                            const timestamp = Date.now();
+                            
+                            if (!base64Audio || base64Audio.length === 0) {
+                                console.error('❌ Données audio vides');
+                                return;
+                            }
+                            
+                            // Envoyer le chunk audio à Firebase
+                            database.ref(`radio/audioChunks/${timestamp}`).set({
+                                data: base64Audio,
+                                timestamp: timestamp,
+                                mimeType: options.mimeType || 'audio/webm'
+                            }).then(() => {
+                                console.log(`✅ Chunk envoyé: ${timestamp}, taille: ${base64Audio.length} chars`);
+                                
+                                // Nettoyer les anciens chunks (plus de 3 secondes)
+                                const cleanupTime = Date.now() - 3000;
+                                database.ref('radio/audioChunks').orderByKey().once('value', (snapshot) => {
+                                    snapshot.forEach((child) => {
+                                        const chunkTime = parseInt(child.key);
+                                        if (chunkTime < cleanupTime) {
+                                            child.ref.remove();
+                                        }
+                                    });
                                 });
+                            }).catch((error) => {
+                                console.error('❌ Erreur envoi chunk:', error);
                             });
-                        }).catch((error) => {
-                            console.error('Erreur envoi chunk:', error);
-                        });
+                        } catch (error) {
+                            console.error('❌ Erreur traitement chunk:', error);
+                        }
                     };
+                    
+                    reader.onerror = (error) => {
+                        console.error('❌ Erreur FileReader:', error);
+                    };
+                    
                     reader.readAsDataURL(event.data);
+                } else {
+                    console.warn('⚠️ Chunk audio vide reçu');
                 }
+            };
+            
+            mediaRecorder.onerror = (event) => {
+                console.error('❌ Erreur MediaRecorder:', event);
             };
             
             // Démarrer l'enregistrement avec des chunks toutes les 500ms

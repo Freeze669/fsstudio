@@ -41,22 +41,20 @@ function togglePlayPause() {
         pauseIcon.style.display = 'none';
         vinylRecord.classList.remove('playing');
     } else {
-        // Play
-        if (radioConfig.streamUrl) {
-            audioPlayer.src = radioConfig.streamUrl;
-            audioPlayer.play().catch(err => {
-                console.error('Erreur de lecture:', err);
-                // Simulation si le stream n'est pas disponible
-                simulatePlayback();
-            });
-        } else {
-            // Mode simulation si pas d'URL de stream
-            simulatePlayback();
-        }
-        isPlaying = true;
-        playIcon.style.display = 'none';
-        pauseIcon.style.display = 'block';
-        vinylRecord.classList.add('playing');
+        // Play - Vérifier si une diffusion vocale est en cours
+        database.ref(FIREBASE_RADIO_STATUS_PATH).once('value', (snapshot) => {
+            const status = snapshot.val();
+            if (status && status.isLive) {
+                // Si une diffusion vocale est active, démarrer l'écoute
+                if (!isPlayingAudio) {
+                    startListeningToAudio();
+                }
+                trackTitle.textContent = 'EN DIRECT 🎙️';
+            }
+        });
+        
+        // Mode simulation pour l'animation
+        simulatePlayback();
     }
 }
 
@@ -104,10 +102,21 @@ function loadRadioStream() {
             const status = snapshot.val();
             if (status && status.isLive) {
                 trackTitle.textContent = 'EN DIRECT 🎙️';
-                startListeningToAudio();
+                if (!isPlayingAudio) {
+                    startListeningToAudio();
+                }
             } else {
                 trackTitle.textContent = 'EN DIRECT';
                 stopListeningToAudio();
+            }
+        });
+        
+        // Vérifier immédiatement si une diffusion est en cours
+        database.ref(FIREBASE_RADIO_STATUS_PATH).once('value', (snapshot) => {
+            const status = snapshot.val();
+            if (status && status.isLive && !isPlayingAudio) {
+                trackTitle.textContent = 'EN DIRECT 🎙️';
+                startListeningToAudio();
             }
         });
         
@@ -137,31 +146,81 @@ function loadRadioStream() {
 
 // Démarrer l'écoute des chunks audio
 function startListeningToAudio() {
-    if (isPlayingAudio) return;
+    if (isPlayingAudio) {
+        console.log('⚠️ Écoute déjà en cours');
+        return;
+    }
     
     isPlayingAudio = true;
     audioChunksQueue = [];
-    lastChunkTimestamp = 0;
+    lastChunkTimestamp = Date.now() - 5000; // Accepter les chunks des 5 dernières secondes
     
-    // Créer le contexte audio pour la lecture
-    audioContextListener = new (window.AudioContext || window.webkitAudioContext)();
+    console.log('🎧 Démarrage de l\'écoute de la diffusion vocale...');
     
-    // Écouter les nouveaux chunks audio
-    database.ref('radio/audioChunks').orderByKey().startAt(String(Date.now() - 2000)).on('child_added', (snapshot) => {
+    // Écouter tous les nouveaux chunks audio
+    const chunksRef = database.ref('radio/audioChunks');
+    
+    // Écouter les nouveaux chunks en temps réel
+    chunksRef.orderByKey().on('child_added', (snapshot) => {
         const chunkData = snapshot.val();
-        if (chunkData && chunkData.data && chunkData.timestamp > lastChunkTimestamp) {
-            lastChunkTimestamp = chunkData.timestamp;
-            playAudioChunk(chunkData.data, chunkData.mimeType);
+        if (chunkData && chunkData.data) {
+            const chunkTimestamp = chunkData.timestamp || parseInt(snapshot.key);
+            const age = Date.now() - chunkTimestamp;
+            
+            // Ne jouer que les chunks récents (moins de 3 secondes)
+            if (chunkTimestamp > lastChunkTimestamp && age < 3000) {
+                lastChunkTimestamp = chunkTimestamp;
+                console.log(`🎵 Chunk reçu: ${chunkTimestamp}, âge: ${age}ms`);
+                playAudioChunk(chunkData.data, chunkData.mimeType || 'audio/webm');
+            } else {
+                console.log(`⏭️ Chunk ignoré (trop vieux): ${age}ms`);
+            }
         }
     });
     
-    console.log('🎧 Écoute de la diffusion vocale démarrée');
+    // Écouter aussi les changements pour récupérer les chunks manqués
+    chunksRef.on('value', (snapshot) => {
+        const chunks = snapshot.val();
+        if (chunks) {
+            const now = Date.now();
+            const chunkEntries = Object.entries(chunks)
+                .map(([key, value]) => ({
+                    key: parseInt(key),
+                    timestamp: value.timestamp || parseInt(key),
+                    ...value
+                }))
+                .filter(chunk => {
+                    const age = now - chunk.timestamp;
+                    return chunk.timestamp > lastChunkTimestamp && age < 3000 && chunk.data;
+                })
+                .sort((a, b) => a.timestamp - b.timestamp);
+            
+            if (chunkEntries.length > 0) {
+                console.log(`📥 Récupération de ${chunkEntries.length} chunks manqués`);
+                chunkEntries.forEach(chunk => {
+                    lastChunkTimestamp = chunk.timestamp;
+                    playAudioChunk(chunk.data, chunk.mimeType || 'audio/webm');
+                });
+            }
+        }
+    });
+    
+    console.log('✅ Écoute de la diffusion vocale démarrée');
 }
 
 // Arrêter l'écoute
 function stopListeningToAudio() {
+    if (!isPlayingAudio) return;
+    
     isPlayingAudio = false;
     audioChunksQueue = [];
+    
+    if (audioContextListener) {
+        try {
+            audioContextListener.close();
+        } catch (e) {}
+        audioContextListener = null;
+    }
     
     if (audioSource) {
         try {
@@ -170,40 +229,90 @@ function stopListeningToAudio() {
         audioSource = null;
     }
     
+    // Désactiver les listeners Firebase
+    try {
+        database.ref('radio/audioChunks').off();
+    } catch (e) {}
+    
     console.log('⏹️ Écoute arrêtée');
 }
 
 // Jouer un chunk audio
 function playAudioChunk(base64Data, mimeType) {
     try {
+        // Ajouter à la queue pour une lecture plus fluide
+        audioChunksQueue.push({ data: base64Data, mimeType: mimeType || 'audio/webm' });
+        
+        // Si c'est le premier chunk, démarrer la lecture
+        if (audioChunksQueue.length === 1) {
+            processAudioQueue();
+        }
+        
+    } catch (error) {
+        console.error('Erreur traitement chunk audio:', error);
+    }
+}
+
+// Traiter la queue audio
+function processAudioQueue() {
+    if (audioChunksQueue.length === 0) return;
+    
+    const chunk = audioChunksQueue.shift();
+    
+    try {
         // Convertir base64 en ArrayBuffer
-        const binaryString = atob(base64Data);
+        const binaryString = atob(chunk.data);
         const bytes = new Uint8Array(binaryString.length);
         for (let i = 0; i < binaryString.length; i++) {
             bytes[i] = binaryString.charCodeAt(i);
         }
         
         // Créer un blob et le jouer
-        const blob = new Blob([bytes], { type: mimeType || 'audio/webm' });
+        const blob = new Blob([bytes], { type: chunk.mimeType });
         const audioUrl = URL.createObjectURL(blob);
         
         const audio = new Audio(audioUrl);
-        audio.play().catch(err => {
+        
+        // Volume à 100%
+        audio.volume = 1.0;
+        
+        // Jouer le chunk
+        audio.play().then(() => {
+            // Quand le chunk est terminé, jouer le suivant
+            audio.addEventListener('ended', () => {
+                URL.revokeObjectURL(audioUrl);
+                // Continuer avec le prochain chunk
+                if (audioChunksQueue.length > 0) {
+                    setTimeout(() => processAudioQueue(), 50); // Petit délai pour fluidité
+                }
+            });
+            
+            // Si le chunk ne se termine pas (problème de format), passer au suivant après 600ms
+            setTimeout(() => {
+                if (!audio.ended) {
+                    audio.pause();
+                    URL.revokeObjectURL(audioUrl);
+                    if (audioChunksQueue.length > 0) {
+                        processAudioQueue();
+                    }
+                }
+            }, 600);
+            
+        }).catch(err => {
             console.error('Erreur lecture chunk:', err);
-        });
-        
-        // Nettoyer l'URL après la lecture
-        audio.addEventListener('ended', () => {
             URL.revokeObjectURL(audioUrl);
+            // Continuer avec le prochain chunk même en cas d'erreur
+            if (audioChunksQueue.length > 0) {
+                setTimeout(() => processAudioQueue(), 50);
+            }
         });
-        
-        // Nettoyer après 2 secondes même si pas fini
-        setTimeout(() => {
-            URL.revokeObjectURL(audioUrl);
-        }, 2000);
         
     } catch (error) {
-        console.error('Erreur traitement chunk audio:', error);
+        console.error('Erreur traitement chunk:', error);
+        // Continuer avec le prochain chunk
+        if (audioChunksQueue.length > 0) {
+            setTimeout(() => processAudioQueue(), 50);
+        }
     }
 }
 
