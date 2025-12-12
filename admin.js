@@ -407,7 +407,29 @@ function initRadioEvents() {
             const bufferLength = analyser.frequencyBinCount;
             dataArray = new Uint8Array(bufferLength);
             
-            microphone.connect(analyser);
+            // Créer des filtres audio pour améliorer la qualité
+            const compressor = audioContext.createDynamicsCompressor();
+            compressor.threshold.value = -24; // Seuil de compression
+            compressor.knee.value = 30; // Zone de transition douce
+            compressor.ratio.value = 12; // Ratio de compression (12:1)
+            compressor.attack.value = 0.003; // Temps d'attaque rapide
+            compressor.release.value = 0.25; // Temps de relâchement
+            
+            const highPassFilter = audioContext.createBiquadFilter();
+            highPassFilter.type = 'highpass';
+            highPassFilter.frequency.value = 80; // Supprimer les basses fréquences (bruit)
+            highPassFilter.Q.value = 1; // Qualité du filtre
+            
+            const lowPassFilter = audioContext.createBiquadFilter();
+            lowPassFilter.type = 'lowpass';
+            lowPassFilter.frequency.value = 8000; // Supprimer les hautes fréquences (bruit)
+            lowPassFilter.Q.value = 1; // Qualité du filtre
+            
+            // Connecter les filtres en chaîne : microphone -> highpass -> lowpass -> compressor -> analyser
+            microphone.connect(highPassFilter);
+            highPassFilter.connect(lowPassFilter);
+            lowPassFilter.connect(compressor);
+            compressor.connect(analyser);
             
             // Utiliser ScriptProcessorNode pour capturer l'audio brut et le convertir en PCM
             const bufferSize = 4096;
@@ -415,6 +437,11 @@ function initRadioEvents() {
             
             let lastSendTime = 0;
             const sendInterval = 100; // Envoyer toutes les 100ms
+            
+            // Variables pour la normalisation et suppression de bruit
+            let noiseGateThreshold = 0.01; // Seuil pour supprimer le bruit de fond
+            let peakLevel = 0;
+            let targetPeak = 0.7; // Niveau cible (70% pour éviter la saturation)
             
             scriptProcessor.onaudioprocess = (event) => {
                 if (!isStreaming) return;
@@ -426,16 +453,46 @@ function initRadioEvents() {
                 const inputData = event.inputBuffer.getChannelData(0);
                 const outputData = event.outputBuffer.getChannelData(0);
                 
-                // Copier l'input vers l'output (pour que l'audio continue)
+                // Traitement audio amélioré
+                let maxAmplitude = 0;
+                const processedData = new Float32Array(inputData.length);
+                
+                // 1. Suppression de bruit (noise gate)
                 for (let i = 0; i < inputData.length; i++) {
-                    outputData[i] = inputData[i];
+                    const absValue = Math.abs(inputData[i]);
+                    if (absValue > noiseGateThreshold) {
+                        processedData[i] = inputData[i];
+                        maxAmplitude = Math.max(maxAmplitude, absValue);
+                    } else {
+                        processedData[i] = 0; // Supprimer le bruit de fond
+                    }
                 }
                 
-                // Convertir les données PCM en Int16 pour transmission
-                const int16Data = new Int16Array(inputData.length);
-                for (let i = 0; i < inputData.length; i++) {
+                // 2. Normalisation dynamique (éviter la saturation)
+                if (maxAmplitude > 0) {
+                    // Ajuster le niveau pour éviter la saturation
+                    const gain = Math.min(targetPeak / maxAmplitude, 2.0); // Gain max 2x
+                    
+                    for (let i = 0; i < processedData.length; i++) {
+                        processedData[i] *= gain;
+                        // Limiter à -1.0 / 1.0 (hard limiter pour éviter la saturation)
+                        processedData[i] = Math.max(-1.0, Math.min(1.0, processedData[i]));
+                    }
+                    
+                    // Mettre à jour le niveau de crête pour la normalisation adaptative
+                    peakLevel = maxAmplitude * gain;
+                }
+                
+                // Copier vers l'output
+                for (let i = 0; i < processedData.length; i++) {
+                    outputData[i] = processedData[i];
+                }
+                
+                // Convertir les données PCM traitées en Int16 pour transmission
+                const int16Data = new Int16Array(processedData.length);
+                for (let i = 0; i < processedData.length; i++) {
                     // Convertir de float32 (-1.0 à 1.0) vers int16 (-32768 à 32767)
-                    const s = Math.max(-1, Math.min(1, inputData[i]));
+                    const s = Math.max(-1, Math.min(1, processedData[i]));
                     int16Data[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
                 }
                 
@@ -483,9 +540,12 @@ function initRadioEvents() {
                 });
             };
             
-            // Connecter le script processor
-            analyser.connect(scriptProcessor);
-            scriptProcessor.connect(audioContext.destination);
+            // Connecter le script processor après le compressor (pour capturer l'audio traité)
+            // NE PAS connecter à destination pour éviter l'écho/feedback
+            compressor.connect(scriptProcessor);
+            // scriptProcessor.connect(audioContext.destination); // DÉSACTIVÉ pour éviter l'écho
+            
+            console.log('✅ Filtres audio activés: High-pass (80Hz), Low-pass (8kHz), Compresseur');
             
             console.log('✅ ScriptProcessor initialisé pour capture audio PCM');
             console.log(`   Sample rate: ${audioContext.sampleRate}Hz, Buffer: ${bufferSize}`);

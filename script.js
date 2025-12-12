@@ -176,27 +176,24 @@ function startListeningToAudio() {
     // Créer/réinitialiser le contexte audio pour la lecture
     if (!audioContextListener || audioContextListener.state === 'closed') {
         audioContextListener = new (window.AudioContext || window.webkitAudioContext)();
-        
-        // Créer un GainNode pour contrôler le volume
+        console.log('✅ Nouveau contexte audio créé, état:', audioContextListener.state);
+    }
+    
+    // Créer le gainNode si nécessaire
+    if (!gainNode) {
         gainNode = audioContextListener.createGain();
         gainNode.gain.value = currentVolume;
         gainNode.connect(audioContextListener.destination);
-        
-        console.log('✅ Contexte audio créé avec contrôle de volume');
+        console.log('✅ GainNode créé et connecté, volume:', currentVolume);
     }
     
     // Reprendre le contexte si suspendu (nécessaire après interaction utilisateur)
     if (audioContextListener.state === 'suspended') {
         audioContextListener.resume().then(() => {
-            console.log('✅ Contexte audio repris');
+            console.log('✅ Contexte audio repris, état:', audioContextListener.state);
+        }).catch(err => {
+            console.error('❌ Erreur reprise contexte:', err);
         });
-    }
-    
-    // S'assurer que le gainNode existe
-    if (!gainNode) {
-        gainNode = audioContextListener.createGain();
-        gainNode.gain.value = currentVolume;
-        gainNode.connect(audioContextListener.destination);
     }
     
     // Initialiser MediaSource pour le streaming
@@ -294,12 +291,30 @@ function startListeningToAudio() {
         const resumeAudio = () => {
             audioContextListener.resume().then(() => {
                 console.log('✅ Contexte audio activé');
-                document.removeEventListener('click', resumeAudio);
-                document.removeEventListener('touchstart', resumeAudio);
+                // Créer le gainNode si nécessaire
+                if (!gainNode) {
+                    gainNode = audioContextListener.createGain();
+                    gainNode.gain.value = currentVolume;
+                    gainNode.connect(audioContextListener.destination);
+                    console.log('✅ GainNode créé après activation');
+                }
+            }).catch(err => {
+                console.error('❌ Erreur activation contexte:', err);
             });
         };
         document.addEventListener('click', resumeAudio, { once: true });
         document.addEventListener('touchstart', resumeAudio, { once: true });
+        
+        // Afficher un message pour l'utilisateur
+        updateAudioStatus(false, 'Cliquez sur la page pour activer l\'audio');
+    } else {
+        // Créer le gainNode immédiatement si le contexte est déjà actif
+        if (!gainNode) {
+            gainNode = audioContextListener.createGain();
+            gainNode.gain.value = currentVolume;
+            gainNode.connect(audioContextListener.destination);
+            console.log('✅ GainNode créé');
+        }
     }
     
     console.log('✅ Écoute de la diffusion vocale démarrée');
@@ -486,6 +501,7 @@ async function processAudioQueue() {
                 gainNode = audioContextListener.createGain();
                 gainNode.gain.value = currentVolume;
                 gainNode.connect(audioContextListener.destination);
+                console.log('✅ GainNode créé avec volume:', currentVolume);
             }
             
             // Créer une source audio et jouer via le gainNode (pour le volume)
@@ -509,9 +525,33 @@ async function processAudioQueue() {
                 }
             };
             
+            // Gérer les erreurs
+            source.onerror = (error) => {
+                console.error('❌ Erreur source audio:', error);
+                isProcessingBuffer = false;
+                if (audioChunksQueue.length > 0) {
+                    setTimeout(() => processAudioQueue(), 10);
+                }
+            };
+            
             try {
-                source.start(0);
-                console.log('✅ Source audio démarrée');
+                // Vérifier que le contexte est prêt
+                if (audioContextListener.state === 'running') {
+                    source.start(0);
+                    console.log('✅ Source audio démarrée (contexte running)');
+                } else {
+                    // Attendre que le contexte soit prêt
+                    audioContextListener.resume().then(() => {
+                        source.start(0);
+                        console.log('✅ Source audio démarrée (contexte résumé)');
+                    }).catch(err => {
+                        console.error('❌ Erreur résumé contexte:', err);
+                        isProcessingBuffer = false;
+                        if (audioChunksQueue.length > 0) {
+                            setTimeout(() => processAudioQueue(), 10);
+                        }
+                    });
+                }
             } catch (startError) {
                 console.error('❌ Erreur démarrage source:', startError);
                 isProcessingBuffer = false;

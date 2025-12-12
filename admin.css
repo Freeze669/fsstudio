@@ -569,6 +569,24 @@ body {
     margin: 0;
 }
 
+.audio-quality-info {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 12px;
+    margin-bottom: 8px;
+}
+
+.quality-badge {
+    font-size: 11px;
+    padding: 4px 8px;
+    background: rgba(67, 181, 129, 0.2);
+    border: 1px solid rgba(67, 181, 129, 0.4);
+    border-radius: 6px;
+    color: #43b581;
+    font-weight: 500;
+}
+
 .radio-instructions {
     margin-top: 24px;
     padding: 16px;
