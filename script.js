@@ -1,7 +1,10 @@
 // Configuration de la radio
 const radioConfig = {
-    streamUrl: '' // URL du stream radio à ajouter
+    streamUrl: '' // URL du stream radio (chargée depuis Firebase)
 };
+
+// Chemins Firebase pour la radio
+const FIREBASE_RADIO_STATUS_PATH = 'radio/status';
 
 // Éléments DOM
 const audioPlayer = document.getElementById('audioPlayer');
@@ -78,10 +81,139 @@ audioPlayer.addEventListener('error', (e) => {
 playPauseBtn.addEventListener('click', togglePlayPause);
 
 
+// ============================================
+// RADIO STREAM - Diffusion vocale directe
+// ============================================
+
+let audioChunksQueue = [];
+let isPlayingAudio = false;
+let lastChunkTimestamp = 0;
+let audioContextListener = null;
+let audioSource = null;
+
+// Charger et jouer les chunks audio depuis Firebase
+function loadRadioStream() {
+    if (typeof firebase === 'undefined' || !firebase.apps.length) {
+        setTimeout(loadRadioStream, 1000);
+        return;
+    }
+    
+    try {
+        // Écouter le statut (en direct/hors ligne)
+        database.ref(FIREBASE_RADIO_STATUS_PATH).on('value', (snapshot) => {
+            const status = snapshot.val();
+            if (status && status.isLive) {
+                trackTitle.textContent = 'EN DIRECT 🎙️';
+                startListeningToAudio();
+            } else {
+                trackTitle.textContent = 'EN DIRECT';
+                stopListeningToAudio();
+            }
+        });
+        
+        // Enregistrer comme auditeur
+        const listenerId = 'listener_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        database.ref(`radio/listeners/${listenerId}`).set({
+            joinedAt: new Date().toISOString(),
+            lastSeen: new Date().toISOString()
+        });
+        
+        // Mettre à jour lastSeen toutes les 30 secondes
+        setInterval(() => {
+            database.ref(`radio/listeners/${listenerId}`).update({
+                lastSeen: new Date().toISOString()
+            });
+        }, 30000);
+        
+        // Nettoyer à la fermeture
+        window.addEventListener('beforeunload', () => {
+            database.ref(`radio/listeners/${listenerId}`).remove();
+        });
+        
+    } catch (error) {
+        console.error('❌ Erreur chargement stream:', error);
+    }
+}
+
+// Démarrer l'écoute des chunks audio
+function startListeningToAudio() {
+    if (isPlayingAudio) return;
+    
+    isPlayingAudio = true;
+    audioChunksQueue = [];
+    lastChunkTimestamp = 0;
+    
+    // Créer le contexte audio pour la lecture
+    audioContextListener = new (window.AudioContext || window.webkitAudioContext)();
+    
+    // Écouter les nouveaux chunks audio
+    database.ref('radio/audioChunks').orderByKey().startAt(String(Date.now() - 2000)).on('child_added', (snapshot) => {
+        const chunkData = snapshot.val();
+        if (chunkData && chunkData.data && chunkData.timestamp > lastChunkTimestamp) {
+            lastChunkTimestamp = chunkData.timestamp;
+            playAudioChunk(chunkData.data, chunkData.mimeType);
+        }
+    });
+    
+    console.log('🎧 Écoute de la diffusion vocale démarrée');
+}
+
+// Arrêter l'écoute
+function stopListeningToAudio() {
+    isPlayingAudio = false;
+    audioChunksQueue = [];
+    
+    if (audioSource) {
+        try {
+            audioSource.disconnect();
+        } catch (e) {}
+        audioSource = null;
+    }
+    
+    console.log('⏹️ Écoute arrêtée');
+}
+
+// Jouer un chunk audio
+function playAudioChunk(base64Data, mimeType) {
+    try {
+        // Convertir base64 en ArrayBuffer
+        const binaryString = atob(base64Data);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+        }
+        
+        // Créer un blob et le jouer
+        const blob = new Blob([bytes], { type: mimeType || 'audio/webm' });
+        const audioUrl = URL.createObjectURL(blob);
+        
+        const audio = new Audio(audioUrl);
+        audio.play().catch(err => {
+            console.error('Erreur lecture chunk:', err);
+        });
+        
+        // Nettoyer l'URL après la lecture
+        audio.addEventListener('ended', () => {
+            URL.revokeObjectURL(audioUrl);
+        });
+        
+        // Nettoyer après 2 secondes même si pas fini
+        setTimeout(() => {
+            URL.revokeObjectURL(audioUrl);
+        }, 2000);
+        
+    } catch (error) {
+        console.error('Erreur traitement chunk audio:', error);
+    }
+}
+
 // Initialisation
 updateTime();
 updateTrackTitle();
 setInterval(updateTime, 1000); // Mettre à jour l'heure chaque seconde
+
+// Charger le stream radio depuis Firebase
+loadRadioStream();
 
 // Gestion du clavier (espace pour play/pause)
 document.addEventListener('keydown', (e) => {
