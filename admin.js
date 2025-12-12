@@ -408,116 +408,72 @@ function initRadioEvents() {
             
             microphone.connect(analyser);
             
-            // Créer le MediaRecorder pour capturer l'audio
-            // Utiliser un format simple et bien supporté
-            let options = {
-                audioBitsPerSecond: 64000
-            };
+            // Utiliser ScriptProcessorNode pour capturer l'audio brut et le convertir en PCM
+            const bufferSize = 4096;
+            const scriptProcessor = audioContext.createScriptProcessor(bufferSize, 1, 1);
             
-            // Essayer les formats dans l'ordre de préférence
-            const supportedTypes = [
-                'audio/webm;codecs=opus',  // Meilleur pour la qualité
-                'audio/webm',              // Fallback WebM
-                'audio/ogg;codecs=opus',   // Alternative
-                ''                          // Laisser le navigateur choisir
-            ];
-            
-            let formatFound = false;
-            for (const mimeType of supportedTypes) {
-                if (!mimeType || MediaRecorder.isTypeSupported(mimeType)) {
-                    if (mimeType) {
-                        options.mimeType = mimeType;
+            scriptProcessor.onaudioprocess = (event) => {
+                if (!isStreaming) return;
+                
+                const inputData = event.inputBuffer.getChannelData(0);
+                const outputData = event.outputBuffer.getChannelData(0);
+                
+                // Copier l'input vers l'output (pour que l'audio continue)
+                for (let i = 0; i < inputData.length; i++) {
+                    outputData[i] = inputData[i];
+                }
+                
+                // Convertir les données PCM en Int16 pour transmission
+                const int16Data = new Int16Array(inputData.length);
+                for (let i = 0; i < inputData.length; i++) {
+                    // Convertir de float32 (-1.0 à 1.0) vers int16 (-32768 à 32767)
+                    const s = Math.max(-1, Math.min(1, inputData[i]));
+                    int16Data[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+                }
+                
+                // Convertir en base64
+                const base64Audio = btoa(String.fromCharCode.apply(null, new Uint8Array(int16Data.buffer)));
+                const timestamp = Date.now();
+                
+                // Envoyer le chunk audio à Firebase
+                database.ref(`radio/audioChunks/${timestamp}`).set({
+                    data: base64Audio,
+                    timestamp: timestamp,
+                    sampleRate: audioContext.sampleRate,
+                    format: 'pcm16'
+                }).then(() => {
+                    chunksSentCount++;
+                    lastSentTime = new Date();
+                    
+                    // Mettre à jour les stats
+                    if (chunksSent) chunksSent.textContent = chunksSentCount;
+                    if (lastSent) {
+                        const timeStr = lastSentTime.toLocaleTimeString();
+                        lastSent.textContent = timeStr;
                     }
-                    console.log(`✅ Format sélectionné: ${mimeType || 'par défaut'}`);
-                    formatFound = true;
-                    break;
-                }
-            }
-            
-            if (!formatFound) {
-                console.warn('⚠️ Utilisation du format par défaut du navigateur');
-            }
-            
-            mediaRecorder = new MediaRecorder(mediaStream, options);
-            audioChunks = [];
-            
-            // Quand on reçoit des données audio
-            mediaRecorder.ondataavailable = (event) => {
-                if (event.data && event.data.size > 0) {
-                    console.log(`📤 Chunk audio reçu: ${event.data.size} bytes, type: ${event.data.type}`);
                     
-                    // Convertir en base64 pour Firebase
-                    const reader = new FileReader();
-                    reader.onloadend = () => {
-                        try {
-                            const result = reader.result;
-                            if (!result || !result.includes(',')) {
-                                console.error('❌ Format base64 invalide');
-                                return;
-                            }
-                            
-                            const base64Audio = result.split(',')[1];
-                            const timestamp = Date.now();
-                            
-                            if (!base64Audio || base64Audio.length === 0) {
-                                console.error('❌ Données audio vides');
-                                return;
-                            }
-                            
-                            // Envoyer le chunk audio à Firebase
-                            database.ref(`radio/audioChunks/${timestamp}`).set({
-                                data: base64Audio,
-                                timestamp: timestamp,
-                                mimeType: options.mimeType || 'audio/webm'
-                            }).then(() => {
-                                chunksSentCount++;
-                                lastSentTime = new Date();
-                                
-                                // Mettre à jour les stats
-                                if (chunksSent) chunksSent.textContent = chunksSentCount;
-                                if (lastSent) {
-                                    const timeStr = lastSentTime.toLocaleTimeString();
-                                    lastSent.textContent = timeStr;
+                    // Nettoyer les anciens chunks (plus de 3 secondes)
+                    if (chunksSentCount % 10 === 0) {
+                        const cleanupTime = Date.now() - 3000;
+                        database.ref('radio/audioChunks').orderByKey().once('value', (snapshot) => {
+                            snapshot.forEach((child) => {
+                                const chunkTime = parseInt(child.key);
+                                if (chunkTime < cleanupTime) {
+                                    child.ref.remove();
                                 }
-                                
-                                console.log(`✅ Chunk envoyé: ${timestamp}, taille: ${base64Audio.length} chars, total: ${chunksSentCount}`);
-                                
-                                // Nettoyer les anciens chunks (plus de 5 secondes)
-                                const cleanupTime = Date.now() - 5000;
-                                database.ref('radio/audioChunks').orderByKey().once('value', (snapshot) => {
-                                    snapshot.forEach((child) => {
-                                        const chunkTime = parseInt(child.key);
-                                        if (chunkTime < cleanupTime) {
-                                            child.ref.remove();
-                                        }
-                                    });
-                                });
-                            }).catch((error) => {
-                                console.error('❌ Erreur envoi chunk:', error);
-                                voiceStatusText.textContent = '❌ Erreur d\'envoi - Vérifiez la connexion Firebase';
                             });
-                        } catch (error) {
-                            console.error('❌ Erreur traitement chunk:', error);
-                        }
-                    };
-                    
-                    reader.onerror = (error) => {
-                        console.error('❌ Erreur FileReader:', error);
-                    };
-                    
-                    reader.readAsDataURL(event.data);
-                } else {
-                    console.warn('⚠️ Chunk audio vide reçu');
-                }
+                        });
+                    }
+                }).catch((error) => {
+                    console.error('❌ Erreur envoi chunk:', error);
+                });
             };
             
-            mediaRecorder.onerror = (event) => {
-                console.error('❌ Erreur MediaRecorder:', event);
-            };
+            // Connecter le script processor
+            analyser.connect(scriptProcessor);
+            scriptProcessor.connect(audioContext.destination);
             
-            // Démarrer l'enregistrement avec des chunks toutes les 1000ms (1 seconde)
-            // Des chunks plus longs sont plus faciles à décoder
-            mediaRecorder.start(1000);
+            console.log('✅ ScriptProcessor initialisé pour capture audio PCM');
             
             // Mettre à jour l'état dans Firebase
             database.ref(FIREBASE_RADIO_STATUS_PATH).set({
@@ -551,10 +507,7 @@ function initRadioEvents() {
 
     // Arrêter la diffusion vocale
     stopVoiceBtn.addEventListener('click', () => {
-        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-            mediaRecorder.stop();
-            mediaRecorder = null;
-        }
+        // ScriptProcessor s'arrêtera automatiquement quand isStreaming = false
         
         if (mediaStream) {
             mediaStream.getTracks().forEach(track => track.stop());
