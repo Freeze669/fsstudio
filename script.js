@@ -100,25 +100,37 @@ function loadRadioStream() {
     
     try {
         // Écouter le statut (en direct/hors ligne)
-        database.ref(FIREBASE_RADIO_STATUS_PATH).on('value', (snapshot) => {
+        const statusRef = database.ref(FIREBASE_RADIO_STATUS_PATH);
+        
+        statusRef.on('value', (snapshot) => {
             const status = snapshot.val();
-            if (status && status.isLive) {
+            console.log('📡 Statut radio reçu:', status);
+            if (status && status.isLive === true) {
                 trackTitle.textContent = 'EN DIRECT 🎙️';
+                console.log('✅ Statut: EN DIRECT - Démarrage de l\'écoute');
                 if (!isPlayingAudio) {
                     startListeningToAudio();
                 }
             } else {
                 trackTitle.textContent = 'EN DIRECT';
+                console.log('⏸️ Statut: Hors ligne');
                 stopListeningToAudio();
             }
         });
         
         // Vérifier immédiatement si une diffusion est en cours
-        database.ref(FIREBASE_RADIO_STATUS_PATH).once('value', (snapshot) => {
+        statusRef.once('value', (snapshot) => {
             const status = snapshot.val();
-            if (status && status.isLive && !isPlayingAudio) {
+            console.log('📡 Vérification statut initial:', status);
+            if (status && status.isLive === true) {
                 trackTitle.textContent = 'EN DIRECT 🎙️';
-                startListeningToAudio();
+                console.log('✅ Diffusion déjà en cours - Démarrage immédiat');
+                if (!isPlayingAudio) {
+                    startListeningToAudio();
+                }
+            } else {
+                trackTitle.textContent = 'EN DIRECT';
+                console.log('⏸️ Aucune diffusion en cours');
             }
         });
         
@@ -169,6 +181,36 @@ function startListeningToAudio() {
         audioContextListener.resume().then(() => {
             console.log('✅ Contexte audio repris');
         });
+    }
+    
+    // Initialiser MediaSource pour le streaming
+    try {
+        if (typeof MediaSource !== 'undefined' && MediaSource.isTypeSupported('audio/webm; codecs=opus')) {
+            mediaSource = new MediaSource();
+            const audio = new Audio();
+            audio.src = URL.createObjectURL(mediaSource);
+            audio.volume = 1.0;
+            
+            mediaSource.addEventListener('sourceopen', () => {
+                try {
+                    sourceBuffer = mediaSource.addSourceBuffer('audio/webm; codecs=opus');
+                    mediaSourceReady = true;
+                    console.log('✅ MediaSource initialisé pour streaming');
+                    
+                    audio.play().catch(err => {
+                        console.warn('⚠️ Auto-play bloqué, nécessite interaction utilisateur');
+                    });
+                } catch (e) {
+                    console.warn('⚠️ MediaSource SourceBuffer non supporté, utilisation du fallback');
+                    mediaSourceReady = false;
+                }
+            });
+            
+            // Stocker la référence audio
+            window.streamAudio = audio;
+        }
+    } catch (e) {
+        console.warn('⚠️ MediaSource non disponible, utilisation du fallback');
     }
     
     // Écouter tous les nouveaux chunks audio
@@ -230,6 +272,29 @@ function stopListeningToAudio() {
     
     isPlayingAudio = false;
     audioChunksQueue = [];
+    audioBufferQueue = [];
+    isProcessingBuffer = false;
+    
+    if (sourceBuffer) {
+        try {
+            if (sourceBuffer.updating) {
+                sourceBuffer.abort();
+            }
+        } catch (e) {}
+        sourceBuffer = null;
+    }
+    
+    if (mediaSource && mediaSource.readyState === 'open') {
+        try {
+            mediaSource.endOfStream();
+        } catch (e) {}
+    }
+    
+    if (mediaSource) {
+        try {
+            mediaSource = null;
+        } catch (e) {}
+    }
     
     if (audioContextListener) {
         try {
@@ -300,12 +365,24 @@ function updateAudioStatus(isReceiving, message = null) {
 // Buffer audio continu pour créer un stream
 let audioBufferQueue = [];
 let isProcessingBuffer = false;
+let mediaSource = null;
+let sourceBuffer = null;
+let mediaSourceReady = false;
 
 // Traiter la queue audio avec accumulation de buffer
 async function processAudioQueue() {
     if (audioChunksQueue.length === 0) {
         if (audioBufferQueue.length === 0) {
-            updateAudioStatus(false, 'Queue vide - En attente...');
+            // Ne pas afficher "Queue vide" si on est en direct
+            const statusRef = database.ref(FIREBASE_RADIO_STATUS_PATH);
+            statusRef.once('value', (snapshot) => {
+                const status = snapshot.val();
+                if (!status || !status.isLive) {
+                    updateAudioStatus(false, 'Aucune diffusion en cours');
+                } else {
+                    updateAudioStatus(true, 'En attente de chunks...');
+                }
+            });
         }
         return;
     }
@@ -341,6 +418,31 @@ async function processAudioQueue() {
         
         // Combiner les blobs
         const combinedBlob = new Blob(blobs, { type: mimeType });
+        
+        // Essayer avec MediaSource d'abord (meilleur pour streaming)
+        if (mediaSourceReady && sourceBuffer && !sourceBuffer.updating && mediaSource.readyState === 'open') {
+            try {
+                const arrayBuffer = await combinedBlob.arrayBuffer();
+                
+                if (sourceBuffer.updating) {
+                    await new Promise(resolve => {
+                        sourceBuffer.addEventListener('updateend', resolve, { once: true });
+                    });
+                }
+                
+                sourceBuffer.appendBuffer(arrayBuffer);
+                updateAudioStatus(true, `Streaming: ${chunksReceivedCount} chunks`);
+                console.log(`🔊 ${chunks.length} chunks ajoutés au stream MediaSource`);
+                
+                isProcessingBuffer = false;
+                if (audioChunksQueue.length > 0 || audioBufferQueue.length > 0) {
+                    setTimeout(() => processAudioQueue(), 50);
+                }
+                return;
+            } catch (msError) {
+                console.warn('⚠️ Erreur MediaSource, fallback Web Audio:', msError);
+            }
+        }
         
         // Essayer de décoder avec Web Audio API
         if (audioContextListener && audioContextListener.state !== 'closed') {
