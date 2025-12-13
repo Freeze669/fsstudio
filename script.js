@@ -246,7 +246,8 @@ function startListeningToAudio() {
                     playAudioChunk(chunkData.data, {
                         format: chunkData.format || 'pcm16',
                         sampleRate: chunkData.sampleRate || 44100,
-                        bufferSize: chunkData.bufferSize || 4096
+                        bufferSize: chunkData.bufferSize || 4096,
+                        mimeType: chunkData.mimeType || null
                     });
                 } else {
                     console.log(`⏭️ Chunk ignoré (trop vieux): ${age}ms`);
@@ -473,13 +474,9 @@ async function processAudioQueue() {
             const blob = new Blob([bytes], { type: mimeType });
             const audioUrl = URL.createObjectURL(blob);
             
-            // Créer un élément audio pour décoder Opus (le navigateur décode automatiquement)
-            const audio = new Audio(audioUrl);
-            audio.preload = 'auto';
-            
             // S'assurer que le contexte est actif
             if (audioContextListener.state === 'suspended') {
-                audioContextListener.resume();
+                await audioContextListener.resume();
             }
             
             if (!gainNode) {
@@ -488,16 +485,12 @@ async function processAudioQueue() {
                 gainNode.connect(audioContextListener.destination);
             }
             
-            // Créer MediaElementSourceNode pour intégrer avec Web Audio API
-            // Cela permet de contrôler le volume via gainNode tout en préservant la qualité Opus
-            let source = null;
-            let cleanup = () => {
-                if (source) {
-                    try {
-                        source.disconnect();
-                    } catch (e) {}
-                    source = null;
-                }
+            // Utiliser directement l'élément Audio pour décoder Opus (méthode la plus fiable)
+            // Le navigateur décode automatiquement Opus via l'élément <audio>
+            const audio = new Audio(audioUrl);
+            audio.volume = currentVolume; // Utiliser volume natif pour éviter createMediaElementSource
+            
+            const cleanup = () => {
                 URL.revokeObjectURL(audioUrl);
                 isProcessingBuffer = false;
                 if (audioChunksQueue.length > 0) {
@@ -505,39 +498,39 @@ async function processAudioQueue() {
                 }
             };
             
-            audio.addEventListener('loadeddata', async () => {
-                try {
-                    // Créer MediaElementSourceNode pour intégrer avec Web Audio
-                    source = audioContextListener.createMediaElementSource(audio);
-                    source.connect(gainNode);
-                    
-                    // Jouer l'audio Opus (qualité appel optimale)
-                    await audio.play();
-                    
-                    console.log(`🎵 Chunk Opus joué (qualité appel - ${mimeType})`);
-                    
-                    // Nettoyer après la fin de la lecture
-                    audio.addEventListener('ended', cleanup, { once: true });
-                    
-                    // Timeout de sécurité pour nettoyer si la lecture ne se termine pas
-                    setTimeout(() => {
-                        if (audio.ended || audio.readyState >= 2) {
-                            cleanup();
-                        }
-                    }, 200);
-                    
-                } catch (error) {
-                    console.error('❌ Erreur lecture Opus:', error);
-                    cleanup();
-                }
-            });
+            // Gérer la fin de la lecture
+            audio.addEventListener('ended', cleanup, { once: true });
             
+            // Gérer les erreurs
             audio.addEventListener('error', (e) => {
-                console.error('❌ Erreur chargement Opus:', e);
+                console.error('❌ Erreur lecture Opus:', e, audio.error);
                 cleanup();
             });
             
-            // Charger l'audio (déclenche le décodage Opus par le navigateur)
+            // Quand l'audio est prêt à jouer
+            audio.addEventListener('canplay', async () => {
+                try {
+                    // Jouer l'audio Opus (qualité appel)
+                    await audio.play();
+                    updateAudioStatus(true, `Lecture Opus: ${chunksReceivedCount} chunks`);
+                    console.log(`🎵 Chunk Opus joué (durée estimée: ~20ms)`);
+                    
+                    // Timeout de sécurité pour continuer le stream (chunks de 20ms)
+                    // On attend un peu plus que la durée réelle pour éviter les coupures
+                    setTimeout(() => {
+                        if (!audio.ended) {
+                            // Forcer la continuation du stream
+                            cleanup();
+                        }
+                    }, 50); // 50ms pour un chunk de ~20ms
+                    
+                } catch (playError) {
+                    console.error('❌ Erreur lecture Opus:', playError);
+                    cleanup();
+                }
+            }, { once: true });
+            
+            // Charger l'audio (déclenche le décodage)
             audio.load();
             
             return; // La callback s'occupera de continuer
