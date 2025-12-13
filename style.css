@@ -75,68 +75,6 @@ body {
     font-size: 14px;
 }
 
-/* Audio Activation Overlay */
-.audio-activation-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.85);
-    backdrop-filter: blur(10px);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 10000;
-}
-
-.activation-box {
-    background: rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(30px);
-    border-radius: 24px;
-    padding: 40px;
-    text-align: center;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-    max-width: 400px;
-}
-
-.activation-box h3 {
-    color: white;
-    font-size: 24px;
-    margin-bottom: 16px;
-    font-weight: 600;
-}
-
-.activation-box p {
-    color: rgba(255, 255, 255, 0.8);
-    font-size: 16px;
-    margin-bottom: 24px;
-    line-height: 1.5;
-}
-
-.activation-btn {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    border: none;
-    padding: 16px 32px;
-    font-size: 18px;
-    font-weight: 600;
-    border-radius: 12px;
-    cursor: pointer;
-    transition: transform 0.2s, box-shadow 0.2s;
-    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
-}
-
-.activation-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
-}
-
-.activation-btn:active {
-    transform: translateY(0);
-}
-
 /* Main Content */
 .main-content {
     flex: 1;

@@ -35,26 +35,21 @@ function updateTrackTitle() {
 function togglePlayPause() {
     if (isPlaying) {
         // Pause
-        audioPlayer.pause();
+        if (streamUrl && audioPlayer.src) {
+            // Si on utilise un stream URL, utiliser l'élément audio
+            audioPlayer.pause();
+        } else {
+            // Sinon, arrêter le streaming vocal
+            stopListeningToAudio();
+        }
         isPlaying = false;
+        isPlayingAudio = false;
         playIcon.style.display = 'block';
         pauseIcon.style.display = 'none';
         vinylRecord.classList.remove('playing');
     } else {
-        // Play - Vérifier si une diffusion vocale est en cours
-        database.ref(FIREBASE_RADIO_STATUS_PATH).once('value', (snapshot) => {
-            const status = snapshot.val();
-            if (status && status.isLive) {
-                // Si une diffusion vocale est active, démarrer l'écoute
-                if (!isPlayingAudio) {
-                    startListeningToAudio();
-                }
-                trackTitle.textContent = 'EN DIRECT 🎙️';
-            }
-        });
-        
-        // Mode simulation pour l'animation
-        simulatePlayback();
+        // Play - Démarrer la lecture
+        startListeningToAudio();
     }
 }
 
@@ -101,12 +96,36 @@ function loadRadioStream() {
     }
     
     try {
-        // Écouter le statut (en direct/hors ligne)
+        // Charger l'URL du stream depuis Firebase
+        database.ref('radio/streamUrl').on('value', (snapshot) => {
+            const url = snapshot.val();
+            if (url && url.trim() !== '') {
+                streamUrl = url.trim();
+                console.log('📡 URL stream chargée:', streamUrl);
+                // Si on est déjà en lecture, mettre à jour l'URL
+                if (isPlayingAudio) {
+                    audioPlayer.src = streamUrl;
+                    audioPlayer.play().catch(err => {
+                        console.error('❌ Erreur lecture stream:', err);
+                    });
+                }
+            } else {
+                streamUrl = '';
+                console.log('📡 Pas d\'URL stream, utilisation du streaming vocal');
+            }
+        });
+        
+        // Écouter le statut (en direct/hors ligne) - seulement si pas d'URL stream
         const statusRef = database.ref(FIREBASE_RADIO_STATUS_PATH);
         
         statusRef.on('value', (snapshot) => {
             const status = snapshot.val();
-            console.log('📡 Statut radio reçu:', status);
+            // Si on a une URL stream, ignorer le statut vocal
+            if (streamUrl && streamUrl.trim() !== '') {
+                return;
+            }
+            
+            console.log('📡 Statut radio vocal reçu:', status);
             if (status && status.isLive === true) {
                 trackTitle.textContent = 'EN DIRECT 🎙️';
                 console.log('✅ Statut: EN DIRECT - Démarrage de l\'écoute');
@@ -123,6 +142,11 @@ function loadRadioStream() {
         // Vérifier immédiatement si une diffusion est en cours
         statusRef.once('value', (snapshot) => {
             const status = snapshot.val();
+            // Si on a une URL stream, ne pas vérifier le statut vocal
+            if (streamUrl && streamUrl.trim() !== '') {
+                return;
+            }
+            
             console.log('📡 Vérification statut initial:', status);
             if (status && status.isLive === true) {
                 trackTitle.textContent = 'EN DIRECT 🎙️';
@@ -160,70 +184,8 @@ function loadRadioStream() {
     }
 }
 
-// Variable pour suivre si l'audio est activé
-let audioActivated = false;
-
-// Fonction pour activer l'audio (appelée par le bouton)
-function activateAudio() {
-    if (audioActivated) return;
-    
-    audioActivated = true;
-    
-    // Créer le contexte audio s'il n'existe pas
-    if (!audioContextListener || audioContextListener.state === 'closed') {
-        try {
-            audioContextListener = new (window.AudioContext || window.webkitAudioContext)({
-                sampleRate: 48000,
-                latencyHint: 'interactive'
-            });
-            console.log('✅ Contexte audio créé:', audioContextListener.sampleRate, 'Hz');
-        } catch (error) {
-            console.error('❌ Erreur création contexte audio:', error);
-            return;
-        }
-    }
-    
-    // Reprendre le contexte
-    if (audioContextListener.state === 'suspended') {
-        audioContextListener.resume().then(() => {
-            console.log('✅ Contexte audio activé');
-            
-            // Créer le gainNode
-            if (!gainNode) {
-                gainNode = audioContextListener.createGain();
-                gainNode.gain.value = currentVolume;
-                gainNode.connect(audioContextListener.destination);
-            }
-            
-            // Masquer l'overlay
-            const overlay = document.getElementById('audioActivationOverlay');
-            if (overlay) overlay.style.display = 'none';
-            
-            // Redémarrer l'écoute si une diffusion est en cours
-            const statusRef = database.ref(FIREBASE_RADIO_STATUS_PATH);
-            statusRef.once('value', (snapshot) => {
-                const status = snapshot.val();
-                if (status && status.isLive && !isPlayingAudio) {
-                    startListeningToAudio();
-                }
-            });
-        }).catch(err => {
-            console.error('❌ Erreur activation audio:', err);
-            audioActivated = false;
-        });
-    } else {
-        // Créer le gainNode
-        if (!gainNode) {
-            gainNode = audioContextListener.createGain();
-            gainNode.gain.value = currentVolume;
-            gainNode.connect(audioContextListener.destination);
-        }
-        
-        // Masquer l'overlay
-        const overlay = document.getElementById('audioActivationOverlay');
-        if (overlay) overlay.style.display = 'none';
-    }
-}
+// Variable pour le stream URL
+let streamUrl = '';
 
 // Démarrer l'écoute des chunks audio
 function startListeningToAudio() {
@@ -232,37 +194,55 @@ function startListeningToAudio() {
         return;
     }
     
-    // Vérifier si l'audio est activé
-    if (!audioActivated || !audioContextListener || audioContextListener.state === 'suspended') {
-        // Afficher l'overlay d'activation
-        const overlay = document.getElementById('audioActivationOverlay');
-        if (overlay) overlay.style.display = 'flex';
-        console.log('⚠️ Audio non activé, affichage de l\'overlay');
+    // Si une URL de stream est configurée, utiliser l'élément audio classique
+    if (streamUrl && streamUrl.trim() !== '') {
+        console.log('📡 Utilisation du stream URL:', streamUrl);
+        audioPlayer.src = streamUrl;
+        audioPlayer.play().then(() => {
+            isPlayingAudio = true;
+            isPlaying = true;
+            playIcon.style.display = 'none';
+            pauseIcon.style.display = 'block';
+            vinylRecord.classList.add('playing');
+            trackTitle.textContent = 'EN DIRECT 🎙️';
+            updateAudioStatus(true, 'Stream actif');
+        }).catch(err => {
+            console.error('❌ Erreur lecture stream:', err);
+            updateAudioStatus(false, 'Erreur lecture');
+        });
         return;
     }
     
-    isPlayingAudio = true;
-    audioChunksQueue = [];
-    lastChunkTimestamp = Date.now() - 2000; // Accepter les chunks des 2 dernières secondes
-    
-    console.log('🎧 Démarrage de l\'écoute de la diffusion vocale...');
-    
-    // Créer/réinitialiser le contexte audio pour la lecture avec qualité optimale
+    // Sinon, utiliser le streaming vocal Firebase
+    // Créer le contexte audio s'il n'existe pas
     if (!audioContextListener || audioContextListener.state === 'closed') {
         try {
             audioContextListener = new (window.AudioContext || window.webkitAudioContext)({
-                sampleRate: 48000, // Qualité supérieure (48kHz comme les appels)
-                latencyHint: 'interactive' // Latence minimale
+                sampleRate: 48000,
+                latencyHint: 'interactive'
             });
-            console.log('✅ Nouveau contexte audio créé:', audioContextListener.sampleRate, 'Hz, état:', audioContextListener.state);
+            console.log('✅ Contexte audio créé pour streaming vocal');
         } catch (error) {
             console.error('❌ Erreur création contexte:', error);
             return;
         }
     }
     
+    // Reprendre le contexte s'il est suspendu
+    if (audioContextListener.state === 'suspended') {
+        audioContextListener.resume().catch(err => {
+            console.error('❌ Erreur activation contexte:', err);
+        });
+    }
+    
+    isPlayingAudio = true;
+    audioChunksQueue = [];
+    lastChunkTimestamp = Date.now() - 2000; // Accepter les chunks des 2 dernières secondes
+    
+    console.log('🎧 Démarrage de l\'écoute de la diffusion vocale Firebase...');
+    
     // Créer le gainNode si nécessaire
-    if (!gainNode) {
+    if (!gainNode && audioContextListener) {
         try {
             gainNode = audioContextListener.createGain();
             gainNode.gain.value = currentVolume;
@@ -799,27 +779,32 @@ if (volumeSlider) {
     });
 }
 
-// Événement pour le bouton d'activation audio
-const activateAudioBtn = document.getElementById('activateAudioBtn');
-if (activateAudioBtn) {
-    activateAudioBtn.addEventListener('click', activateAudio);
-}
-
 // Initialisation
 updateTime();
 updateTrackTitle();
 setInterval(updateTime, 1000); // Mettre à jour l'heure chaque seconde
 
-// Vérifier si l'audio doit être activé au chargement
-// Les navigateurs modernes nécessitent une interaction utilisateur
-window.addEventListener('load', () => {
-    // Afficher l'overlay d'activation au chargement
-    setTimeout(() => {
-        const overlay = document.getElementById('audioActivationOverlay');
-        if (overlay && !audioActivated) {
-            overlay.style.display = 'flex';
-        }
-    }, 500);
+// Gestion des événements audio player
+audioPlayer.addEventListener('play', () => {
+    isPlaying = true;
+    isPlayingAudio = true;
+    playIcon.style.display = 'none';
+    pauseIcon.style.display = 'block';
+    vinylRecord.classList.add('playing');
+    updateAudioStatus(true, 'Lecture en cours');
+});
+
+audioPlayer.addEventListener('pause', () => {
+    isPlaying = false;
+    isPlayingAudio = false;
+    playIcon.style.display = 'block';
+    pauseIcon.style.display = 'none';
+    vinylRecord.classList.remove('playing');
+});
+
+audioPlayer.addEventListener('error', (e) => {
+    console.error('❌ Erreur audio player:', e, audioPlayer.error);
+    updateAudioStatus(false, 'Erreur de lecture');
 });
 
 // Charger le stream radio depuis Firebase

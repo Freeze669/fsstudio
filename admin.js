@@ -943,6 +943,44 @@ function initRadio() {
     initRadioEvents();
     listenToRadioStatus();
     countListeners();
+    initStreamUrlConfig();
+}
+
+// Initialiser la configuration de l'URL du stream
+function initStreamUrlConfig() {
+    const streamUrlInput = document.getElementById('streamUrlInput');
+    const saveStreamUrlBtn = document.getElementById('saveStreamUrlBtn');
+    
+    if (!streamUrlInput || !saveStreamUrlBtn) return;
+    
+    // Charger l'URL actuelle depuis Firebase
+    database.ref('radio/streamUrl').once('value', (snapshot) => {
+        const url = snapshot.val();
+        if (url) {
+            streamUrlInput.value = url;
+        }
+    });
+    
+    // Enregistrer l'URL
+    saveStreamUrlBtn.addEventListener('click', () => {
+        const url = streamUrlInput.value.trim();
+        database.ref('radio/streamUrl').set(url)
+            .then(() => {
+                console.log('✅ URL stream enregistrée:', url);
+                alert('URL du stream enregistrée avec succès !');
+            })
+            .catch((error) => {
+                console.error('❌ Erreur enregistrement URL:', error);
+                alert('Erreur lors de l\'enregistrement de l\'URL');
+            });
+    });
+    
+    // Permettre d'effacer l'URL
+    streamUrlInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            saveStreamUrlBtn.click();
+        }
+    });
 }
 
 // Initialisation
