@@ -512,10 +512,10 @@ function initRadioEvents() {
                 const bufferSize = 2048;
                 scriptProcessor = audioContext.createScriptProcessor(bufferSize, 1, 1);
             } else {
-                // Utiliser MediaRecorder avec Opus (qualité appel optimale)
+                // Utiliser MediaRecorder avec Opus (haute qualité vocale)
                 mediaRecorder = new MediaRecorder(mediaStream, {
                     mimeType: selectedMimeType,
-                    audioBitsPerSecond: 64000 // 64 kbps (qualité appel optimale, comme WhatsApp)
+                    audioBitsPerSecond: 128000 // 128 kbps pour qualité vocale supérieure (au lieu de 64 kbps)
                 });
                 
                 const audioChunks = [];
@@ -567,10 +567,10 @@ function initRadioEvents() {
                 // Démarrer l'enregistrement avec intervalles optimisés (100ms pour éviter les crashes)
                 // 100ms = bon compromis entre latence et performance
                 mediaRecorder.start(100); // 100ms = éviter trop de chunks
-                console.log('✅ MediaRecorder démarré avec Opus (qualité appel)');
+                console.log('✅ MediaRecorder démarré avec Opus (haute qualité vocale)');
                 console.log(`   Codec: ${selectedMimeType}`);
-                console.log(`   Bitrate: 64 kbps (qualité appel optimale)`);
-                console.log(`   Intervalle: 20ms (latence minimale)`);
+                console.log(`   Bitrate: 128 kbps (qualité vocale supérieure)`);
+                console.log(`   Intervalle: 100ms (optimisé pour stabilité)`);
             }
             
             // Pour compatibilité avec l'ancien code (ScriptProcessor fallback)
@@ -772,13 +772,14 @@ function initRadioEvents() {
             // Les filtres Web Audio sont toujours actifs pour l'analyse du niveau audio
             limiter.connect(analyser);
             
-            console.log('✅ Configuration audio optimisée QUALITÉ APPEL:');
-            console.log('   - Codec: Opus (64 kbps) - Standard appels modernes');
-            console.log('   - Sample rate: 48kHz (qualité appel haute qualité)');
-            console.log('   - Intervalle: 100ms (optimisé pour éviter les crashes)');
-            console.log('   - Auto Gain Control: Activé (optimisé pour appels)');
+            console.log('✅ Configuration audio optimisée HAUTE QUALITÉ VOCALE:');
+            console.log('   - Codec: Opus (128 kbps) - Qualité vocale supérieure');
+            console.log('   - Sample rate: 48kHz (qualité professionnelle)');
+            console.log('   - Intervalle: 100ms (optimisé pour stabilité)');
+            console.log('   - Auto Gain Control: Activé (volume automatique optimal)');
             console.log('   - Echo Cancellation: Double AEC activé');
             console.log('   - Noise Suppression: Activé');
+            console.log('   - Filtres audio: Égaliseur multi-bandes actif');
             console.log('   - Écho: COMPLÈTEMENT DÉSACTIVÉ');
             
             // Mettre à jour l'état dans Firebase
@@ -788,8 +789,8 @@ function initRadioEvents() {
                 sampleRate: audioContext.sampleRate,
                 format: selectedMimeType ? 'opus' : 'pcm16', // Format Opus ou PCM fallback
                 codec: selectedMimeType || 'pcm16',
-                bitrate: selectedMimeType ? 64000 : 768000, // 64 kbps pour Opus, brut pour PCM
-                quality: 'call' // Qualité appel optimisée
+                bitrate: selectedMimeType ? 128000 : 768000, // 128 kbps pour Opus (qualité supérieure), brut pour PCM
+                quality: 'high' // Qualité vocale haute
             });
             
             // Afficher les contrôles
@@ -946,10 +947,21 @@ function initRadio() {
     initStreamUrlConfig();
 }
 
+// Variables pour la diffusion MP3
+let mp3StreamInterval = null;
+let mp3AudioContext = null;
+let mp3AudioBuffer = null;
+let mp3IsStreaming = false;
+let mp3SourceNode = null;
+
 // Initialiser la configuration de l'URL du stream
 function initStreamUrlConfig() {
     const streamUrlInput = document.getElementById('streamUrlInput');
     const saveStreamUrlBtn = document.getElementById('saveStreamUrlBtn');
+    const mp3FileInput = document.getElementById('mp3FileInput');
+    const startMp3StreamBtn = document.getElementById('startMp3StreamBtn');
+    const stopMp3StreamBtn = document.getElementById('stopMp3StreamBtn');
+    const mp3StreamStatus = document.getElementById('mp3StreamStatus');
     
     if (!streamUrlInput || !saveStreamUrlBtn) return;
     
@@ -981,6 +993,151 @@ function initStreamUrlConfig() {
             saveStreamUrlBtn.click();
         }
     });
+    
+    // Diffusion MP3 simple
+    if (mp3FileInput && startMp3StreamBtn && stopMp3StreamBtn && mp3StreamStatus) {
+        startMp3StreamBtn.addEventListener('click', async () => {
+            const file = mp3FileInput.files[0];
+            if (!file) {
+                alert('Veuillez sélectionner un fichier MP3');
+                return;
+            }
+            
+            try {
+                mp3StreamStatus.textContent = '⏳ Chargement du fichier...';
+                
+                // Créer un contexte audio
+                mp3AudioContext = new (window.AudioContext || window.webkitAudioContext)();
+                
+                // Lire le fichier
+                const arrayBuffer = await file.arrayBuffer();
+                mp3AudioBuffer = await mp3AudioContext.decodeAudioData(arrayBuffer);
+                
+                mp3StreamStatus.textContent = '✅ Fichier chargé ! Démarrage de la diffusion...';
+                
+                // Mettre à jour le statut dans Firebase
+                database.ref(FIREBASE_RADIO_STATUS_PATH).set({
+                    isLive: true,
+                    startedAt: new Date().toISOString(),
+                    format: 'mp3-file',
+                    filename: file.name
+                });
+                
+                // Démarrer la diffusion (en boucle)
+                startMp3StreamLoop();
+                
+                startMp3StreamBtn.style.display = 'none';
+                stopMp3StreamBtn.style.display = 'inline-block';
+                mp3StreamStatus.textContent = '✅ Diffusion en cours ! Le fichier joue en boucle sur le site.';
+                
+            } catch (error) {
+                console.error('❌ Erreur chargement MP3:', error);
+                mp3StreamStatus.textContent = '❌ Erreur : ' + error.message;
+                alert('Erreur lors du chargement du fichier MP3');
+            }
+        });
+        
+        stopMp3StreamBtn.addEventListener('click', () => {
+            stopMp3Stream();
+        });
+    }
+}
+
+// Démarrer la boucle de diffusion MP3
+function startMp3StreamLoop() {
+    if (mp3IsStreaming) return;
+    mp3IsStreaming = true;
+    
+    let currentTime = 0;
+    const sampleRate = mp3AudioBuffer.sampleRate;
+    const chunkDuration = 0.1; // 100ms par chunk
+    const chunkSize = Math.floor(sampleRate * chunkDuration);
+    
+    function sendNextChunk() {
+        if (!mp3IsStreaming) return;
+        
+        const startSample = Math.floor(currentTime * sampleRate);
+        const endSample = Math.min(startSample + chunkSize, mp3AudioBuffer.length);
+        
+        if (startSample >= mp3AudioBuffer.length) {
+            // Fin du fichier, recommencer
+            currentTime = 0;
+            sendNextChunk();
+            return;
+        }
+        
+        // Extraire les données audio
+        const channelData = mp3AudioBuffer.getChannelData(0);
+        const chunkData = channelData.slice(startSample, endSample);
+        
+        // Convertir en Int16
+        const int16Data = new Int16Array(chunkData.length);
+        for (let i = 0; i < chunkData.length; i++) {
+            int16Data[i] = Math.max(-32768, Math.min(32767, chunkData[i] * 32768));
+        }
+        
+        // Convertir en base64
+        const uint8Array = new Uint8Array(int16Data.buffer);
+        let base64Audio = '';
+        const chunkSize2 = 8192;
+        for (let i = 0; i < uint8Array.length; i += chunkSize2) {
+            const chunk = uint8Array.slice(i, i + chunkSize2);
+            base64Audio += String.fromCharCode.apply(null, chunk);
+        }
+        base64Audio = btoa(base64Audio);
+        
+        // Envoyer à Firebase
+        const timestamp = Date.now();
+        database.ref(`radio/audioChunks/${timestamp}`).set({
+            data: base64Audio,
+            timestamp: timestamp,
+            sampleRate: sampleRate,
+            format: 'pcm16',
+            bufferSize: chunkData.length
+        }).catch((error) => {
+            console.error('❌ Erreur envoi chunk:', error);
+        });
+        
+        currentTime += chunkDuration;
+        
+        // Envoyer le prochain chunk
+        mp3StreamInterval = setTimeout(sendNextChunk, chunkDuration * 1000);
+    }
+    
+    sendNextChunk();
+}
+
+// Arrêter la diffusion MP3
+function stopMp3Stream() {
+    mp3IsStreaming = false;
+    
+    if (mp3StreamInterval) {
+        clearTimeout(mp3StreamInterval);
+        mp3StreamInterval = null;
+    }
+    
+    if (mp3SourceNode) {
+        mp3SourceNode.stop();
+        mp3SourceNode = null;
+    }
+    
+    if (mp3AudioContext) {
+        mp3AudioContext.close();
+        mp3AudioContext = null;
+    }
+    
+    // Supprimer les chunks
+    database.ref('radio/audioChunks').remove();
+    
+    // Mettre à jour le statut
+    database.ref(FIREBASE_RADIO_STATUS_PATH).set({
+        isLive: false,
+        stoppedAt: new Date().toISOString()
+    });
+    
+    document.getElementById('startMp3StreamBtn').style.display = 'inline-block';
+    document.getElementById('stopMp3StreamBtn').style.display = 'none';
+    document.getElementById('mp3StreamStatus').textContent = '⏹️ Diffusion arrêtée';
 }
 
 // Initialisation
