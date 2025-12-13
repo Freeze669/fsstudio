@@ -160,6 +160,71 @@ function loadRadioStream() {
     }
 }
 
+// Variable pour suivre si l'audio est activé
+let audioActivated = false;
+
+// Fonction pour activer l'audio (appelée par le bouton)
+function activateAudio() {
+    if (audioActivated) return;
+    
+    audioActivated = true;
+    
+    // Créer le contexte audio s'il n'existe pas
+    if (!audioContextListener || audioContextListener.state === 'closed') {
+        try {
+            audioContextListener = new (window.AudioContext || window.webkitAudioContext)({
+                sampleRate: 48000,
+                latencyHint: 'interactive'
+            });
+            console.log('✅ Contexte audio créé:', audioContextListener.sampleRate, 'Hz');
+        } catch (error) {
+            console.error('❌ Erreur création contexte audio:', error);
+            return;
+        }
+    }
+    
+    // Reprendre le contexte
+    if (audioContextListener.state === 'suspended') {
+        audioContextListener.resume().then(() => {
+            console.log('✅ Contexte audio activé');
+            
+            // Créer le gainNode
+            if (!gainNode) {
+                gainNode = audioContextListener.createGain();
+                gainNode.gain.value = currentVolume;
+                gainNode.connect(audioContextListener.destination);
+            }
+            
+            // Masquer l'overlay
+            const overlay = document.getElementById('audioActivationOverlay');
+            if (overlay) overlay.style.display = 'none';
+            
+            // Redémarrer l'écoute si une diffusion est en cours
+            const statusRef = database.ref(FIREBASE_RADIO_STATUS_PATH);
+            statusRef.once('value', (snapshot) => {
+                const status = snapshot.val();
+                if (status && status.isLive && !isPlayingAudio) {
+                    startListeningToAudio();
+                }
+            });
+        }).catch(err => {
+            console.error('❌ Erreur activation audio:', err);
+            audioActivated = false;
+        });
+    } else {
+        // Créer le gainNode
+        if (!gainNode) {
+            gainNode = audioContextListener.createGain();
+            gainNode.gain.value = currentVolume;
+            gainNode.connect(audioContextListener.destination);
+        }
+        
+        // Masquer l'overlay
+        const overlay = document.getElementById('audioActivationOverlay');
+        if (overlay) overlay.style.display = 'none';
+    }
+}
+
 // Démarrer l'écoute des chunks audio
 function startListeningToAudio() {
     if (isPlayingAudio) {
@@ -167,67 +232,49 @@ function startListeningToAudio() {
         return;
     }
     
+    // Vérifier si l'audio est activé
+    if (!audioActivated || !audioContextListener || audioContextListener.state === 'suspended') {
+        // Afficher l'overlay d'activation
+        const overlay = document.getElementById('audioActivationOverlay');
+        if (overlay) overlay.style.display = 'flex';
+        console.log('⚠️ Audio non activé, affichage de l\'overlay');
+        return;
+    }
+    
     isPlayingAudio = true;
     audioChunksQueue = [];
-    lastChunkTimestamp = Date.now() - 5000; // Accepter les chunks des 5 dernières secondes
+    lastChunkTimestamp = Date.now() - 2000; // Accepter les chunks des 2 dernières secondes
     
     console.log('🎧 Démarrage de l\'écoute de la diffusion vocale...');
     
     // Créer/réinitialiser le contexte audio pour la lecture avec qualité optimale
     if (!audioContextListener || audioContextListener.state === 'closed') {
-        audioContextListener = new (window.AudioContext || window.webkitAudioContext)({
-            sampleRate: 48000, // Qualité supérieure (48kHz comme les appels)
-            latencyHint: 'interactive' // Latence minimale
-        });
-        console.log('✅ Nouveau contexte audio créé:', audioContextListener.sampleRate, 'Hz, état:', audioContextListener.state);
+        try {
+            audioContextListener = new (window.AudioContext || window.webkitAudioContext)({
+                sampleRate: 48000, // Qualité supérieure (48kHz comme les appels)
+                latencyHint: 'interactive' // Latence minimale
+            });
+            console.log('✅ Nouveau contexte audio créé:', audioContextListener.sampleRate, 'Hz, état:', audioContextListener.state);
+        } catch (error) {
+            console.error('❌ Erreur création contexte:', error);
+            return;
+        }
     }
     
     // Créer le gainNode si nécessaire
     if (!gainNode) {
-        gainNode = audioContextListener.createGain();
-        gainNode.gain.value = currentVolume;
-        gainNode.connect(audioContextListener.destination);
-        console.log('✅ GainNode créé et connecté, volume:', currentVolume);
-    }
-    
-    // Reprendre le contexte si suspendu (nécessaire après interaction utilisateur)
-    if (audioContextListener.state === 'suspended') {
-        audioContextListener.resume().then(() => {
-            console.log('✅ Contexte audio repris, état:', audioContextListener.state);
-        }).catch(err => {
-            console.error('❌ Erreur reprise contexte:', err);
-        });
-    }
-    
-    // Initialiser MediaSource pour le streaming
-    try {
-        if (typeof MediaSource !== 'undefined' && MediaSource.isTypeSupported('audio/webm; codecs=opus')) {
-            mediaSource = new MediaSource();
-            const audio = new Audio();
-            audio.src = URL.createObjectURL(mediaSource);
-            audio.volume = 1.0;
-            
-            mediaSource.addEventListener('sourceopen', () => {
-                try {
-                    sourceBuffer = mediaSource.addSourceBuffer('audio/webm; codecs=opus');
-                    mediaSourceReady = true;
-                    console.log('✅ MediaSource initialisé pour streaming');
-                    
-                    audio.play().catch(err => {
-                        console.warn('⚠️ Auto-play bloqué, nécessite interaction utilisateur');
-                    });
-                } catch (e) {
-                    console.warn('⚠️ MediaSource SourceBuffer non supporté, utilisation du fallback');
-                    mediaSourceReady = false;
-                }
-            });
-            
-            // Stocker la référence audio
-            window.streamAudio = audio;
+        try {
+            gainNode = audioContextListener.createGain();
+            gainNode.gain.value = currentVolume;
+            gainNode.connect(audioContextListener.destination);
+            console.log('✅ GainNode créé et connecté, volume:', currentVolume);
+        } catch (error) {
+            console.error('❌ Erreur création gainNode:', error);
+            return;
         }
-    } catch (e) {
-        console.warn('⚠️ MediaSource non disponible, utilisation du fallback');
     }
+    
+    // MediaSource n'est plus utilisé, on utilise directement Audio pour chaque chunk
     
     // Écouter tous les nouveaux chunks audio
     const chunksRef = database.ref('radio/audioChunks');
@@ -242,16 +289,14 @@ function startListeningToAudio() {
                 // Ne jouer que les chunks récents (moins de 2 secondes) pour éviter les retards
                 if (chunkTimestamp > lastChunkTimestamp && age < 2000) {
                     lastChunkTimestamp = chunkTimestamp;
-                    console.log(`🎵 Chunk reçu: ${chunkTimestamp}, âge: ${age}ms, format: ${chunkData.format || 'pcm16'}`);
                     playAudioChunk(chunkData.data, {
                         format: chunkData.format || 'pcm16',
                         sampleRate: chunkData.sampleRate || 44100,
                         bufferSize: chunkData.bufferSize || 4096,
                         mimeType: chunkData.mimeType || null
                     });
-                } else {
-                    console.log(`⏭️ Chunk ignoré (trop vieux): ${age}ms`);
                 }
+                // Chunk trop vieux, ignorer silencieusement
             }
     });
     
@@ -290,37 +335,7 @@ function startListeningToAudio() {
     chunksReceivedCount = 0;
     updateAudioStatus(false, 'En attente des chunks...');
     
-    // S'assurer que le contexte audio est actif (nécessaire pour certains navigateurs)
-    if (audioContextListener.state === 'suspended') {
-        // Activer le contexte avec une interaction utilisateur
-        const resumeAudio = () => {
-            audioContextListener.resume().then(() => {
-                console.log('✅ Contexte audio activé');
-                // Créer le gainNode si nécessaire
-                if (!gainNode) {
-                    gainNode = audioContextListener.createGain();
-                    gainNode.gain.value = currentVolume;
-                    gainNode.connect(audioContextListener.destination);
-                    console.log('✅ GainNode créé après activation');
-                }
-            }).catch(err => {
-                console.error('❌ Erreur activation contexte:', err);
-            });
-        };
-        document.addEventListener('click', resumeAudio, { once: true });
-        document.addEventListener('touchstart', resumeAudio, { once: true });
-        
-        // Afficher un message pour l'utilisateur
-        updateAudioStatus(false, 'Cliquez sur la page pour activer l\'audio');
-    } else {
-        // Créer le gainNode immédiatement si le contexte est déjà actif
-        if (!gainNode) {
-            gainNode = audioContextListener.createGain();
-            gainNode.gain.value = currentVolume;
-            gainNode.connect(audioContextListener.destination);
-            console.log('✅ GainNode créé');
-        }
-    }
+    // Le contexte devrait déjà être activé, sinon on l'affichera dans startListeningToAudio
     
     console.log('✅ Écoute de la diffusion vocale démarrée');
 }
@@ -526,10 +541,13 @@ async function processAudioQueue() {
             // Gérer la fin de la lecture
             audio.addEventListener('ended', cleanup, { once: true });
             
-            // Gérer les erreurs
+            // Gérer les erreurs (en silence pour éviter le spam)
             audio.addEventListener('error', (e) => {
                 if (!hasCleaned) {
-                    console.error('❌ Erreur lecture Opus:', e, audio.error);
+                    // Log seulement si c'est une vraie erreur (pas juste un warning)
+                    if (audio.error && audio.error.code !== 0) {
+                        console.warn('⚠️ Erreur lecture Opus (code:', audio.error.code + ')');
+                    }
                     cleanup();
                 }
             }, { once: true });
@@ -658,9 +676,9 @@ async function processAudioQueue() {
                 }
             };
             
-            // Gérer les erreurs
+            // Gérer les erreurs (en silence pour éviter le spam)
             source.onerror = (error) => {
-                console.error('❌ Erreur source audio:', error);
+                // Log seulement si vraiment nécessaire
                 isProcessingBuffer = false;
                 if (audioChunksQueue.length > 0) {
                     setTimeout(() => processAudioQueue(), 10);
@@ -781,10 +799,28 @@ if (volumeSlider) {
     });
 }
 
+// Événement pour le bouton d'activation audio
+const activateAudioBtn = document.getElementById('activateAudioBtn');
+if (activateAudioBtn) {
+    activateAudioBtn.addEventListener('click', activateAudio);
+}
+
 // Initialisation
 updateTime();
 updateTrackTitle();
 setInterval(updateTime, 1000); // Mettre à jour l'heure chaque seconde
+
+// Vérifier si l'audio doit être activé au chargement
+// Les navigateurs modernes nécessitent une interaction utilisateur
+window.addEventListener('load', () => {
+    // Afficher l'overlay d'activation au chargement
+    setTimeout(() => {
+        const overlay = document.getElementById('audioActivationOverlay');
+        if (overlay && !audioActivated) {
+            overlay.style.display = 'flex';
+        }
+    }, 500);
+});
 
 // Charger le stream radio depuis Firebase
 loadRadioStream();
