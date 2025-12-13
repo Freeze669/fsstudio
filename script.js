@@ -239,8 +239,8 @@ function startListeningToAudio() {
                 const chunkTimestamp = chunkData.timestamp || parseInt(snapshot.key);
                 const age = Date.now() - chunkTimestamp;
                 
-                // Ne jouer que les chunks récents (moins de 5 secondes)
-                if (chunkTimestamp > lastChunkTimestamp && age < 5000) {
+                // Ne jouer que les chunks récents (moins de 2 secondes) pour éviter les retards
+                if (chunkTimestamp > lastChunkTimestamp && age < 2000) {
                     lastChunkTimestamp = chunkTimestamp;
                     console.log(`🎵 Chunk reçu: ${chunkTimestamp}, âge: ${age}ms, format: ${chunkData.format || 'pcm16'}`);
                     playAudioChunk(chunkData.data, {
@@ -268,7 +268,7 @@ function startListeningToAudio() {
                 }))
                 .filter(chunk => {
                     const age = now - chunk.timestamp;
-                    return chunk.timestamp > lastChunkTimestamp && age < 5000 && chunk.data;
+                    return chunk.timestamp > lastChunkTimestamp && age < 2000 && chunk.data;
                 })
                 .sort((a, b) => a.timestamp - b.timestamp);
             
@@ -386,6 +386,13 @@ function playAudioChunk(base64Data, chunkInfo) {
         // Mettre à jour le statut visuel
         updateAudioStatus(true);
         
+        // LIMITER la queue à 10 chunks maximum pour éviter les crashes
+        if (audioChunksQueue.length > 10) {
+            console.warn(`⚠️ Queue trop longue (${audioChunksQueue.length}), suppression des anciens chunks`);
+            // Supprimer les 5 plus anciens
+            audioChunksQueue.splice(0, 5);
+        }
+        
         // Ajouter à la queue avec les informations du chunk
         audioChunksQueue.push({ 
             data: base64Data, 
@@ -396,11 +403,14 @@ function playAudioChunk(base64Data, chunkInfo) {
         });
         
         // Si c'est le premier chunk, démarrer la lecture
-        if (audioChunksQueue.length === 1) {
+        if (audioChunksQueue.length === 1 && !isProcessingBuffer) {
             processAudioQueue();
         }
         
-        console.log(`🎵 Chunk reçu et ajouté à la queue (total: ${chunksReceivedCount}, format: ${chunkInfo.format || 'pcm16'})`);
+        // Log seulement tous les 10 chunks pour éviter le spam
+        if (chunksReceivedCount % 10 === 0) {
+            console.log(`🎵 ${chunksReceivedCount} chunks reçus, queue: ${audioChunksQueue.length}, format: ${chunkInfo.format || 'pcm16'}`);
+        }
         
     } catch (error) {
         console.error('Erreur traitement chunk audio:', error);
@@ -489,12 +499,27 @@ async function processAudioQueue() {
             // Le navigateur décode automatiquement Opus via l'élément <audio>
             const audio = new Audio(audioUrl);
             audio.volume = currentVolume; // Utiliser volume natif pour éviter createMediaElementSource
+            audio.preload = 'auto';
+            
+            let hasPlayed = false;
+            let hasCleaned = false;
             
             const cleanup = () => {
+                if (hasCleaned) return;
+                hasCleaned = true;
+                
+                try {
+                    audio.pause();
+                    audio.src = '';
+                    audio.load();
+                } catch (e) {}
+                
                 URL.revokeObjectURL(audioUrl);
                 isProcessingBuffer = false;
+                
+                // Continuer avec le prochain chunk immédiatement
                 if (audioChunksQueue.length > 0) {
-                    setTimeout(() => processAudioQueue(), 5);
+                    setTimeout(() => processAudioQueue(), 10);
                 }
             };
             
@@ -503,35 +528,51 @@ async function processAudioQueue() {
             
             // Gérer les erreurs
             audio.addEventListener('error', (e) => {
-                console.error('❌ Erreur lecture Opus:', e, audio.error);
-                cleanup();
-            });
-            
-            // Quand l'audio est prêt à jouer
-            audio.addEventListener('canplay', async () => {
-                try {
-                    // Jouer l'audio Opus (qualité appel)
-                    await audio.play();
-                    updateAudioStatus(true, `Lecture Opus: ${chunksReceivedCount} chunks`);
-                    console.log(`🎵 Chunk Opus joué (durée estimée: ~20ms)`);
-                    
-                    // Timeout de sécurité pour continuer le stream (chunks de 20ms)
-                    // On attend un peu plus que la durée réelle pour éviter les coupures
-                    setTimeout(() => {
-                        if (!audio.ended) {
-                            // Forcer la continuation du stream
-                            cleanup();
-                        }
-                    }, 50); // 50ms pour un chunk de ~20ms
-                    
-                } catch (playError) {
-                    console.error('❌ Erreur lecture Opus:', playError);
+                if (!hasCleaned) {
+                    console.error('❌ Erreur lecture Opus:', e, audio.error);
                     cleanup();
                 }
             }, { once: true });
             
+            // Quand l'audio est prêt à jouer
+            const playAudio = async () => {
+                if (hasPlayed || hasCleaned) return;
+                
+                try {
+                    // Jouer l'audio Opus (qualité appel)
+                    await audio.play();
+                    hasPlayed = true;
+                    updateAudioStatus(true, `Lecture: ${chunksReceivedCount} chunks`);
+                    
+                    // Timeout de sécurité pour continuer le stream (chunks de 100ms)
+                    setTimeout(() => {
+                        if (!hasCleaned) {
+                            cleanup();
+                        }
+                    }, 150); // 150ms pour un chunk de ~100ms
+                    
+                } catch (playError) {
+                    if (!hasCleaned) {
+                        console.error('❌ Erreur lecture Opus:', playError);
+                        cleanup();
+                    }
+                }
+            };
+            
+            // Essayer de jouer dès que possible
+            audio.addEventListener('canplay', playAudio, { once: true });
+            audio.addEventListener('canplaythrough', playAudio, { once: true });
+            
             // Charger l'audio (déclenche le décodage)
             audio.load();
+            
+            // Timeout de sécurité si l'audio ne charge pas
+            setTimeout(() => {
+                if (!hasPlayed && !hasCleaned) {
+                    console.warn('⚠️ Timeout chargement Opus, nettoyage');
+                    cleanup();
+                }
+            }, 500);
             
             return; // La callback s'occupera de continuer
         }

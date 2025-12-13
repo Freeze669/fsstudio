@@ -564,9 +564,9 @@ function initRadioEvents() {
                     voiceStatusText.textContent = '❌ Erreur enregistrement audio';
                 };
                 
-                // Démarrer l'enregistrement avec intervalles optimisés pour appels (20ms)
-                // Timeslice de 20ms = latence minimale comme les appels vocaux
-                mediaRecorder.start(20); // 20ms = latence ultra-faible (qualité appel)
+                // Démarrer l'enregistrement avec intervalles optimisés (100ms pour éviter les crashes)
+                // 100ms = bon compromis entre latence et performance
+                mediaRecorder.start(100); // 100ms = éviter trop de chunks
                 console.log('✅ MediaRecorder démarré avec Opus (qualité appel)');
                 console.log(`   Codec: ${selectedMimeType}`);
                 console.log(`   Bitrate: 64 kbps (qualité appel optimale)`);
@@ -575,7 +575,7 @@ function initRadioEvents() {
             
             // Pour compatibilité avec l'ancien code (ScriptProcessor fallback)
             let lastSendTime = 0;
-            const sendInterval = 20; // 20ms pour qualité appel (au lieu de 80ms)
+            const sendInterval = 100; // 100ms pour éviter trop de chunks (évite les crashes)
             
             // Variables pour la normalisation et suppression de bruit (qualité APPEL)
             let noiseGateThreshold = 0.002; // Seuil optimisé pour voix (qualité appel)
@@ -775,7 +775,7 @@ function initRadioEvents() {
             console.log('✅ Configuration audio optimisée QUALITÉ APPEL:');
             console.log('   - Codec: Opus (64 kbps) - Standard appels modernes');
             console.log('   - Sample rate: 48kHz (qualité appel haute qualité)');
-            console.log('   - Latence: 20ms (comme WhatsApp/Telegram)');
+            console.log('   - Intervalle: 100ms (optimisé pour éviter les crashes)');
             console.log('   - Auto Gain Control: Activé (optimisé pour appels)');
             console.log('   - Echo Cancellation: Double AEC activé');
             console.log('   - Noise Suppression: Activé');
