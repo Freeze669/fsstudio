@@ -278,7 +278,8 @@ function startListeningToAudio() {
                     playAudioChunk(chunk.data, {
                         format: chunk.format || 'pcm16',
                         sampleRate: chunk.sampleRate || 44100,
-                        bufferSize: chunk.bufferSize || 4096
+                        bufferSize: chunk.bufferSize || 4096,
+                        mimeType: chunk.mimeType || null
                     });
                 });
             }
@@ -389,7 +390,8 @@ function playAudioChunk(base64Data, chunkInfo) {
             data: base64Data, 
             format: chunkInfo.format || 'pcm16',
             sampleRate: chunkInfo.sampleRate || 44100,
-            bufferSize: chunkInfo.bufferSize || 4096
+            bufferSize: chunkInfo.bufferSize || 4096,
+            mimeType: chunkInfo.mimeType || null
         });
         
         // Si c'est le premier chunk, démarrer la lecture
@@ -431,7 +433,7 @@ let mediaSource = null;
 let sourceBuffer = null;
 let mediaSourceReady = false;
 
-// Traiter la queue audio - Format PCM16
+// Traiter la queue audio - Formats PCM16 et Opus (qualité appel)
 async function processAudioQueue() {
     if (audioChunksQueue.length === 0) {
         if (audioBufferQueue.length === 0) {
@@ -456,7 +458,92 @@ async function processAudioQueue() {
     const chunk = audioChunksQueue.shift();
     
     try {
-        // Vérifier le format
+        // Gérer le format Opus (qualité appel) - nouveau format optimisé
+        if (chunk.format === 'opus' || chunk.mimeType) {
+            // Format Opus (qualité appel optimale comme WhatsApp/Telegram)
+            const mimeType = chunk.mimeType || 'audio/webm;codecs=opus';
+            
+            // Convertir base64 en Blob
+            const binaryString = atob(chunk.data);
+            const bytes = new Uint8Array(binaryString.length);
+            for (let i = 0; i < binaryString.length; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+            
+            const blob = new Blob([bytes], { type: mimeType });
+            const audioUrl = URL.createObjectURL(blob);
+            
+            // Créer un élément audio pour décoder Opus (le navigateur décode automatiquement)
+            const audio = new Audio(audioUrl);
+            audio.preload = 'auto';
+            
+            // S'assurer que le contexte est actif
+            if (audioContextListener.state === 'suspended') {
+                audioContextListener.resume();
+            }
+            
+            if (!gainNode) {
+                gainNode = audioContextListener.createGain();
+                gainNode.gain.value = currentVolume;
+                gainNode.connect(audioContextListener.destination);
+            }
+            
+            // Créer MediaElementSourceNode pour intégrer avec Web Audio API
+            // Cela permet de contrôler le volume via gainNode tout en préservant la qualité Opus
+            let source = null;
+            let cleanup = () => {
+                if (source) {
+                    try {
+                        source.disconnect();
+                    } catch (e) {}
+                    source = null;
+                }
+                URL.revokeObjectURL(audioUrl);
+                isProcessingBuffer = false;
+                if (audioChunksQueue.length > 0) {
+                    setTimeout(() => processAudioQueue(), 5);
+                }
+            };
+            
+            audio.addEventListener('loadeddata', async () => {
+                try {
+                    // Créer MediaElementSourceNode pour intégrer avec Web Audio
+                    source = audioContextListener.createMediaElementSource(audio);
+                    source.connect(gainNode);
+                    
+                    // Jouer l'audio Opus (qualité appel optimale)
+                    await audio.play();
+                    
+                    console.log(`🎵 Chunk Opus joué (qualité appel - ${mimeType})`);
+                    
+                    // Nettoyer après la fin de la lecture
+                    audio.addEventListener('ended', cleanup, { once: true });
+                    
+                    // Timeout de sécurité pour nettoyer si la lecture ne se termine pas
+                    setTimeout(() => {
+                        if (audio.ended || audio.readyState >= 2) {
+                            cleanup();
+                        }
+                    }, 200);
+                    
+                } catch (error) {
+                    console.error('❌ Erreur lecture Opus:', error);
+                    cleanup();
+                }
+            });
+            
+            audio.addEventListener('error', (e) => {
+                console.error('❌ Erreur chargement Opus:', e);
+                cleanup();
+            });
+            
+            // Charger l'audio (déclenche le décodage Opus par le navigateur)
+            audio.load();
+            
+            return; // La callback s'occupera de continuer
+        }
+        
+        // Vérifier le format PCM16 (ancien format, fallback)
         if (chunk.format === 'pcm16' && chunk.sampleRate) {
             // Convertir base64 en Int16Array
             const binaryString = atob(chunk.data);

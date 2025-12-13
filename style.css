@@ -185,10 +185,17 @@ body {
     animation: pulse 2s infinite;
 }
 
+/* Contrôles du player */
+.player-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+}
+
 /* Contrôle de volume */
 .volume-control {
     position: relative;
-    margin-top: 16px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -221,6 +228,8 @@ body {
 .volume-slider-container {
     position: absolute;
     bottom: 50px;
+    left: 50%;
+    transform: translateX(-50%);
     background: rgba(30, 30, 30, 0.95);
     backdrop-filter: blur(20px);
     border-radius: 12px;
@@ -232,6 +241,7 @@ body {
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
     border: 1px solid rgba(255, 255, 255, 0.1);
     min-width: 120px;
+    z-index: 10;
 }
 
 .volume-slider {

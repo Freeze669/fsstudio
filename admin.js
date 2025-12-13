@@ -388,23 +388,29 @@ function initRadioEvents() {
     // Démarrer la diffusion vocale
     startVoiceBtn.addEventListener('click', async () => {
         try {
-            // Demander l'accès au microphone avec qualité maximale
+            // Demander l'accès au microphone avec qualité APPEL (comme WhatsApp/Telegram)
             mediaStream = await navigator.mediaDevices.getUserMedia({ 
                 audio: {
-                    echoCancellation: true,
-                    noiseSuppression: true,
-                    autoGainControl: false, // Désactivé pour contrôle manuel
-                    sampleRate: 48000, // Qualité supérieure (48kHz)
-                    channelCount: 1, // Mono pour la voix
-                    latency: 0.01, // Latence minimale
-                    // Paramètres Google Chrome optimisés
+                    // Paramètres optimisés pour qualité vocale téléphonique (appel)
+                    echoCancellation: true, // Essentiel pour éviter l'écho
+                    noiseSuppression: true, // Supprime le bruit ambiant
+                    autoGainControl: true, // Contrôle automatique du volume (meilleur pour appels)
+                    sampleRate: 48000, // 48kHz (qualité appel haute qualité)
+                    channelCount: 1, // Mono (standard pour voix)
+                    latency: 0.01, // Latence minimale (20ms comme les appels)
+                    // Paramètres Google Chrome optimisés pour qualité appel
                     googEchoCancellation: true,
-                    googAutoGainControl: false, // Désactivé pour contrôle manuel
+                    googAutoGainControl: true, // Activé pour qualité appel optimale
                     googNoiseSuppression: true,
                     googHighpassFilter: true,
                     googTypingNoiseDetection: true,
                     googNoiseReduction: true,
-                    googAudioMirroring: false // Important : pas de miroir audio
+                    googAudioMirroring: false, // Pas de miroir audio
+                    googEchoCancellation2: true, // Version améliorée si disponible
+                    googDAEchoCancellation: true, // Double AEC si disponible
+                    googAECM: true, // Acoustic Echo Cancellation Mobile
+                    googBeamforming: false, // Désactivé pour mono
+                    googArrayGeometry: undefined
                 } 
             });
             
@@ -481,21 +487,106 @@ function initRadioEvents() {
             compressor.connect(limiter); // Limiter dur pour éviter saturation
             limiter.connect(analyser);
             
-            // Utiliser ScriptProcessorNode avec buffer optimisé pour qualité vocale
-            const bufferSize = 2048; // Buffer plus petit pour latence réduite
-            scriptProcessor = audioContext.createScriptProcessor(bufferSize, 1, 1);
+            // Utiliser MediaRecorder avec Opus pour qualité APPEL (comme WhatsApp/Telegram)
+            // Opus est le codec standard des appels vocaux modernes
+            const mimeType = 'audio/webm;codecs=opus';
+            const supportedMimeTypes = [
+                'audio/webm;codecs=opus',
+                'audio/webm',
+                'audio/ogg;codecs=opus',
+                'audio/mp4;codecs=opus'
+            ];
             
+            let selectedMimeType = null;
+            for (const type of supportedMimeTypes) {
+                if (MediaRecorder.isTypeSupported(type)) {
+                    selectedMimeType = type;
+                    console.log(`✅ Codec supporté: ${type}`);
+                    break;
+                }
+            }
+            
+            if (!selectedMimeType) {
+                console.warn('⚠️ Opus non supporté, utilisation de ScriptProcessor (qualité réduite)');
+                // Fallback vers l'ancienne méthode
+                const bufferSize = 2048;
+                scriptProcessor = audioContext.createScriptProcessor(bufferSize, 1, 1);
+            } else {
+                // Utiliser MediaRecorder avec Opus (qualité appel optimale)
+                mediaRecorder = new MediaRecorder(mediaStream, {
+                    mimeType: selectedMimeType,
+                    audioBitsPerSecond: 64000 // 64 kbps (qualité appel optimale, comme WhatsApp)
+                });
+                
+                const audioChunks = [];
+                
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0) {
+                        audioChunks.push(event.data);
+                        
+                        // Convertir le blob en base64
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                            const base64Audio = reader.result.split(',')[1]; // Enlever le préfixe data:audio/webm;base64,
+                            
+                            // Envoyer le chunk Opus à Firebase
+                            const timestamp = Date.now();
+                            database.ref(`radio/audioChunks/${timestamp}`).set({
+                                data: base64Audio,
+                                timestamp: timestamp,
+                                sampleRate: audioContext.sampleRate,
+                                format: 'opus', // Format Opus (qualité appel)
+                                mimeType: selectedMimeType,
+                                bufferSize: event.data.size
+                            }).then(() => {
+                                chunksSentCount++;
+                                lastSentTime = new Date();
+                                
+                                // Mettre à jour les stats
+                                if (chunksSent) chunksSent.textContent = chunksSentCount;
+                                if (lastSent) {
+                                    const timeStr = lastSentTime.toLocaleTimeString();
+                                    lastSent.textContent = timeStr;
+                                }
+                                
+                                console.log(`✅ Chunk Opus envoyé: ${chunksSentCount}, taille: ${event.data.size} bytes`);
+                            }).catch((error) => {
+                                console.error('❌ Erreur envoi chunk Opus:', error);
+                                voiceStatusText.textContent = '❌ Erreur Firebase - Vérifiez la connexion';
+                            });
+                        };
+                        reader.readAsDataURL(event.data);
+                    }
+                };
+                
+                mediaRecorder.onerror = (event) => {
+                    console.error('❌ Erreur MediaRecorder:', event.error);
+                    voiceStatusText.textContent = '❌ Erreur enregistrement audio';
+                };
+                
+                // Démarrer l'enregistrement avec intervalles optimisés pour appels (20ms)
+                // Timeslice de 20ms = latence minimale comme les appels vocaux
+                mediaRecorder.start(20); // 20ms = latence ultra-faible (qualité appel)
+                console.log('✅ MediaRecorder démarré avec Opus (qualité appel)');
+                console.log(`   Codec: ${selectedMimeType}`);
+                console.log(`   Bitrate: 64 kbps (qualité appel optimale)`);
+                console.log(`   Intervalle: 20ms (latence minimale)`);
+            }
+            
+            // Pour compatibilité avec l'ancien code (ScriptProcessor fallback)
             let lastSendTime = 0;
-            const sendInterval = 80; // Envoyer toutes les 80ms pour meilleure qualité
+            const sendInterval = 20; // 20ms pour qualité appel (au lieu de 80ms)
             
-            // Variables pour la normalisation et suppression de bruit (qualité maximale)
-            let noiseGateThreshold = 0.003; // Seuil très bas pour capturer la voix douce
+            // Variables pour la normalisation et suppression de bruit (qualité APPEL)
+            let noiseGateThreshold = 0.002; // Seuil optimisé pour voix (qualité appel)
             let peakLevel = 0;
-            let targetPeak = 0.65; // Niveau cible optimisé (65% pour qualité maximale)
+            let targetPeak = 0.70; // Niveau cible optimisé pour appels (70%)
             let adaptiveGain = 1.0; // Gain adaptatif initial
-            let maxGain = 1.5; // Gain maximum pour qualité
+            let maxGain = 1.3; // Gain max optimisé pour qualité appel
             
-            scriptProcessor.onaudioprocess = (event) => {
+            // ScriptProcessor uniquement en fallback (si Opus non disponible)
+            if (scriptProcessor) {
+                scriptProcessor.onaudioprocess = (event) => {
                 const inputData = event.inputBuffer.getChannelData(0);
                 const outputData = event.outputBuffer.getChannelData(0);
                 
@@ -654,46 +745,51 @@ function initRadioEvents() {
                     console.error('❌ Erreur envoi chunk:', error);
                     voiceStatusText.textContent = '❌ Erreur Firebase - Vérifiez la connexion';
                 });
-            };
+                };
+            }
             
-            // Créer un dummy destination (AudioDestinationNode) pour activer le scriptProcessor
-            // MAIS ne pas connecter à destination pour éviter TOUT écho
-            // Le scriptProcessor fonctionnera quand même car il reçoit les données d'input
+            // Connecter ScriptProcessor uniquement si utilisé (fallback)
+            if (scriptProcessor) {
+                // Créer un gainNode complètement silencieux
+                const silentGain = audioContext.createGain();
+                silentGain.gain.value = 0; // Volume à ZÉRO absolu pour aucun écho
+                
+                // Créer un dummy analyser pour activer le scriptProcessor sans sortie
+                const dummyAnalyser = audioContext.createAnalyser();
+                dummyAnalyser.fftSize = 32; // Taille minimale pour économiser ressources
+                
+                // Connecter le script processor après le limiter (pour capturer l'audio traité)
+                limiter.connect(scriptProcessor);
+                // Connecter à un analyser dummy puis à un gain silencieux (pour activer sans écho)
+                scriptProcessor.connect(dummyAnalyser);
+                dummyAnalyser.connect(silentGain);
+                silentGain.connect(audioContext.destination); // Connecté mais volume 0 = aucun son
+                
+                console.log('✅ ScriptProcessor initialisé (fallback PCM)');
+            }
             
-            // Créer un gainNode complètement silencieux
-            const silentGain = audioContext.createGain();
-            silentGain.gain.value = 0; // Volume à ZÉRO absolu pour aucun écho
+            // Note: Si MediaRecorder avec Opus est utilisé, les filtres sont gérés automatiquement
+            // Les filtres Web Audio sont toujours actifs pour l'analyse du niveau audio
+            limiter.connect(analyser);
             
-            // Créer un dummy analyser pour activer le scriptProcessor sans sortie
-            const dummyAnalyser = audioContext.createAnalyser();
-            dummyAnalyser.fftSize = 32; // Taille minimale pour économiser ressources
-            
-            // Connecter le script processor après le limiter (pour capturer l'audio traité)
-            limiter.connect(scriptProcessor);
-            // Connecter à un analyser dummy puis à un gain silencieux (pour activer sans écho)
-            scriptProcessor.connect(dummyAnalyser);
-            dummyAnalyser.connect(silentGain);
-            silentGain.connect(audioContext.destination); // Connecté mais volume 0 = aucun son
-            
-            console.log('✅ Filtres audio professionnels activés (qualité maximale):');
-            console.log('   - High-pass: 120Hz (suppression basses optimisée)');
-            console.log('   - Low-pass: 14kHz (conservation fréquences vocales maximales)');
-            console.log('   - Égaliseur: Boost 2kHz + 3kHz, Réduction 9kHz');
-            console.log('   - Compresseur: Ratio 6:1 (compression équilibrée)');
-            console.log('   - Limiter: Ratio 20:1 (protection saturation)');
-            console.log('   - Gain max: 1.5x, Limite hard: 85% (qualité maximale)');
-            console.log('   - Sample rate: 48kHz (qualité professionnelle)');
-            console.log('   - Écho: COMPLÈTEMENT DÉSACTIVÉ (volume 0)');
-            
-            console.log('✅ ScriptProcessor initialisé pour capture audio PCM');
-            console.log(`   Sample rate: ${audioContext.sampleRate}Hz, Buffer: ${bufferSize}`);
+            console.log('✅ Configuration audio optimisée QUALITÉ APPEL:');
+            console.log('   - Codec: Opus (64 kbps) - Standard appels modernes');
+            console.log('   - Sample rate: 48kHz (qualité appel haute qualité)');
+            console.log('   - Latence: 20ms (comme WhatsApp/Telegram)');
+            console.log('   - Auto Gain Control: Activé (optimisé pour appels)');
+            console.log('   - Echo Cancellation: Double AEC activé');
+            console.log('   - Noise Suppression: Activé');
+            console.log('   - Écho: COMPLÈTEMENT DÉSACTIVÉ');
             
             // Mettre à jour l'état dans Firebase
             database.ref(FIREBASE_RADIO_STATUS_PATH).set({
                 isLive: true,
                 startedAt: new Date().toISOString(),
                 sampleRate: audioContext.sampleRate,
-                format: 'pcm16'
+                format: selectedMimeType ? 'opus' : 'pcm16', // Format Opus ou PCM fallback
+                codec: selectedMimeType || 'pcm16',
+                bitrate: selectedMimeType ? 64000 : 768000, // 64 kbps pour Opus, brut pour PCM
+                quality: 'call' // Qualité appel optimisée
             });
             
             // Afficher les contrôles
@@ -721,7 +817,18 @@ function initRadioEvents() {
 
     // Arrêter la diffusion vocale
     stopVoiceBtn.addEventListener('click', () => {
-        // Déconnecter le script processor
+        // Arrêter MediaRecorder si actif (Opus)
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+            try {
+                mediaRecorder.stop();
+                console.log('⏹️ MediaRecorder arrêté');
+            } catch (e) {
+                console.error('Erreur arrêt MediaRecorder:', e);
+            }
+            mediaRecorder = null;
+        }
+        
+        // Déconnecter le script processor (fallback)
         if (scriptProcessor) {
             try {
                 scriptProcessor.disconnect();

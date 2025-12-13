@@ -21,6 +21,7 @@ Le chat public se connecte automatiquement à Firebase et fonctionne en temps r�
 
 - 🎵 **Lecteur radio** avec contrôle play/pause
 - 💬 **Chat public** en temps réel
+- 🤖 **Bot automatique** qui répond aux messages du chat
 - 👥 **Compteur d'utilisateurs en ligne**
 - 🔄 **Synchronisation automatique** via Firebase
 
@@ -71,10 +72,22 @@ Pour déployer sur GitHub Pages, Netlify, Vercel, etc. :
 - Le fichier est déjà dans `.gitignore`
 - Pour la production, utilisez l'authentification Firebase et des règles de sécurité plus strictes
 
+## 🤖 Bot Automatique
+
+Un bot intelligent est disponible pour répondre automatiquement aux messages du chat !
+
+**Pour déployer le bot** :
+1. Consultez `BOT-DEPLOYMENT.md` pour les instructions complètes
+2. Le bot répond aux mots-clés comme "bonjour", "aide", "musique", etc.
+3. Vous pouvez personnaliser les réponses dans `functions/index.js`
+
 ## 📦 Fichiers du projet
 
 - `index.html` - Page principale
 - `script.js` - Logique de la radio et du chat
 - `style.css` - Styles
+- `admin.html` / `admin.js` - Interface d'administration
+- `functions/` - Code du bot Firebase Functions
 - `firebase-config.js` - Configuration Firebase (ne pas commiter)
 - `firebase-config.example.js` - Exemple de configuration
+- `BOT-DEPLOYMENT.md` - Guide de déploiement du bot
