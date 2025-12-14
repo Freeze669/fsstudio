@@ -800,15 +800,15 @@ function startContinuousPlayback(sampleRate, channels = 1) {
                 audioBuffer.getChannelData(0).set(audioChunk);
             }
             
-            // Créer et jouer la source - VOLUME AUGMENTÉ POUR SON AUDIBLE
+            // Créer et jouer la source - VOLUME OPTIMISÉ POUR CLARTÉ
             if (!gainNode) {
                 gainNode = audioContextListener.createGain();
-                // Volume par défaut à 1.2 (120%) pour son audible même à faible volume
-                gainNode.gain.value = (currentVolume || 1.0) * 1.2;
+                // Volume par défaut à 1.0 (100%) pour éviter la distorsion et garder la clarté
+                gainNode.gain.value = currentVolume || 1.0;
                 gainNode.connect(audioContextListener.destination);
             } else {
-                // S'assurer que le volume est toujours élevé pour son audible
-                gainNode.gain.value = Math.max((currentVolume || 1.0) * 1.2, 1.0);
+                // Volume normal pour clarté maximale (pas de sur-amplification)
+                gainNode.gain.value = currentVolume || 1.0;
             }
             
             const source = audioContextListener.createBufferSource();

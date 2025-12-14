@@ -433,58 +433,58 @@ function initRadioEvents() {
             const bufferLength = analyser.frequencyBinCount;
             dataArray = new Uint8Array(bufferLength);
             
-            // Créer des filtres audio professionnels pour qualité vocale maximale
+            // Créer des filtres audio professionnels pour QUALITÉ MAXIMALE ET CLARTÉ
             const compressor = audioContext.createDynamicsCompressor();
-            compressor.threshold.value = -28; // Seuil optimisé
-            compressor.knee.value = 15; // Zone de transition serrée
-            compressor.ratio.value = 6; // Ratio équilibré (6:1)
-            compressor.attack.value = 0.0001; // Attaque ultra-rapide
-            compressor.release.value = 0.08; // Relâchement très rapide
+            compressor.threshold.value = -24; // Seuil plus haut (moins de compression) pour clarté
+            compressor.knee.value = 20; // Zone de transition plus large (plus doux)
+            compressor.ratio.value = 4; // Ratio plus doux (4:1 au lieu de 6:1) pour préserver la voix
+            compressor.attack.value = 0.003; // Attaque plus lente (3ms) pour préserver les transitoires
+            compressor.release.value = 0.1; // Relâchement plus lent pour plus de naturel
             
             // High-pass filter pour supprimer les basses (bruit, vent, vibrations)
             const highPassFilter = audioContext.createBiquadFilter();
             highPassFilter.type = 'highpass';
-            highPassFilter.frequency.value = 120; // Fréquence optimisée pour voix claire
-            highPassFilter.Q.value = 0.8; // Qualité améliorée
+            highPassFilter.frequency.value = 80; // Fréquence plus basse (80Hz) pour garder plus de chaleur vocale
+            highPassFilter.Q.value = 0.7; // Q plus doux pour transition naturelle
             
             // Low-pass filter pour supprimer les hautes fréquences (bruit, sifflements)
             const lowPassFilter = audioContext.createBiquadFilter();
             lowPassFilter.type = 'lowpass';
-            lowPassFilter.frequency.value = 14000; // Garder plus de fréquences vocales (14kHz)
-            lowPassFilter.Q.value = 0.8; // Qualité améliorée
+            lowPassFilter.frequency.value = 16000; // Garder plus de fréquences (16kHz) pour clarté maximale
+            lowPassFilter.Q.value = 0.7; // Q plus doux
             
-            // Égaliseur multi-bandes pour qualité vocale maximale
+            // Égaliseur multi-bandes pour CLARTÉ MAXIMALE (moins agressif)
             const eq1 = audioContext.createBiquadFilter(); // Boost fréquences vocales principales
             eq1.type = 'peaking';
-            eq1.frequency.value = 2000; // Fréquence centrale de la voix
-            eq1.gain.value = 3; // Boost modéré pour clarté
-            eq1.Q.value = 1.2;
+            eq1.frequency.value = 2500; // Fréquence centrale de la voix (2.5kHz)
+            eq1.gain.value = 2; // Boost plus doux (2dB au lieu de 3dB) pour naturel
+            eq1.Q.value = 1.0; // Q plus large pour transition douce
             
             const eq2 = audioContext.createBiquadFilter(); // Réduction des fréquences problématiques
             eq2.type = 'notch';
             eq2.frequency.value = 60; // Supprimer le ronflement 50/60Hz
-            eq2.Q.value = 10;
+            eq2.Q.value = 8; // Q un peu moins serré
             
             const eq3 = audioContext.createBiquadFilter(); // Réduction des fréquences aiguës problématiques
             eq3.type = 'peaking';
-            eq3.frequency.value = 9000; // Réduire les fréquences très aiguës qui causent saturation
-            eq3.gain.value = -3; // Réduction modérée
-            eq3.Q.value = 2;
+            eq3.frequency.value = 12000; // Réduire seulement les très hautes fréquences (12kHz)
+            eq3.gain.value = -2; // Réduction plus douce (-2dB au lieu de -3dB)
+            eq3.Q.value = 1.5; // Q plus large
             
             // Égaliseur supplémentaire pour améliorer les fréquences moyennes
             const eq4 = audioContext.createBiquadFilter();
             eq4.type = 'peaking';
-            eq4.frequency.value = 3000; // Boost fréquences moyennes-hautes
-            eq4.gain.value = 2; // Légère amélioration
-            eq4.Q.value = 1;
+            eq4.frequency.value = 3500; // Boost fréquences moyennes-hautes (3.5kHz) pour clarté
+            eq4.gain.value = 1.5; // Boost doux (1.5dB) pour naturel
+            eq4.Q.value = 0.8; // Q large
             
-            // Ajouter un limiter supplémentaire avant la compression
+            // Ajouter un limiter DOUX pour éviter saturation sans déformer
             const limiter = audioContext.createDynamicsCompressor();
-            limiter.threshold.value = -3; // Seuil très haut (presque pas de compression normale)
-            limiter.knee.value = 0; // Pas de zone de transition
-            limiter.ratio.value = 20; // Ratio très élevé (limiter dur)
-            limiter.attack.value = 0.0001; // Attaque ultra-rapide
-            limiter.release.value = 0.01; // Relâchement très rapide
+            limiter.threshold.value = -1; // Seuil plus haut (-1dB) pour moins de limitation
+            limiter.knee.value = 5; // Zone de transition douce (5dB)
+            limiter.ratio.value = 10; // Ratio moins agressif (10:1 au lieu de 20:1)
+            limiter.attack.value = 0.001; // Attaque plus lente (1ms) pour préserver les transitoires
+            limiter.release.value = 0.05; // Relâchement plus lent (50ms) pour plus de naturel
             
             // Connecter les filtres en chaîne optimisée pour qualité vocale maximale
             microphone.connect(eq2); // D'abord supprimer le ronflement 60Hz
@@ -520,7 +520,7 @@ function initRadioEvents() {
             // Opus WebM ne peut pas être joué en fragments individuels, donc on utilise PCM16 stéréo
             console.log('✅ Utilisation de PCM16 STÉRÉO 48kHz (plus fiable pour streaming fragmenté)');
             selectedMimeType = null; // Forcer PCM16 stéréo
-            const bufferSize = 4096;
+            const bufferSize = 8192; // Buffer plus grand (8192 au lieu de 4096) pour meilleure qualité
             scriptProcessor = audioContext.createScriptProcessor(bufferSize, 2, 2); // 2 canaux (stéréo)
             
             if (false) { // Désactivé - Opus ne fonctionne pas avec fragments
@@ -621,11 +621,11 @@ function initRadioEvents() {
             let continuousAudioBuffer = [];
             let bufferAccumulationTime = 0;
             let lastBufferSendTime = Date.now();
-            // Buffers plus petits pour fluidité maximale (comme Discord)
-            const bufferTargetDuration = 0.08; // 80ms seulement (au lieu de 150ms) pour latence minimale
-            const bufferMaxWaitTime = 100; // Envoyer au maximum toutes les 100ms (au lieu de 200ms) pour fluidité
+            // Buffers optimisés pour QUALITÉ MAXIMALE (plus grands = meilleure qualité)
+            const bufferTargetDuration = 0.12; // 120ms (augmenté de 80ms) pour meilleure qualité
+            const bufferMaxWaitTime = 150; // Envoyer au maximum toutes les 150ms (augmenté de 100ms) pour qualité
             const sampleRate = audioContext.sampleRate;
-            const samplesPerBuffer = Math.floor(sampleRate * bufferTargetDuration); // ~3840 échantillons à 48kHz (plus petit = plus fluide)
+            const samplesPerBuffer = Math.floor(sampleRate * bufferTargetDuration); // ~5760 échantillons à 48kHz (plus grand = meilleure qualité)
             
             // Nettoyer l'ancien timer s'il existe
             if (bufferTimer) {
@@ -656,12 +656,12 @@ function initRadioEvents() {
                 }
             }, 50); // Vérifier toutes les 50ms (au lieu de 100ms) pour fluidité maximale
             
-            // Variables pour la normalisation et suppression de bruit - QUALITÉ DISCORD (TRÈS FLUIDE ET AUDIBLE)
-            let noiseGateThreshold = 0.0003; // Seuil encore plus bas pour capturer tous les détails
+            // Variables pour la normalisation et suppression de bruit - QUALITÉ MAXIMALE ET CLARTÉ
+            let noiseGateThreshold = 0.0005; // Seuil légèrement plus haut pour éviter le bruit de fond
             let peakLevel = 0;
-            let targetPeak = 0.95; // Niveau cible très élevé (95%) pour son audible et clair
+            let targetPeak = 0.75; // Niveau cible modéré (75%) pour éviter la distorsion et garder la clarté
             let adaptiveGain = 1.0;
-            let maxGain = 2.5; // Gain max très élevé (2.5x) pour son audible même à faible volume
+            let maxGain = 1.8; // Gain max modéré (1.8x) pour éviter la distorsion
             
             // Fonction pour envoyer le buffer accumulé comme un stream continu
             const sendContinuousBuffer = () => {
@@ -793,9 +793,9 @@ function initRadioEvents() {
                 }
                 const rms = Math.sqrt(sumSquares / (inputDataLeft.length * 2)); // Diviser par 2 car 2 canaux
                 
-                // 2. Gain adaptatif pour qualité appel
-                const targetGain = targetPeak / Math.max(maxAmplitude, 0.05);
-                adaptiveGain = adaptiveGain * 0.95 + targetGain * 0.05; // Lissage très doux
+                // 2. Gain adaptatif pour clarté maximale (moins agressif)
+                const targetGain = targetPeak / Math.max(maxAmplitude, 0.1); // Seuil minimum plus haut (0.1)
+                adaptiveGain = adaptiveGain * 0.9 + targetGain * 0.1; // Lissage plus rapide pour réactivité
                 const gain = Math.min(adaptiveGain, maxGain);
                 
                 // 3. Traitement audio professionnel STÉRÉO (qualité appel téléphonique)
@@ -806,16 +806,17 @@ function initRadioEvents() {
                     let sampleLeft = inputDataLeft[i];
                     let sampleRight = inputDataRight[i];
                     
-                    // Suppression de bruit très douce (qualité appel)
+                    // Suppression de bruit très douce (pour clarté)
                     const absValueLeft = Math.abs(sampleLeft);
                     const absValueRight = Math.abs(sampleRight);
                     
+                    // Réduction plus douce pour préserver les détails vocaux
                     if (absValueLeft < noiseGateThreshold) {
-                        const reduction = Math.pow(absValueLeft / noiseGateThreshold, 3) * 0.3;
+                        const reduction = Math.pow(absValueLeft / noiseGateThreshold, 2) * 0.5; // Plus doux (^2 au lieu de ^3, 0.5 au lieu de 0.3)
                         sampleLeft *= reduction;
                     }
                     if (absValueRight < noiseGateThreshold) {
-                        const reduction = Math.pow(absValueRight / noiseGateThreshold, 3) * 0.3;
+                        const reduction = Math.pow(absValueRight / noiseGateThreshold, 2) * 0.5;
                         sampleRight *= reduction;
                     }
                     
@@ -823,32 +824,33 @@ function initRadioEvents() {
                     sampleLeft *= gain;
                     sampleRight *= gain;
                     
-                    // Soft limiter très doux (qualité Discord - son audible)
-                    const softThreshold = 0.97;
+                    // Soft limiter très doux pour clarté (seuil plus bas pour éviter distorsion)
+                    const softThreshold = 0.85; // Seuil plus bas (85%) pour éviter la distorsion
                     if (sampleLeft > softThreshold) {
                         const excess = sampleLeft - softThreshold;
-                        sampleLeft = softThreshold + excess / (1 + excess * 4);
+                        sampleLeft = softThreshold + excess / (1 + excess * 6); // Compression plus douce (x6 au lieu de x4)
                     } else if (sampleLeft < -softThreshold) {
                         const excess = Math.abs(sampleLeft) - softThreshold;
-                        sampleLeft = -(softThreshold + excess / (1 + excess * 4));
+                        sampleLeft = -(softThreshold + excess / (1 + excess * 6));
                     }
                     if (sampleRight > softThreshold) {
                         const excess = sampleRight - softThreshold;
-                        sampleRight = softThreshold + excess / (1 + excess * 4);
+                        sampleRight = softThreshold + excess / (1 + excess * 6);
                     } else if (sampleRight < -softThreshold) {
                         const excess = Math.abs(sampleRight) - softThreshold;
-                        sampleRight = -(softThreshold + excess / (1 + excess * 4));
+                        sampleRight = -(softThreshold + excess / (1 + excess * 6));
                     }
                     
-                    // Hard limiter (sécurité)
-                    const hardLimit = 0.99;
+                    // Hard limiter (sécurité) - limite plus basse pour éviter distorsion
+                    const hardLimit = 0.90; // Limite plus basse (90%) pour clarté
                     if (sampleLeft > hardLimit) sampleLeft = hardLimit;
                     else if (sampleLeft < -hardLimit) sampleLeft = -hardLimit;
                     if (sampleRight > hardLimit) sampleRight = hardLimit;
                     else if (sampleRight < -hardLimit) sampleRight = -hardLimit;
                     
-                    processedDataLeft[i] = Math.max(-0.99, Math.min(0.99, sampleLeft));
-                    processedDataRight[i] = Math.max(-0.99, Math.min(0.99, sampleRight));
+                    // Limite finale pour clarté maximale
+                    processedDataLeft[i] = Math.max(-0.90, Math.min(0.90, sampleLeft));
+                    processedDataRight[i] = Math.max(-0.90, Math.min(0.90, sampleRight));
                 }
                 
                 peakLevel = maxAmplitude * gain;
