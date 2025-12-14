@@ -61,12 +61,22 @@ function togglePlayPause() {
             audioContextListener.resume().then(() => {
                 console.log('✅ Contexte audio activé, démarrage de l\'écoute...');
                 startListeningToAudio();
+                // Activer l'interface
+                isPlaying = true;
+                playIcon.style.display = 'none';
+                pauseIcon.style.display = 'block';
+                vinylRecord.classList.add('playing');
             }).catch(err => {
                 console.error('❌ Erreur activation audio:', err);
                 alert('Erreur: Impossible d\'activer l\'audio. Vérifiez les permissions.');
             });
         } else {
             startListeningToAudio();
+            // Activer l'interface
+            isPlaying = true;
+            playIcon.style.display = 'none';
+            pauseIcon.style.display = 'block';
+            vinylRecord.classList.add('playing');
         }
     }
 }
@@ -146,14 +156,30 @@ function loadRadioStream() {
             console.log('📡 Statut radio vocal reçu:', status);
             if (status && status.isLive === true) {
                 trackTitle.textContent = 'EN DIRECT 🎙️';
-                console.log('✅ Statut: EN DIRECT - Démarrage de l\'écoute');
+                console.log('✅ Statut: EN DIRECT - Démarrage automatique de l\'écoute');
+                
+                // Démarrer automatiquement l'écoute si pas déjà en cours
                 if (!isPlayingAudio) {
-                    startListeningToAudio();
+                    // Activer automatiquement l'interface et l'audio
+                    autoStartAudio();
+                } else {
+                    // Si déjà en cours, juste mettre à jour l'interface
+                    if (!isPlaying) {
+                        isPlaying = true;
+                        playIcon.style.display = 'none';
+                        pauseIcon.style.display = 'block';
+                        vinylRecord.classList.add('playing');
+                    }
                 }
             } else {
                 trackTitle.textContent = 'EN DIRECT';
                 console.log('⏸️ Statut: Hors ligne');
                 stopListeningToAudio();
+                // Mettre à jour l'interface
+                isPlaying = false;
+                playIcon.style.display = 'block';
+                pauseIcon.style.display = 'none';
+                vinylRecord.classList.remove('playing');
             }
         });
         
@@ -168,9 +194,16 @@ function loadRadioStream() {
             console.log('📡 Vérification statut initial:', status);
             if (status && status.isLive === true) {
                 trackTitle.textContent = 'EN DIRECT 🎙️';
-                console.log('✅ Diffusion déjà en cours - Démarrage immédiat');
+                console.log('✅ Diffusion déjà en cours - Démarrage automatique immédiat');
                 if (!isPlayingAudio) {
-                    startListeningToAudio();
+                    // Démarrer automatiquement l'audio
+                    autoStartAudio();
+                } else {
+                    // Si déjà en cours, activer l'interface
+                    isPlaying = true;
+                    playIcon.style.display = 'none';
+                    pauseIcon.style.display = 'block';
+                    vinylRecord.classList.add('playing');
                 }
             } else {
                 trackTitle.textContent = 'EN DIRECT';
@@ -204,6 +237,63 @@ function loadRadioStream() {
 
 // Variable pour le stream URL
 let streamUrl = '';
+
+// Variables pour le système de rediffusion amélioré
+let chunksListenerRef = null;
+let reconnectAttempts = 0;
+let maxReconnectAttempts = 5;
+let reconnectDelay = 0; // Pas de délai
+let lastSuccessfulChunkTime = null;
+let healthCheckInterval = null;
+let autoPlayEnabled = true; // Activer la lecture automatique par défaut
+
+// Démarrer automatiquement l'audio (sans interaction utilisateur requise)
+function autoStartAudio() {
+    console.log('🎵 Démarrage automatique de l\'audio...');
+    
+    // Créer le contexte audio s'il n'existe pas
+    if (!audioContextListener || audioContextListener.state === 'closed') {
+        try {
+            audioContextListener = new (window.AudioContext || window.webkitAudioContext)({
+                sampleRate: 48000,
+                latencyHint: 'interactive'
+            });
+            console.log('✅ Contexte audio créé automatiquement');
+        } catch (error) {
+            console.error('❌ Erreur création contexte:', error);
+            // Si échec, essayer avec startListeningToAudio qui demande l'interaction
+            startListeningToAudio();
+            return;
+        }
+    }
+    
+    // Essayer de reprendre le contexte (peut nécessiter une interaction utilisateur)
+    if (audioContextListener.state === 'suspended') {
+        audioContextListener.resume().then(() => {
+            console.log('✅ Contexte audio activé automatiquement');
+            // Démarrer l'écoute
+            startListeningToAudio();
+            // Activer l'interface
+            isPlaying = true;
+            playIcon.style.display = 'none';
+            pauseIcon.style.display = 'block';
+            vinylRecord.classList.add('playing');
+        }).catch(err => {
+            console.warn('⚠️ Impossible d\'activer automatiquement, attente interaction utilisateur');
+            // Si échec, attendre l'interaction utilisateur
+            // L'utilisateur devra cliquer sur play
+            updateAudioStatus(false, 'Cliquez sur ▶️ pour démarrer');
+        });
+    } else {
+        // Contexte déjà actif, démarrer directement
+        startListeningToAudio();
+        // Activer l'interface
+        isPlaying = true;
+        playIcon.style.display = 'none';
+        pauseIcon.style.display = 'block';
+        vinylRecord.classList.add('playing');
+    }
+}
 
 // Démarrer l'écoute des chunks audio
 function startListeningToAudio() {
@@ -261,7 +351,9 @@ function startListeningToAudio() {
     
     isPlayingAudio = true;
     audioChunksQueue = [];
-    lastChunkTimestamp = Date.now() - 2000; // Accepter les chunks des 2 dernières secondes
+    lastChunkTimestamp = Date.now() - 5000; // Accepter les chunks des 5 dernières secondes
+    reconnectAttempts = 0;
+    lastSuccessfulChunkTime = Date.now();
     
     console.log('🎧 Démarrage de l\'écoute de la diffusion vocale Firebase...');
     
@@ -285,38 +377,127 @@ function startListeningToAudio() {
         currentVolume = 1.0;
     }
     
-    // MediaSource n'est plus utilisé, on utilise directement Audio pour chaque chunk
+    // ÉCOUTER TOUS LES NOUVEAUX CHUNKS - SYSTÈME AMÉLIORÉ ET FIABLE
+    connectToAudioChunks();
     
-    // ÉCOUTER TOUS LES NOUVEAUX CHUNKS - SYSTÈME SIMPLIFIÉ ET FIABLE
-    const chunksRef = database.ref('radio/audioChunks');
-    
-    // Écouter chaque nouveau chunk (SYSTÈME SIMPLIFIÉ)
-    chunksRef.orderByKey().on('child_added', (snapshot) => {
-        const chunkData = snapshot.val();
-        if (!chunkData || !chunkData.data) return;
-        
-        const chunkTimestamp = chunkData.timestamp || parseInt(snapshot.key);
-        const age = Date.now() - chunkTimestamp;
-        
-        // Accepter seulement les nouveaux chunks récents (moins de 3 secondes)
-        if (chunkTimestamp > lastChunkTimestamp && age < 3000) {
-            lastChunkTimestamp = chunkTimestamp;
-            console.log(`📥 Chunk reçu: ${chunkTimestamp}, âge: ${age}ms`);
-            playAudioChunk(chunkData.data, {
-                format: chunkData.format || 'pcm16',
-                sampleRate: chunkData.sampleRate || 44100,
-                bufferSize: chunkData.bufferSize || 4096,
-                mimeType: chunkData.mimeType || null
-            });
-        }
-    });
+    // Démarrer le health check
+    startHealthCheck();
     
     chunksReceivedCount = 0;
     updateAudioStatus(false, 'En attente des chunks...');
     
-    // Le contexte devrait déjà être activé, sinon on l'affichera dans startListeningToAudio
-    
     console.log('✅ Écoute de la diffusion vocale démarrée');
+    
+    // Mettre à jour l'interface si pas déjà fait
+    if (!isPlaying) {
+        isPlaying = true;
+        playIcon.style.display = 'none';
+        pauseIcon.style.display = 'block';
+        vinylRecord.classList.add('playing');
+    }
+}
+
+// Se connecter aux chunks audio Firebase
+function connectToAudioChunks() {
+    // Désactiver l'ancien listener s'il existe
+    if (chunksListenerRef) {
+        try {
+            chunksListenerRef.off('child_added');
+        } catch (e) {
+            console.warn('⚠️ Erreur désactivation ancien listener:', e);
+        }
+    }
+    
+    const chunksRef = database.ref('radio/audioChunks');
+    
+    // Écouter chaque nouveau chunk avec gestion d'erreur
+    chunksListenerRef = chunksRef.orderByKey();
+    
+    chunksListenerRef.on('child_added', (snapshot) => {
+        try {
+            const chunkData = snapshot.val();
+            if (!chunkData || !chunkData.data) {
+                console.warn('⚠️ Chunk invalide reçu');
+                return;
+            }
+            
+            const chunkTimestamp = chunkData.timestamp || parseInt(snapshot.key);
+            const age = Date.now() - chunkTimestamp;
+            
+            // Accepter les chunks récents (moins de 5 secondes) ou nouveaux
+            if (chunkTimestamp > lastChunkTimestamp || age < 5000) {
+                lastChunkTimestamp = Math.max(lastChunkTimestamp, chunkTimestamp);
+                lastSuccessfulChunkTime = Date.now();
+                reconnectAttempts = 0; // Réinitialiser les tentatives de reconnexion
+                
+                // Log seulement tous les 20 chunks pour éviter le spam
+                if (chunksReceivedCount % 20 === 0) {
+                    console.log(`📥 Chunk reçu: ${chunkTimestamp}, âge: ${age}ms, format: ${chunkData.format || 'pcm16'}`);
+                }
+                
+                playAudioChunk(chunkData.data, {
+                    format: chunkData.format || 'pcm16',
+                    sampleRate: chunkData.sampleRate || 44100,
+                    bufferSize: chunkData.bufferSize || 4096,
+                    mimeType: chunkData.mimeType || null
+                });
+            } else {
+                // Chunk trop ancien, l'ignorer
+                if (chunksReceivedCount % 50 === 0) {
+                    console.log(`⏭️ Chunk ignoré (trop ancien): ${chunkTimestamp}, âge: ${age}ms`);
+                }
+            }
+        } catch (error) {
+            console.error('❌ Erreur traitement chunk:', error);
+        }
+    }, (error) => {
+        console.error('❌ Erreur listener Firebase:', error);
+        handleAudioChunksError(error);
+    });
+    
+    console.log('✅ Listener Firebase connecté pour les chunks audio');
+}
+
+// Gérer les erreurs de connexion aux chunks
+function handleAudioChunksError(error) {
+    console.error('❌ Erreur connexion chunks audio:', error);
+    reconnectAttempts++;
+    
+    if (reconnectAttempts < maxReconnectAttempts) {
+        console.log(`🔄 Tentative de reconnexion ${reconnectAttempts}/${maxReconnectAttempts} dans ${reconnectDelay}ms...`);
+        updateAudioStatus(false, `Reconnexion... (${reconnectAttempts}/${maxReconnectAttempts})`);
+        
+        // Reconnexion immédiate sans délai
+        if (isPlayingAudio) {
+            connectToAudioChunks();
+        }
+    } else {
+        console.error('❌ Échec de reconnexion après', maxReconnectAttempts, 'tentatives');
+        updateAudioStatus(false, 'Erreur de connexion');
+        alert('⚠️ Impossible de se connecter au stream audio. Vérifiez votre connexion internet.');
+    }
+}
+
+// Health check pour détecter les problèmes de connexion
+function startHealthCheck() {
+    if (healthCheckInterval) {
+        clearInterval(healthCheckInterval);
+    }
+    
+    healthCheckInterval = setInterval(() => {
+        if (!isPlayingAudio) {
+            clearInterval(healthCheckInterval);
+            healthCheckInterval = null;
+            return;
+        }
+        
+        // Si aucun chunk n'a été reçu depuis 10 secondes, essayer de se reconnecter
+        if (lastSuccessfulChunkTime && (Date.now() - lastSuccessfulChunkTime > 10000)) {
+            console.warn('⚠️ Aucun chunk reçu depuis 10 secondes, reconnexion...');
+            updateAudioStatus(false, 'Reconnexion...');
+            connectToAudioChunks();
+        }
+    }, 5000); // Vérifier toutes les 5 secondes
 }
 
 // Arrêter l'écoute
@@ -327,6 +508,29 @@ function stopListeningToAudio() {
     audioChunksQueue = [];
     audioBufferQueue = [];
     isProcessingBuffer = false;
+    
+    // Arrêter le health check
+    if (healthCheckInterval) {
+        clearInterval(healthCheckInterval);
+        healthCheckInterval = null;
+    }
+    
+    // Désactiver le listener Firebase
+    if (chunksListenerRef) {
+        try {
+            chunksListenerRef.off('child_added');
+            chunksListenerRef = null;
+        } catch (e) {
+            console.warn('⚠️ Erreur désactivation listener:', e);
+        }
+    }
+    
+    // Désactiver tous les listeners Firebase sur audioChunks
+    try {
+        database.ref('radio/audioChunks').off();
+    } catch (e) {
+        console.warn('⚠️ Erreur désactivation listeners Firebase:', e);
+    }
     
     if (sourceBuffer) {
         try {
@@ -349,13 +553,6 @@ function stopListeningToAudio() {
         } catch (e) {}
     }
     
-    if (audioContextListener) {
-        try {
-            audioContextListener.close();
-        } catch (e) {}
-        audioContextListener = null;
-    }
-    
     if (audioSource) {
         try {
             audioSource.disconnect();
@@ -363,10 +560,20 @@ function stopListeningToAudio() {
         audioSource = null;
     }
     
-    // Désactiver les listeners Firebase
-    try {
-        database.ref('radio/audioChunks').off();
-    } catch (e) {}
+    // Ne pas fermer le contexte audio, juste le suspendre (pour pouvoir le réutiliser)
+    if (audioContextListener && audioContextListener.state !== 'closed') {
+        try {
+            if (audioContextListener.state !== 'suspended') {
+                audioContextListener.suspend();
+            }
+        } catch (e) {
+            console.warn('⚠️ Erreur suspension contexte audio:', e);
+        }
+    }
+    
+    // Réinitialiser les variables de suivi
+    reconnectAttempts = 0;
+    lastSuccessfulChunkTime = null;
     
     console.log('⏹️ Écoute arrêtée');
 }
@@ -374,17 +581,22 @@ function stopListeningToAudio() {
 // Jouer un chunk audio
 function playAudioChunk(base64Data, chunkInfo) {
     try {
+        if (!isPlayingAudio) {
+            // Si l'écoute est arrêtée, ignorer le chunk
+            return;
+        }
+        
         chunksReceivedCount++;
         lastReceivedTime = new Date();
         
         // Mettre à jour le statut visuel
         updateAudioStatus(true);
         
-        // LIMITER la queue à 10 chunks maximum pour éviter les crashes
-        if (audioChunksQueue.length > 10) {
+        // LIMITER la queue à 15 chunks maximum pour éviter les crashes et la latence
+        if (audioChunksQueue.length > 15) {
             console.warn(`⚠️ Queue trop longue (${audioChunksQueue.length}), suppression des anciens chunks`);
-            // Supprimer les 5 plus anciens
-            audioChunksQueue.splice(0, 5);
+            // Supprimer les 8 plus anciens pour garder la queue fluide
+            audioChunksQueue.splice(0, 8);
         }
         
         // Ajouter à la queue avec les informations du chunk
@@ -393,21 +605,22 @@ function playAudioChunk(base64Data, chunkInfo) {
             format: chunkInfo.format || 'pcm16',
             sampleRate: chunkInfo.sampleRate || 44100,
             bufferSize: chunkInfo.bufferSize || 4096,
-            mimeType: chunkInfo.mimeType || null
+            mimeType: chunkInfo.mimeType || null,
+            timestamp: Date.now() // Ajouter un timestamp pour le suivi
         });
         
-        // Si c'est le premier chunk, démarrer la lecture
-        if (audioChunksQueue.length === 1 && !isProcessingBuffer) {
+        // Si c'est le premier chunk ou si aucun traitement n'est en cours, démarrer la lecture
+        if ((audioChunksQueue.length === 1 || !isProcessingBuffer) && isPlayingAudio) {
             processAudioQueue();
         }
         
-        // Log seulement tous les 10 chunks pour éviter le spam
-        if (chunksReceivedCount % 10 === 0) {
+        // Log seulement tous les 20 chunks pour éviter le spam
+        if (chunksReceivedCount % 20 === 0) {
             console.log(`🎵 ${chunksReceivedCount} chunks reçus, queue: ${audioChunksQueue.length}, format: ${chunkInfo.format || 'pcm16'}`);
         }
         
     } catch (error) {
-        console.error('Erreur traitement chunk audio:', error);
+        console.error('❌ Erreur traitement chunk audio:', error);
         updateAudioStatus(false, 'Erreur traitement');
     }
 }
@@ -438,8 +651,13 @@ let mediaSource = null;
 let sourceBuffer = null;
 let mediaSourceReady = false;
 
-// TRAITER LA QUEUE AUDIO - SYSTÈME SIMPLIFIÉ ET FIABLE
+// TRAITER LA QUEUE AUDIO - SYSTÈME AMÉLIORÉ ET FIABLE
 async function processAudioQueue() {
+    if (!isPlayingAudio) {
+        isProcessingBuffer = false;
+        return;
+    }
+    
     if (audioChunksQueue.length === 0) {
         isProcessingBuffer = false;
         updateAudioStatus(true, 'En attente de chunks...');
@@ -453,159 +671,191 @@ async function processAudioQueue() {
     const chunk = audioChunksQueue.shift();
     
     try {
+        // S'assurer que le contexte audio est actif
+        if (!audioContextListener || audioContextListener.state === 'closed') {
+            console.warn('⚠️ Contexte audio fermé, recréation...');
+            audioContextListener = new (window.AudioContext || window.webkitAudioContext)({
+                sampleRate: 48000,
+                latencyHint: 'interactive'
+            });
+        }
+        
+        if (audioContextListener.state === 'suspended') {
+            await audioContextListener.resume();
+        }
+        
         // FORMAT OPUS - Utiliser directement l'élément Audio HTML (plus fiable)
         if (chunk.format === 'opus' || chunk.mimeType) {
             // Format Opus (qualité appel optimale comme WhatsApp/Telegram)
             const mimeType = chunk.mimeType || 'audio/webm;codecs=opus';
             
-            // Convertir base64 en Blob
-            const binaryString = atob(chunk.data);
-            const bytes = new Uint8Array(binaryString.length);
-            for (let i = 0; i < binaryString.length; i++) {
-                bytes[i] = binaryString.charCodeAt(i);
-            }
-            
-            const blob = new Blob([bytes], { type: mimeType });
-            const audioUrl = URL.createObjectURL(blob);
-            
-            // S'assurer que le contexte est actif
-            if (audioContextListener.state === 'suspended') {
-                await audioContextListener.resume();
-            }
-            
-            if (!gainNode) {
-                gainNode = audioContextListener.createGain();
-                gainNode.gain.value = currentVolume;
-                gainNode.connect(audioContextListener.destination);
-            }
-            
-            // LECTURE OPUS SIMPLIFIÉE - Élément Audio HTML direct
-            const audio = new Audio(audioUrl);
-            audio.volume = currentVolume;
-            
-            let cleaned = false;
-            const cleanup = () => {
-                if (cleaned) return;
-                cleaned = true;
-                try {
-                    audio.pause();
-                    audio.src = '';
-                    URL.revokeObjectURL(audioUrl);
-                } catch (e) {}
-                isProcessingBuffer = false;
-                if (audioChunksQueue.length > 0) {
-                    setTimeout(() => processAudioQueue(), 5);
-                }
-            };
-            
-            audio.addEventListener('ended', cleanup, { once: true });
-            audio.addEventListener('error', () => cleanup(), { once: true });
-            
             try {
-                audio.play().then(() => {
-                    updateAudioStatus(true, `Lecture: ${chunksReceivedCount} chunks`);
-                    // Cleanup après ~150ms (durée du chunk)
-                    setTimeout(cleanup, 150);
-                }).catch((err) => {
-                    console.error('❌ Erreur play Opus:', err);
+                // Convertir base64 en Blob
+                const binaryString = atob(chunk.data);
+                const bytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
+                }
+                
+                const blob = new Blob([bytes], { type: mimeType });
+                const audioUrl = URL.createObjectURL(blob);
+                
+                // Créer/connecter gainNode si nécessaire
+                if (!gainNode) {
+                    gainNode = audioContextListener.createGain();
+                    gainNode.gain.value = currentVolume;
+                    gainNode.connect(audioContextListener.destination);
+                }
+                
+                // LECTURE OPUS SIMPLIFIÉE - Élément Audio HTML direct
+                const audio = new Audio(audioUrl);
+                audio.volume = currentVolume;
+                
+                let cleaned = false;
+                const cleanup = () => {
+                    if (cleaned) return;
+                    cleaned = true;
+                    try {
+                        audio.pause();
+                        audio.src = '';
+                        URL.revokeObjectURL(audioUrl);
+                    } catch (e) {}
+                isProcessingBuffer = false;
+                // Traiter le prochain chunk immédiatement
+                if (audioChunksQueue.length > 0 && isPlayingAudio) {
+                    processAudioQueue();
+                }
+                };
+                
+                audio.addEventListener('ended', cleanup, { once: true });
+                audio.addEventListener('error', (e) => {
+                    console.warn('⚠️ Erreur lecture audio Opus:', e);
                     cleanup();
-                });
-            } catch (err) {
-                console.error('❌ Erreur lecture Opus:', err);
-                cleanup();
+                }, { once: true });
+                
+                // Jouer le chunk
+                const playPromise = audio.play();
+                if (playPromise !== undefined) {
+                    playPromise.then(() => {
+                        updateAudioStatus(true, `Lecture: ${chunksReceivedCount} chunks`);
+                        // Cleanup immédiat après le démarrage
+                        cleanup();
+                    }).catch((err) => {
+                        console.warn('⚠️ Erreur play Opus:', err);
+                        cleanup();
+                    });
+                } else {
+                    cleanup();
+                }
+                
+                return;
+            } catch (error) {
+                console.error('❌ Erreur traitement Opus:', error);
+                isProcessingBuffer = false;
+                if (audioChunksQueue.length > 0 && isPlayingAudio) {
+                    processAudioQueue();
+                }
+                return;
             }
-            
-            return;
         }
         
         // FORMAT PCM16 - LECTURE SIMPLIFIÉE ET FIABLE
         if (chunk.format === 'pcm16' && chunk.sampleRate) {
-            // Décoder base64
-            const binaryString = atob(chunk.data);
-            const bytes = new Uint8Array(binaryString.length);
-            for (let i = 0; i < binaryString.length; i++) {
-                bytes[i] = binaryString.charCodeAt(i);
-            }
-            
-            if (bytes.length % 2 !== 0) {
-                console.warn('⚠️ Taille invalide');
-                isProcessingBuffer = false;
-                if (audioChunksQueue.length > 0) setTimeout(() => processAudioQueue(), 10);
-                return;
-            }
-            
-            // Convertir en Int16 puis Float32
-            const int16Data = new Int16Array(bytes.buffer);
-            const float32Data = new Float32Array(int16Data.length);
-            for (let i = 0; i < int16Data.length; i++) {
-                float32Data[i] = int16Data[i] / 32768.0;
-            }
-            
-            // Créer AudioBuffer
-            const sampleRate = chunk.sampleRate || 44100;
-            const audioBuffer = audioContextListener.createBuffer(1, float32Data.length, sampleRate);
-            audioBuffer.getChannelData(0).set(float32Data);
-            
-            // Activer le contexte
-            if (audioContextListener.state === 'suspended') {
-                await audioContextListener.resume();
-            }
-            
-            // Créer/connecter gainNode
-            if (!gainNode) {
-                gainNode = audioContextListener.createGain();
-                gainNode.connect(audioContextListener.destination);
-            }
-            gainNode.gain.value = currentVolume || 1.0;
-            
-            // Créer et jouer la source
-            const source = audioContextListener.createBufferSource();
-            source.buffer = audioBuffer;
-            source.connect(gainNode);
-            
-            const duration = audioBuffer.duration;
-            console.log(`🔊 Chunk PCM: ${float32Data.length} échantillons, ${duration.toFixed(3)}s, volume: ${(currentVolume * 100).toFixed(0)}%`);
-            
-            source.onended = () => {
-                isProcessingBuffer = false;
-                if (audioChunksQueue.length > 0) {
-                    setTimeout(() => processAudioQueue(), 5);
-                }
-            };
-            
-            source.onerror = () => {
-                isProcessingBuffer = false;
-                if (audioChunksQueue.length > 0) {
-                    setTimeout(() => processAudioQueue(), 10);
-                }
-            };
-            
             try {
+                // Décoder base64
+                const binaryString = atob(chunk.data);
+                const bytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
+                }
+                
+                if (bytes.length % 2 !== 0) {
+                    console.warn('⚠️ Taille PCM invalide (impair)');
+                    isProcessingBuffer = false;
+                    if (audioChunksQueue.length > 0 && isPlayingAudio) {
+                        processAudioQueue();
+                    }
+                    return;
+                }
+                
+                // Convertir en Int16 puis Float32
+                const int16Data = new Int16Array(bytes.buffer);
+                const float32Data = new Float32Array(int16Data.length);
+                for (let i = 0; i < int16Data.length; i++) {
+                    float32Data[i] = int16Data[i] / 32768.0;
+                }
+                
+                // Créer AudioBuffer
+                const sampleRate = chunk.sampleRate || 44100;
+                const audioBuffer = audioContextListener.createBuffer(1, float32Data.length, sampleRate);
+                audioBuffer.getChannelData(0).set(float32Data);
+                
+                // Créer/connecter gainNode
+                if (!gainNode) {
+                    gainNode = audioContextListener.createGain();
+                    gainNode.connect(audioContextListener.destination);
+                }
+                gainNode.gain.value = currentVolume || 1.0;
+                
+                // Créer et jouer la source
+                const source = audioContextListener.createBufferSource();
+                source.buffer = audioBuffer;
+                source.connect(gainNode);
+                
+                const duration = audioBuffer.duration;
+                
+                // Log seulement tous les 50 chunks
+                if (chunksReceivedCount % 50 === 0) {
+                    console.log(`🔊 Chunk PCM: ${float32Data.length} échantillons, ${duration.toFixed(3)}s, volume: ${(currentVolume * 100).toFixed(0)}%`);
+                }
+                
+                source.onended = () => {
+                    isProcessingBuffer = false;
+                    if (audioChunksQueue.length > 0 && isPlayingAudio) {
+                        processAudioQueue();
+                    }
+                };
+                
+                source.onerror = (e) => {
+                    console.warn('⚠️ Erreur source PCM:', e);
+                    isProcessingBuffer = false;
+                    if (audioChunksQueue.length > 0 && isPlayingAudio) {
+                        processAudioQueue();
+                    }
+                };
+                
                 source.start(0);
                 updateAudioStatus(true, `Lecture: ${chunksReceivedCount} chunks`);
-                setTimeout(() => {
-                    isProcessingBuffer = false;
-                    if (audioChunksQueue.length > 0) processAudioQueue();
-                }, duration * 1000 + 50);
-            } catch (err) {
-                console.error('❌ Erreur start source:', err);
+                
+                // Traiter le prochain chunk immédiatement après le démarrage
                 isProcessingBuffer = false;
-                if (audioChunksQueue.length > 0) setTimeout(() => processAudioQueue(), 10);
+                if (audioChunksQueue.length > 0 && isPlayingAudio) {
+                    processAudioQueue();
+                }
+                
+            } catch (error) {
+                console.error('❌ Erreur traitement PCM:', error);
+                isProcessingBuffer = false;
+                if (audioChunksQueue.length > 0 && isPlayingAudio) {
+                    setTimeout(() => processAudioQueue(), 10);
+                }
             }
             
         } else {
             console.warn('⚠️ Format non supporté:', chunk.format);
             isProcessingBuffer = false;
-            if (audioChunksQueue.length > 0) setTimeout(() => processAudioQueue(), 10);
+            if (audioChunksQueue.length > 0 && isPlayingAudio) {
+                processAudioQueue();
+            }
         }
         
     } catch (error) {
-        console.error('❌ Erreur traitement chunk PCM:', error);
+        console.error('❌ Erreur traitement chunk:', error);
         isProcessingBuffer = false;
         updateAudioStatus(false, 'Erreur traitement');
         // Continuer avec le prochain chunk
-        if (audioChunksQueue.length > 0) {
-            setTimeout(() => processAudioQueue(), 10);
+        if (audioChunksQueue.length > 0 && isPlayingAudio) {
+            processAudioQueue();
         }
     }
 }
