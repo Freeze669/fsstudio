@@ -44,9 +44,9 @@ function togglePlayPause() {
         }
         isPlaying = false;
         isPlayingAudio = false;
-        playIcon.style.display = 'block';
-        pauseIcon.style.display = 'none';
-        vinylRecord.classList.remove('playing');
+        if (playIcon) playIcon.style.display = 'block';
+        if (pauseIcon) pauseIcon.style.display = 'none';
+        if (vinylRecord) vinylRecord.classList.remove('playing');
     } else {
         // Play - Activer le contexte audio puis démarrer la lecture
         // Le navigateur nécessite une interaction utilisateur pour activer l'audio
@@ -57,15 +57,16 @@ function togglePlayPause() {
             });
         }
         
+        // TOUJOURS essayer de reprendre le contexte (déblocage utilisateur)
         if (audioContextListener.state === 'suspended') {
             audioContextListener.resume().then(() => {
-                console.log('✅ Contexte audio activé, démarrage de l\'écoute...');
+                console.log('✅ Contexte audio activé par interaction utilisateur');
                 startListeningToAudio();
                 // Activer l'interface
                 isPlaying = true;
-                playIcon.style.display = 'none';
-                pauseIcon.style.display = 'block';
-                vinylRecord.classList.add('playing');
+                if (playIcon) playIcon.style.display = 'none';
+                if (pauseIcon) pauseIcon.style.display = 'block';
+                if (vinylRecord) vinylRecord.classList.add('playing');
             }).catch(err => {
                 console.error('❌ Erreur activation audio:', err);
                 alert('Erreur: Impossible d\'activer l\'audio. Vérifiez les permissions.');
@@ -74,9 +75,9 @@ function togglePlayPause() {
             startListeningToAudio();
             // Activer l'interface
             isPlaying = true;
-            playIcon.style.display = 'none';
-            pauseIcon.style.display = 'block';
-            vinylRecord.classList.add('playing');
+            if (playIcon) playIcon.style.display = 'none';
+            if (pauseIcon) pauseIcon.style.display = 'block';
+            if (vinylRecord) vinylRecord.classList.add('playing');
         }
     }
 }
@@ -463,6 +464,12 @@ function startListeningToAudio() {
         }
     }, 2000); // Vérifier toutes les 2 secondes
     
+    // Stocker l'interval pour le nettoyer plus tard
+    if (!window.audioActiveIntervals) {
+        window.audioActiveIntervals = [];
+    }
+    window.audioActiveIntervals.push(keepAudioActive);
+    
     isPlayingAudio = true;
     audioChunksQueue = [];
     lastChunkTimestamp = Date.now() - 5000; // Accepter les chunks des 5 dernières secondes
@@ -686,6 +693,12 @@ function stopListeningToAudio() {
         healthCheckInterval = null;
     }
     
+    // Arrêter tous les intervalles de maintien audio
+    if (window.audioActiveIntervals) {
+        window.audioActiveIntervals.forEach(interval => clearInterval(interval));
+        window.audioActiveIntervals = [];
+    }
+    
     // Désactiver le listener Firebase
     if (chunksListenerRef) {
         try {
@@ -876,8 +889,12 @@ async function processAudioQueue() {
             console.log('✅ GainNode créé et connecté');
         }
         
-        // TRAITER LE CHUNK - UNIQUEMENT PCM16 (plus fiable)
-        if (chunk.format === 'pcm16' && chunk.sampleRate) {
+        // DÉTECTER LE FORMAT DU CHUNK
+        const chunkFormat = (chunk.format || '').toLowerCase();
+        const hasOpusMimeType = chunk.mimeType && (chunk.mimeType.includes('opus') || chunk.mimeType.includes('webm'));
+        
+        // TRAITER LE CHUNK - PCM16 OU OPUS
+        if (chunkFormat === 'pcm16' && chunk.sampleRate) {
             // Décoder base64
             const binaryString = atob(chunk.data);
             const bytes = new Uint8Array(binaryString.length);
@@ -951,12 +968,75 @@ async function processAudioQueue() {
                 }
             }, nextChunkDelay);
             
-        } else if (chunk.format === 'opus' || chunk.mimeType) {
-            // FORMAT OPUS - Convertir en PCM pour compatibilité
-            console.warn('⚠️ Format Opus détecté, conversion nécessaire (non implémentée, ignoré)');
-            isProcessingBuffer = false;
-            if (audioChunksQueue.length > 0 && isPlayingAudio) {
-                processAudioQueue();
+        } else if (chunkFormat === 'opus' || hasOpusMimeType) {
+            // FORMAT OPUS - Utiliser l'élément Audio HTML (le navigateur décode Opus nativement)
+            const mimeType = chunk.mimeType || 'audio/webm;codecs=opus';
+            
+            console.log(`🎵 Traitement chunk Opus: format=${chunk.format}, mimeType=${chunk.mimeType}, dataLength=${chunk.data ? chunk.data.length : 0}`);
+            
+            try {
+                // Convertir base64 en Blob
+                const binaryString = atob(chunk.data);
+                const bytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
+                }
+                
+                const blob = new Blob([bytes], { type: mimeType });
+                const audioUrl = URL.createObjectURL(blob);
+                
+                // Créer un élément Audio pour jouer le chunk Opus
+                const audio = new Audio(audioUrl);
+                audio.volume = currentVolume || 1.0;
+                
+                let cleaned = false;
+                const cleanup = () => {
+                    if (cleaned) return;
+                    cleaned = true;
+                    try {
+                        audio.pause();
+                        audio.src = '';
+                        URL.revokeObjectURL(audioUrl);
+                    } catch (e) {}
+                    isProcessingBuffer = false;
+                    // Traiter le prochain chunk
+                    if (audioChunksQueue.length > 0 && isPlayingAudio) {
+                        processAudioQueue();
+                    }
+                };
+                
+                audio.addEventListener('ended', cleanup, { once: true });
+                audio.addEventListener('error', (e) => {
+                    console.warn('⚠️ Erreur lecture Opus:', e);
+                    cleanup();
+                }, { once: true });
+                
+                // Jouer le chunk Opus
+                const playPromise = audio.play();
+                if (playPromise !== undefined) {
+                    playPromise.then(() => {
+                        updateAudioStatus(true, `Lecture Opus: ${chunksReceivedCount} chunks`);
+                        // Attendre la fin du chunk avant de nettoyer
+                        // Le cleanup sera appelé par 'ended' ou après un délai
+                    }).catch((err) => {
+                        console.warn('⚠️ Erreur play Opus:', err);
+                        cleanup();
+                    });
+                } else {
+                    cleanup();
+                }
+                
+                // Log pour débogage - TOUJOURS logger pour confirmer que c'est bien traité
+                console.log(`✅ Chunk Opus ${chunksReceivedCount} en cours de lecture, queue: ${audioChunksQueue.length}`);
+                
+                return;
+            } catch (error) {
+                console.error('❌ Erreur traitement Opus:', error);
+                isProcessingBuffer = false;
+                if (audioChunksQueue.length > 0 && isPlayingAudio) {
+                    processAudioQueue();
+                }
+                return;
             }
         } else {
             console.warn('⚠️ Format non supporté:', chunk.format);
@@ -1065,10 +1145,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
     
-    // Débloquer l'audio au premier clic/touch
-    document.addEventListener('click', unlockAudio, { once: true });
-    document.addEventListener('touchstart', unlockAudio, { once: true });
-    document.addEventListener('keydown', unlockAudio, { once: true });
+    // Débloquer l'audio au premier clic/touch - PLUS AGRESSIF
+    const events = ['click', 'touchstart', 'keydown', 'mousedown', 'pointerdown', 'mousemove'];
+    events.forEach(eventType => {
+        document.addEventListener(eventType, unlockAudio, { once: true, passive: true });
+    });
 });
 
 // Gestion des événements audio player
