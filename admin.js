@@ -395,7 +395,7 @@ function initRadioEvents() {
                     echoCancellation: true, // Essentiel pour éviter l'écho
                     noiseSuppression: true, // Supprime le bruit ambiant
                     autoGainControl: true, // Contrôle automatique du volume (meilleur pour appels)
-                    sampleRate: 48000, // 48kHz (qualité appel haute qualité)
+                    sampleRate: 48000, // 48kHz (qualité maximale - standard professionnel)
                     channelCount: 1, // Mono (standard pour voix)
                     latency: 0.01, // Latence minimale (20ms comme les appels)
                     // Paramètres Google Chrome optimisés pour qualité appel
@@ -414,12 +414,17 @@ function initRadioEvents() {
                 } 
             });
             
-            // Créer le contexte audio pour l'analyse
-            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            // Créer le contexte audio pour l'analyse - QUALITÉ MAXIMALE
+            audioContext = new (window.AudioContext || window.webkitAudioContext)({
+                sampleRate: 48000, // 48kHz qualité maximale
+                latencyHint: 'interactive' // Latence minimale
+            });
             analyser = audioContext.createAnalyser();
             microphone = audioContext.createMediaStreamSource(mediaStream);
             
-            analyser.fftSize = 256;
+            // Augmenter la résolution de l'analyseur pour meilleure qualité
+            analyser.fftSize = 2048; // Augmenté de 256 à 2048 pour meilleure résolution
+            analyser.smoothingTimeConstant = 0.8; // Lissage pour qualité
             const bufferLength = analyser.frequencyBinCount;
             dataArray = new Uint8Array(bufferLength);
             
@@ -513,8 +518,10 @@ function initRadioEvents() {
             
             if (!selectedMimeType) {
                 console.log('✅ Utilisation de ScriptProcessor (PCM16) pour compatibilité maximale');
-                // Utiliser ScriptProcessor pour générer du PCM16
-                const bufferSize = 2048;
+                // Utiliser ScriptProcessor pour générer du PCM16 - QUALITÉ MAXIMALE
+                // Buffer size plus grand = meilleure qualité mais plus de latence
+                // 4096 = bon compromis qualité/stabilité (évite les crashes)
+                const bufferSize = 4096; // Augmenté de 2048 à 4096 pour meilleure qualité
                 scriptProcessor = audioContext.createScriptProcessor(bufferSize, 1, 1);
             } else {
                 // Utiliser MediaRecorder avec Opus (haute qualité vocale)
@@ -580,14 +587,15 @@ function initRadioEvents() {
             
             // Pour compatibilité avec l'ancien code (ScriptProcessor fallback)
             let lastSendTime = 0;
-            const sendInterval = 100; // 100ms pour éviter trop de chunks (évite les crashes)
+            // Intervalle optimisé : 80ms = meilleure qualité avec moins de latence, mais stable
+            const sendInterval = 80; // Réduit de 100ms à 80ms pour meilleure qualité (évite toujours les crashes)
             
-            // Variables pour la normalisation et suppression de bruit (qualité APPEL)
-            let noiseGateThreshold = 0.002; // Seuil optimisé pour voix (qualité appel)
+            // Variables pour la normalisation et suppression de bruit - QUALITÉ MAXIMALE
+            let noiseGateThreshold = 0.001; // Seuil réduit pour meilleure qualité (capture plus de détails)
             let peakLevel = 0;
-            let targetPeak = 0.70; // Niveau cible optimisé pour appels (70%)
+            let targetPeak = 0.85; // Niveau cible augmenté pour meilleure qualité (85% au lieu de 70%)
             let adaptiveGain = 1.0; // Gain adaptatif initial
-            let maxGain = 1.3; // Gain max optimisé pour qualité appel
+            let maxGain = 1.5; // Gain max augmenté pour meilleure qualité (1.5x au lieu de 1.3x)
             
             // ScriptProcessor uniquement en fallback (si Opus non disponible)
             if (scriptProcessor) {
@@ -647,18 +655,18 @@ function initRadioEvents() {
                     // Appliquer le gain adaptatif optimisé
                     sample *= gain;
                     
-                    // Soft limiter doux (transition douce pour qualité maximale)
-                    const softThreshold = 0.75; // Seuil plus haut pour meilleure qualité
+                    // Soft limiter doux - QUALITÉ MAXIMALE (seuils augmentés)
+                    const softThreshold = 0.90; // Seuil augmenté de 0.75 à 0.90 pour meilleure qualité
                     if (sample > softThreshold) {
                         const excess = sample - softThreshold;
-                        sample = softThreshold + excess / (1 + excess * 3); // Compression douce
+                        sample = softThreshold + excess / (1 + excess * 2); // Compression plus douce
                     } else if (sample < -softThreshold) {
                         const excess = Math.abs(sample) - softThreshold;
-                        sample = -(softThreshold + excess / (1 + excess * 3));
+                        sample = -(softThreshold + excess / (1 + excess * 2));
                     }
                     
-                    // Hard limiter final (sécurité contre saturation)
-                    const hardLimit = 0.85; // Limite à 85% pour qualité maximale
+                    // Hard limiter final (sécurité contre saturation) - QUALITÉ MAXIMALE
+                    const hardLimit = 0.95; // Limite augmentée de 0.85 à 0.95 pour meilleure qualité
                     if (sample > hardLimit) {
                         sample = hardLimit;
                     } else if (sample < -hardLimit) {
@@ -685,27 +693,41 @@ function initRadioEvents() {
                     int16Data[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
                 }
                 
-                // Convertir en base64 (méthode optimisée pour grandes chaînes)
+                // Convertir en base64 (méthode optimisée pour grandes chaînes) - PROTECTION ANTI-CRASH
                 const uint8Array = new Uint8Array(int16Data.buffer);
                 const timestamp = Date.now();
+                
+                // Limiter la taille pour éviter les crashes mémoire
+                const maxArraySize = 100000; // 100KB max par chunk
+                let arrayToEncode = uint8Array;
+                if (uint8Array.length > maxArraySize) {
+                    console.warn(`⚠️ Array trop grand (${uint8Array.length} bytes), tronqué à ${maxArraySize}`);
+                    arrayToEncode = uint8Array.slice(0, maxArraySize);
+                }
                 
                 // Utiliser une méthode plus efficace pour la conversion base64
                 let base64Audio;
                 try {
-                    // Méthode optimisée pour grandes chaînes
+                    // Méthode optimisée pour grandes chaînes - PROTECTION ANTI-CRASH
                     const chunkSize = 8192; // Traiter par chunks pour éviter les erreurs
                     let binary = '';
                     
-                    for (let i = 0; i < uint8Array.length; i += chunkSize) {
-                        const chunk = uint8Array.slice(i, i + chunkSize);
+                    for (let i = 0; i < arrayToEncode.length; i += chunkSize) {
+                        const chunk = arrayToEncode.slice(i, i + chunkSize);
                         binary += String.fromCharCode.apply(null, chunk);
                     }
                     
                     base64Audio = btoa(binary);
                 } catch (btoaError) {
                     console.error('❌ Erreur conversion base64:', btoaError);
-                    // Fallback : méthode alternative
-                    base64Audio = btoa(String.fromCharCode.apply(null, uint8Array));
+                    // Fallback : méthode alternative avec taille réduite
+                    try {
+                        const reducedArray = arrayToEncode.slice(0, Math.min(50000, arrayToEncode.length));
+                        base64Audio = btoa(String.fromCharCode.apply(null, reducedArray));
+                    } catch (e) {
+                        console.error('❌ Erreur conversion base64 (fallback):', e);
+                        return; // Ignorer ce chunk si conversion impossible
+                    }
                 }
                 
                 // Vérifier qu'il y a du son (pas seulement du silence)
@@ -714,7 +736,14 @@ function initRadioEvents() {
                     return;
                 }
                 
-                // Envoyer le chunk audio à Firebase
+                // Envoyer le chunk audio à Firebase - PROTECTION ANTI-CRASH
+                // Limiter la taille du chunk pour éviter les crashes Firebase
+                const maxChunkSize = 200000; // 200KB max par chunk PCM16 (plus grand car non compressé)
+                if (base64Audio.length > maxChunkSize) {
+                    console.warn(`⚠️ Chunk PCM trop grand (${base64Audio.length} bytes), tronqué à ${maxChunkSize}`);
+                    base64Audio = base64Audio.substring(0, maxChunkSize);
+                }
+                
                 database.ref(`radio/audioChunks/${timestamp}`).set({
                     data: base64Audio,
                     timestamp: timestamp,
@@ -734,16 +763,26 @@ function initRadioEvents() {
                     
                     console.log(`✅ Chunk ${chunksSentCount} envoyé: ${base64Audio.length} chars, amplitude: ${maxAmplitude.toFixed(3)}`);
                     
-                    // Nettoyer les anciens chunks (plus de 3 secondes)
-                    if (chunksSentCount % 20 === 0) {
-                        const cleanupTime = Date.now() - 3000;
+                    // Nettoyer les anciens chunks (plus de 5 secondes) - OPTIMISÉ POUR STABILITÉ
+                    // Nettoyer moins souvent pour éviter les crashes (tous les 30 chunks au lieu de 20)
+                    if (chunksSentCount % 30 === 0) {
+                        const cleanupTime = Date.now() - 5000; // Augmenté à 5 secondes pour stabilité
                         database.ref('radio/audioChunks').orderByKey().once('value', (snapshot) => {
+                            let cleaned = 0;
                             snapshot.forEach((child) => {
                                 const chunkTime = parseInt(child.key);
                                 if (chunkTime < cleanupTime) {
-                                    child.ref.remove();
+                                    child.ref.remove().catch(err => {
+                                        console.warn('⚠️ Erreur nettoyage chunk:', err);
+                                    });
+                                    cleaned++;
                                 }
                             });
+                            if (cleaned > 0) {
+                                console.log(`🧹 ${cleaned} anciens chunks nettoyés`);
+                            }
+                        }).catch(err => {
+                            console.warn('⚠️ Erreur nettoyage:', err);
                         });
                     }
                 }).catch((error) => {

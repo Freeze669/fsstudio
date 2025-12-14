@@ -785,11 +785,12 @@ function playAudioChunk(base64Data, chunkInfo) {
         // Mettre à jour le statut visuel
         updateAudioStatus(true);
         
-        // LIMITER la queue à 15 chunks maximum pour éviter les crashes et la latence
-        if (audioChunksQueue.length > 15) {
+        // LIMITER la queue à 25 chunks maximum pour meilleure qualité (augmenté de 20)
+        // Protection anti-crash : si trop de chunks, supprimer les plus anciens
+        if (audioChunksQueue.length > 25) {
             console.warn(`⚠️ Queue trop longue (${audioChunksQueue.length}), suppression des anciens chunks`);
-            // Supprimer les 8 plus anciens pour garder la queue fluide
-            audioChunksQueue.splice(0, 8);
+            // Supprimer les 12 plus anciens pour garder la queue fluide
+            audioChunksQueue.splice(0, 12);
         }
         
         // Ajouter à la queue avec les informations du chunk
@@ -911,17 +912,20 @@ async function processAudioQueue() {
                 return;
             }
             
-            // Convertir en Int16 puis Float32
-            const int16Data = new Int16Array(bytes.buffer);
-            const float32Data = new Float32Array(int16Data.length);
-            for (let i = 0; i < int16Data.length; i++) {
-                float32Data[i] = Math.max(-1, Math.min(1, int16Data[i] / 32768.0));
-            }
-            
-            // Créer AudioBuffer
-            const sampleRate = chunk.sampleRate || 44100;
-            const audioBuffer = audioContextListener.createBuffer(1, float32Data.length, sampleRate);
-            audioBuffer.getChannelData(0).set(float32Data);
+                // Convertir en Int16 puis Float32 - QUALITÉ MAXIMALE
+                const int16Data = new Int16Array(bytes.buffer);
+                const float32Data = new Float32Array(int16Data.length);
+                
+                // Conversion haute qualité avec normalisation
+                for (let i = 0; i < int16Data.length; i++) {
+                    // Conversion précise avec normalisation
+                    float32Data[i] = Math.max(-1, Math.min(1, int16Data[i] / 32768.0));
+                }
+                
+                // Créer AudioBuffer - QUALITÉ MAXIMALE
+                const sampleRate = chunk.sampleRate || 48000; // 48kHz par défaut (qualité maximale)
+                const audioBuffer = audioContextListener.createBuffer(1, float32Data.length, sampleRate);
+                audioBuffer.getChannelData(0).set(float32Data);
             
             // Mettre à jour le volume
             gainNode.gain.value = currentVolume || 1.0;
@@ -956,17 +960,26 @@ async function processAudioQueue() {
                 }
             };
             
-            // DÉMARRER LA LECTURE
-            source.start(0);
-            updateAudioStatus(true, `Lecture: ${chunksReceivedCount} chunks`);
-            
-            // Planifier le traitement du prochain chunk AVANT la fin (pour continuité)
-            const nextChunkDelay = Math.max(duration * 1000 - 50, 0);
-            setTimeout(() => {
-                if (!isProcessingBuffer && audioChunksQueue.length > 0 && isPlayingAudio) {
-                    processAudioQueue();
+            // DÉMARRER LA LECTURE - PROTECTION ANTI-CRASH
+            try {
+                source.start(0);
+                updateAudioStatus(true, `Lecture: ${chunksReceivedCount} chunks`);
+                
+                // Planifier le traitement du prochain chunk AVANT la fin (pour continuité)
+                const nextChunkDelay = Math.max(duration * 1000 - 30, 0); // Réduit de 50ms à 30ms pour meilleure continuité
+                setTimeout(() => {
+                    if (!isProcessingBuffer && audioChunksQueue.length > 0 && isPlayingAudio) {
+                        processAudioQueue();
+                    }
+                }, nextChunkDelay);
+            } catch (error) {
+                console.error('❌ Erreur start source:', error);
+                isProcessingBuffer = false;
+                // Continuer avec le prochain chunk
+                if (audioChunksQueue.length > 0 && isPlayingAudio) {
+                    setTimeout(() => processAudioQueue(), 50);
                 }
-            }, nextChunkDelay);
+            }
             
         } else if (chunkFormat === 'opus' || hasOpusMimeType) {
             // FORMAT OPUS - Utiliser MediaSource API pour créer un stream continu
