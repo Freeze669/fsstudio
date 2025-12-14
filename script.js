@@ -91,9 +91,31 @@ function simulatePlayback() {
 
 // Gestion des erreurs audio
 audioPlayer.addEventListener('error', (e) => {
-    console.error('Erreur audio:', e);
-    // Basculer en mode simulation
-    if (isPlaying) {
+    console.error('❌ Erreur audio player:', e, audioPlayer.error);
+    
+    // Si c'est une erreur de fichier local ou source non supportée, basculer vers streaming vocal
+    if (audioPlayer.error && (
+        audioPlayer.error.code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED ||
+        (streamUrl && (streamUrl.startsWith('file://') || streamUrl.match(/^[A-Z]:[\\/]/)))
+    )) {
+        console.warn('⚠️ Source non supportée, basculement vers streaming vocal Firebase');
+        streamUrl = '';
+        audioPlayer.src = '';
+        
+        // Vérifier si une diffusion vocale est en cours
+        if (typeof firebase !== 'undefined' && firebase.apps.length > 0) {
+            database.ref(FIREBASE_RADIO_STATUS_PATH).once('value', (snapshot) => {
+                const status = snapshot.val();
+                if (status && status.isLive === true) {
+                    console.log('✅ Diffusion vocale détectée, démarrage...');
+                    autoStartAudio();
+                } else {
+                    updateAudioStatus(false, 'Aucune source disponible');
+                }
+            });
+        }
+    } else if (isPlaying) {
+        // Autres erreurs, essayer le mode simulation
         simulatePlayback();
     }
 });
@@ -111,6 +133,7 @@ let isPlayingAudio = false;
 let lastChunkTimestamp = 0;
 let audioContextListener = null;
 let audioSource = null;
+let silentAudioSource = null; // Source audio silencieuse pour maintenir l'icône dans l'onglet
 let chunksReceivedCount = 0;
 let lastReceivedTime = null;
 let gainNode = null; // Pour contrôler le volume
@@ -128,13 +151,54 @@ function loadRadioStream() {
         database.ref('radio/streamUrl').on('value', (snapshot) => {
             const url = snapshot.val();
             if (url && url.trim() !== '') {
-                streamUrl = url.trim();
-                console.log('📡 URL stream chargée:', streamUrl);
+                const trimmedUrl = url.trim();
+                
+                // VALIDATION : Rejeter les fichiers locaux (file://) et les chemins Windows
+                if (trimmedUrl.startsWith('file://') || 
+                    trimmedUrl.startsWith('C:/') || 
+                    trimmedUrl.startsWith('C:\\') ||
+                    trimmedUrl.match(/^[A-Z]:[\\/]/)) {
+                    console.warn('⚠️ URL de fichier local détectée, ignorée (sécurité navigateur):', trimmedUrl);
+                    console.log('📡 Utilisation du streaming vocal Firebase à la place');
+                    streamUrl = '';
+                    // S'assurer qu'on utilise le streaming vocal
+                    if (isPlayingAudio) {
+                        stopListeningToAudio();
+                        const statusRef = database.ref(FIREBASE_RADIO_STATUS_PATH);
+                        statusRef.once('value', (statusSnapshot) => {
+                            const status = statusSnapshot.val();
+                            if (status && status.isLive === true) {
+                                autoStartAudio();
+                            }
+                        });
+                    }
+                    return;
+                }
+                
+                // Valider que c'est une URL HTTP/HTTPS valide
+                try {
+                    const urlObj = new URL(trimmedUrl);
+                    if (urlObj.protocol !== 'http:' && urlObj.protocol !== 'https:') {
+                        console.warn('⚠️ Protocole non supporté:', urlObj.protocol);
+                        streamUrl = '';
+                        return;
+                    }
+                } catch (e) {
+                    console.warn('⚠️ URL invalide:', trimmedUrl);
+                    streamUrl = '';
+                    return;
+                }
+                
+                streamUrl = trimmedUrl;
+                console.log('📡 URL stream valide chargée:', streamUrl);
                 // Si on est déjà en lecture, mettre à jour l'URL
                 if (isPlayingAudio) {
                     audioPlayer.src = streamUrl;
                     audioPlayer.play().catch(err => {
                         console.error('❌ Erreur lecture stream:', err);
+                        // En cas d'erreur, basculer vers le streaming vocal
+                        streamUrl = '';
+                        updateAudioStatus(false, 'Erreur stream, basculement vocal...');
                     });
                 }
             } else {
@@ -155,7 +219,7 @@ function loadRadioStream() {
             
             console.log('📡 Statut radio vocal reçu:', status);
             if (status && status.isLive === true) {
-                trackTitle.textContent = 'EN DIRECT 🎙️';
+                if (trackTitle) trackTitle.textContent = 'EN DIRECT 🎙️';
                 console.log('✅ Statut: EN DIRECT - Démarrage automatique de l\'écoute');
                 
                 // Démarrer automatiquement l'écoute si pas déjà en cours
@@ -163,23 +227,25 @@ function loadRadioStream() {
                     // Activer automatiquement l'interface et l'audio
                     autoStartAudio();
                 } else {
-                    // Si déjà en cours, juste mettre à jour l'interface
-                    if (!isPlaying) {
-                        isPlaying = true;
-                        playIcon.style.display = 'none';
-                        pauseIcon.style.display = 'block';
-                        vinylRecord.classList.add('playing');
-                    }
+                    // Si déjà en cours, s'assurer que l'interface est à jour
+                    isPlaying = true;
+                    isPlayingAudio = true;
+                    if (playIcon) playIcon.style.display = 'none';
+                    if (pauseIcon) pauseIcon.style.display = 'block';
+                    if (vinylRecord) vinylRecord.classList.add('playing');
+                    if (trackTitle) trackTitle.textContent = 'EN DIRECT 🎙️';
+                    updateAudioStatus(true, 'Diffusion en cours');
                 }
             } else {
-                trackTitle.textContent = 'EN DIRECT';
+                if (trackTitle) trackTitle.textContent = 'EN DIRECT';
                 console.log('⏸️ Statut: Hors ligne');
                 stopListeningToAudio();
                 // Mettre à jour l'interface
                 isPlaying = false;
-                playIcon.style.display = 'block';
-                pauseIcon.style.display = 'none';
-                vinylRecord.classList.remove('playing');
+                isPlayingAudio = false;
+                if (playIcon) playIcon.style.display = 'block';
+                if (pauseIcon) pauseIcon.style.display = 'none';
+                if (vinylRecord) vinylRecord.classList.remove('playing');
             }
         });
         
@@ -304,21 +370,38 @@ function startListeningToAudio() {
     
     // Si une URL de stream est configurée, utiliser l'élément audio classique
     if (streamUrl && streamUrl.trim() !== '') {
-        console.log('📡 Utilisation du stream URL:', streamUrl);
-        audioPlayer.src = streamUrl;
-        audioPlayer.play().then(() => {
-            isPlayingAudio = true;
-            isPlaying = true;
-            playIcon.style.display = 'none';
-            pauseIcon.style.display = 'block';
-            vinylRecord.classList.add('playing');
-            trackTitle.textContent = 'EN DIRECT 🎙️';
-            updateAudioStatus(true, 'Stream actif');
-        }).catch(err => {
-            console.error('❌ Erreur lecture stream:', err);
-            updateAudioStatus(false, 'Erreur lecture');
-        });
-        return;
+        // Vérifier à nouveau que ce n'est pas un fichier local
+        if (streamUrl.startsWith('file://') || 
+            streamUrl.startsWith('C:/') || 
+            streamUrl.startsWith('C:\\') ||
+            streamUrl.match(/^[A-Z]:[\\/]/)) {
+            console.warn('⚠️ Fichier local détecté, basculement vers streaming vocal');
+            streamUrl = '';
+            // Continuer avec le streaming vocal
+        } else {
+            console.log('📡 Utilisation du stream URL:', streamUrl);
+            audioPlayer.src = streamUrl;
+            audioPlayer.play().then(() => {
+                isPlayingAudio = true;
+                isPlaying = true;
+                playIcon.style.display = 'none';
+                pauseIcon.style.display = 'block';
+                vinylRecord.classList.add('playing');
+                trackTitle.textContent = 'EN DIRECT 🎙️';
+                updateAudioStatus(true, 'Stream actif');
+            }).catch(err => {
+                console.error('❌ Erreur lecture stream:', err);
+                updateAudioStatus(false, 'Erreur lecture, basculement vocal...');
+                // En cas d'erreur, basculer vers le streaming vocal
+                streamUrl = '';
+                // Ne pas return, continuer avec le streaming vocal
+            });
+            
+            // Si le stream fonctionne, on return
+            if (audioPlayer.src && !audioPlayer.error) {
+                return;
+            }
+        }
     }
     
     // Sinon, utiliser le streaming vocal Firebase
@@ -377,6 +460,48 @@ function startListeningToAudio() {
         currentVolume = 1.0;
     }
     
+    // Créer une source audio silencieuse continue pour maintenir l'icône audio dans l'onglet
+    // Cela permet au navigateur de détecter que l'audio est actif
+    if (audioContextListener && !silentAudioSource && gainNode) {
+        try {
+            // Créer un buffer silencieux très court (0.1 seconde)
+            const silentBuffer = audioContextListener.createBuffer(1, Math.floor(audioContextListener.sampleRate * 0.1), audioContextListener.sampleRate);
+            // Le buffer est déjà rempli de zéros (silence)
+            
+            // Fonction pour créer et jouer une source silencieuse en boucle
+            const playSilentLoop = () => {
+                if (!isPlayingAudio || !audioContextListener || audioContextListener.state === 'closed') return;
+                
+                try {
+                    const source = audioContextListener.createBufferSource();
+                    source.buffer = silentBuffer;
+                    source.connect(gainNode);
+                    
+                    source.onended = () => {
+                        // Rejouer en boucle tant que l'audio est actif
+                        if (isPlayingAudio && audioContextListener && audioContextListener.state !== 'closed') {
+                            playSilentLoop();
+                        } else {
+                            silentAudioSource = null;
+                        }
+                    };
+                    
+                    source.start(0);
+                    silentAudioSource = source;
+                } catch (error) {
+                    console.warn('⚠️ Erreur création source silencieuse:', error);
+                    silentAudioSource = null;
+                }
+            };
+            
+            // Démarrer la boucle silencieuse
+            playSilentLoop();
+            console.log('✅ Source audio silencieuse créée pour maintenir l\'icône dans l\'onglet');
+        } catch (error) {
+            console.warn('⚠️ Impossible de créer la source silencieuse:', error);
+        }
+    }
+    
     // ÉCOUTER TOUS LES NOUVEAUX CHUNKS - SYSTÈME AMÉLIORÉ ET FIABLE
     connectToAudioChunks();
     
@@ -384,17 +509,19 @@ function startListeningToAudio() {
     startHealthCheck();
     
     chunksReceivedCount = 0;
-    updateAudioStatus(false, 'En attente des chunks...');
     
     console.log('✅ Écoute de la diffusion vocale démarrée');
     
-    // Mettre à jour l'interface si pas déjà fait
-    if (!isPlaying) {
-        isPlaying = true;
-        playIcon.style.display = 'none';
-        pauseIcon.style.display = 'block';
-        vinylRecord.classList.add('playing');
-    }
+    // TOUJOURS mettre à jour l'interface visuelle
+    isPlaying = true;
+    isPlayingAudio = true;
+    if (playIcon) playIcon.style.display = 'none';
+    if (pauseIcon) pauseIcon.style.display = 'block';
+    if (vinylRecord) vinylRecord.classList.add('playing');
+    if (trackTitle) trackTitle.textContent = 'EN DIRECT 🎙️';
+    
+    // Afficher l'indicateur audio
+    updateAudioStatus(true, 'En attente des chunks...');
 }
 
 // Se connecter aux chunks audio Firebase
@@ -551,6 +678,15 @@ function stopListeningToAudio() {
         try {
             mediaSource = null;
         } catch (e) {}
+    }
+    
+    // Arrêter la source audio silencieuse
+    if (silentAudioSource) {
+        try {
+            silentAudioSource.stop();
+            silentAudioSource.disconnect();
+        } catch (e) {}
+        silentAudioSource = null;
     }
     
     if (audioSource) {

@@ -976,10 +976,38 @@ function initStreamUrlConfig() {
     // Enregistrer l'URL
     saveStreamUrlBtn.addEventListener('click', () => {
         const url = streamUrlInput.value.trim();
+        
+        // VALIDATION : Vérifier que ce n'est pas un fichier local
+        if (url && url !== '') {
+            // Rejeter les fichiers locaux
+            if (url.startsWith('file://') || 
+                url.startsWith('C:/') || 
+                url.startsWith('C:\\') ||
+                url.match(/^[A-Z]:[\\/]/)) {
+                alert('❌ Erreur : Les fichiers locaux ne sont pas supportés par les navigateurs pour des raisons de sécurité.\n\nUtilisez une URL HTTP/HTTPS valide (ex: https://example.com/stream.mp3) ou laissez vide pour utiliser le streaming vocal Firebase.');
+                console.error('❌ Tentative d\'enregistrement d\'un fichier local:', url);
+                return;
+            }
+            
+            // Valider que c'est une URL HTTP/HTTPS valide
+            try {
+                const urlObj = new URL(url);
+                if (urlObj.protocol !== 'http:' && urlObj.protocol !== 'https:') {
+                    alert('❌ Erreur : Seules les URLs HTTP/HTTPS sont supportées.\n\nProtocole détecté: ' + urlObj.protocol);
+                    console.error('❌ Protocole non supporté:', urlObj.protocol);
+                    return;
+                }
+            } catch (e) {
+                alert('❌ Erreur : URL invalide.\n\nFormat attendu: http://example.com/stream.mp3 ou https://example.com/stream.mp3\n\nOu laissez vide pour utiliser le streaming vocal Firebase.');
+                console.error('❌ URL invalide:', url);
+                return;
+            }
+        }
+        
         database.ref('radio/streamUrl').set(url)
             .then(() => {
-                console.log('✅ URL stream enregistrée:', url);
-                alert('URL du stream enregistrée avec succès !');
+                console.log('✅ URL stream enregistrée:', url || '(vide - streaming vocal activé)');
+                alert(url ? 'URL du stream enregistrée avec succès !' : 'URL effacée - Le streaming vocal Firebase sera utilisé.');
             })
             .catch((error) => {
                 console.error('❌ Erreur enregistrement URL:', error);
