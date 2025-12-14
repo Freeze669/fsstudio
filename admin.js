@@ -585,19 +585,111 @@ function initRadioEvents() {
                 console.log(`   Intervalle: 100ms (optimisé pour stabilité)`);
             }
             
-            // Pour compatibilité avec l'ancien code (ScriptProcessor fallback)
-            let lastSendTime = 0;
-            // Intervalle optimisé : 80ms = meilleure qualité avec moins de latence, mais stable
-            const sendInterval = 80; // Réduit de 100ms à 80ms pour meilleure qualité (évite toujours les crashes)
+            // ============================================
+            // SYSTÈME DE STREAMING CONTINU (STYLE APPEL)
+            // ============================================
+            // Au lieu de chunks individuels, on accumule les données dans un buffer continu
+            // et on envoie par paquets plus grands pour créer un flux continu
             
-            // Variables pour la normalisation et suppression de bruit - QUALITÉ MAXIMALE
-            let noiseGateThreshold = 0.001; // Seuil réduit pour meilleure qualité (capture plus de détails)
+            // Buffer continu pour accumuler les données audio
+            let continuousAudioBuffer = [];
+            let bufferAccumulationTime = 0;
+            const bufferTargetDuration = 0.2; // Accumuler 200ms de données avant d'envoyer (stream continu)
+            const sampleRate = audioContext.sampleRate;
+            const samplesPerBuffer = Math.floor(sampleRate * bufferTargetDuration); // ~9600 échantillons à 48kHz
+            
+            // Variables pour la normalisation et suppression de bruit - QUALITÉ APPEL
+            let noiseGateThreshold = 0.0005; // Seuil très bas pour qualité appel (capture tous les détails)
             let peakLevel = 0;
-            let targetPeak = 0.85; // Niveau cible augmenté pour meilleure qualité (85% au lieu de 70%)
-            let adaptiveGain = 1.0; // Gain adaptatif initial
-            let maxGain = 1.5; // Gain max augmenté pour meilleure qualité (1.5x au lieu de 1.3x)
+            let targetPeak = 0.90; // Niveau cible très élevé pour qualité appel (90%)
+            let adaptiveGain = 1.0;
+            let maxGain = 2.0; // Gain max élevé pour qualité appel
             
-            // ScriptProcessor uniquement en fallback (si Opus non disponible)
+            // Fonction pour envoyer le buffer accumulé comme un stream continu
+            const sendContinuousBuffer = () => {
+                if (continuousAudioBuffer.length === 0 || !isStreaming) return;
+                
+                // Convertir le buffer accumulé en Int16
+                const totalSamples = continuousAudioBuffer.length;
+                const int16Data = new Int16Array(totalSamples);
+                
+                for (let i = 0; i < totalSamples; i++) {
+                    const s = Math.max(-1, Math.min(1, continuousAudioBuffer[i]));
+                    int16Data[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+                }
+                
+                // Convertir en base64 de manière optimisée
+                const uint8Array = new Uint8Array(int16Data.buffer);
+                const timestamp = Date.now();
+                
+                let base64Audio;
+                try {
+                    // Conversion optimisée par chunks
+                    const chunkSize = 16384; // Chunks plus grands pour meilleure performance
+                    let binary = '';
+                    
+                    for (let i = 0; i < uint8Array.length; i += chunkSize) {
+                        const chunk = uint8Array.slice(i, i + chunkSize);
+                        binary += String.fromCharCode.apply(null, chunk);
+                    }
+                    
+                    base64Audio = btoa(binary);
+                } catch (btoaError) {
+                    console.error('❌ Erreur conversion base64:', btoaError);
+                    continuousAudioBuffer = []; // Réinitialiser le buffer en cas d'erreur
+                    return;
+                }
+                
+                // Envoyer le buffer continu à Firebase
+                database.ref(`radio/audioStream/${timestamp}`).set({
+                    data: base64Audio,
+                    timestamp: timestamp,
+                    sampleRate: sampleRate,
+                    format: 'pcm16-stream', // Format stream continu
+                    samples: totalSamples,
+                    duration: totalSamples / sampleRate
+                }).then(() => {
+                    chunksSentCount++;
+                    lastSentTime = new Date();
+                    
+                    if (chunksSent) chunksSent.textContent = chunksSentCount;
+                    if (lastSent) {
+                        const timeStr = lastSentTime.toLocaleTimeString();
+                        lastSent.textContent = timeStr;
+                    }
+                    
+                    // Log tous les 10 buffers
+                    if (chunksSentCount % 10 === 0) {
+                        console.log(`📡 Stream continu envoyé: ${chunksSentCount}, ${totalSamples} échantillons, ${(totalSamples/sampleRate).toFixed(2)}s`);
+                    }
+                    
+                    // Nettoyer les anciens streams (plus de 3 secondes)
+                    if (chunksSentCount % 20 === 0) {
+                        const cleanupTime = Date.now() - 3000;
+                        database.ref('radio/audioStream').orderByKey().once('value', (snapshot) => {
+                            let cleaned = 0;
+                            snapshot.forEach((child) => {
+                                const streamTime = parseInt(child.key);
+                                if (streamTime < cleanupTime) {
+                                    child.ref.remove().catch(() => {});
+                                    cleaned++;
+                                }
+                            });
+                            if (cleaned > 0) {
+                                console.log(`🧹 ${cleaned} anciens streams nettoyés`);
+                            }
+                        });
+                    }
+                }).catch((error) => {
+                    console.error('❌ Erreur envoi stream:', error);
+                });
+                
+                // Réinitialiser le buffer
+                continuousAudioBuffer = [];
+                bufferAccumulationTime = 0;
+            };
+            
+            // ScriptProcessor pour capturer et accumuler les données
             if (scriptProcessor) {
                 scriptProcessor.onaudioprocess = (event) => {
                 const inputData = event.inputBuffer.getChannelData(0);
@@ -609,20 +701,15 @@ function initRadioEvents() {
                 }
                 
                 if (!isStreaming) {
+                    continuousAudioBuffer = []; // Réinitialiser le buffer
                     return;
                 }
                 
-                const now = Date.now();
-                if (now - lastSendTime < sendInterval) {
-                    return; // Limiter l'envoi
-                }
-                lastSendTime = now;
-                
-                // Traitement audio amélioré
+                // Traitement audio haute qualité (qualité appel)
                 let maxAmplitude = 0;
                 const processedData = new Float32Array(inputData.length);
                 
-                // 1. Calculer l'amplitude RMS (Root Mean Square) pour meilleure détection
+                // 1. Calculer RMS pour détection précise
                 let sumSquares = 0;
                 for (let i = 0; i < inputData.length; i++) {
                     sumSquares += inputData[i] * inputData[i];
@@ -630,165 +717,63 @@ function initRadioEvents() {
                 }
                 const rms = Math.sqrt(sumSquares / inputData.length);
                 
-                // 2. Si pas assez de son, ne pas traiter
-                if (rms < noiseGateThreshold && maxAmplitude < noiseGateThreshold * 3) {
-                    return; // Pas assez de son, ignorer
-                }
+                // 2. Gain adaptatif pour qualité appel
+                const targetGain = targetPeak / Math.max(maxAmplitude, 0.05);
+                adaptiveGain = adaptiveGain * 0.95 + targetGain * 0.05; // Lissage très doux
+                const gain = Math.min(adaptiveGain, maxGain);
                 
-                // 3. Gain adaptatif optimisé (s'ajuste progressivement)
-                const targetGain = targetPeak / Math.max(maxAmplitude, 0.1);
-                adaptiveGain = adaptiveGain * 0.9 + targetGain * 0.1; // Lissage doux pour qualité
-                const gain = Math.min(adaptiveGain, maxGain); // Gain max 1.5x pour qualité
-                
-                // 4. Traitement audio haute qualité pour voix
+                // 3. Traitement audio professionnel (qualité appel téléphonique)
                 for (let i = 0; i < inputData.length; i++) {
                     let sample = inputData[i];
                     
-                    // Suppression de bruit adaptative (basée sur RMS)
+                    // Suppression de bruit très douce (qualité appel)
                     const absValue = Math.abs(sample);
                     if (absValue < noiseGateThreshold) {
-                        // Réduction progressive du bruit
-                        const reduction = Math.pow(absValue / noiseGateThreshold, 2) * 0.2;
+                        const reduction = Math.pow(absValue / noiseGateThreshold, 3) * 0.3; // Plus doux
                         sample *= reduction;
                     }
                     
-                    // Appliquer le gain adaptatif optimisé
+                    // Appliquer le gain
                     sample *= gain;
                     
-                    // Soft limiter doux - QUALITÉ MAXIMALE (seuils augmentés)
-                    const softThreshold = 0.90; // Seuil augmenté de 0.75 à 0.90 pour meilleure qualité
+                    // Soft limiter très doux (qualité appel)
+                    const softThreshold = 0.95; // Seuil très élevé
                     if (sample > softThreshold) {
                         const excess = sample - softThreshold;
-                        sample = softThreshold + excess / (1 + excess * 2); // Compression plus douce
+                        sample = softThreshold + excess / (1 + excess * 3); // Compression très douce
                     } else if (sample < -softThreshold) {
                         const excess = Math.abs(sample) - softThreshold;
-                        sample = -(softThreshold + excess / (1 + excess * 2));
+                        sample = -(softThreshold + excess / (1 + excess * 3));
                     }
                     
-                    // Hard limiter final (sécurité contre saturation) - QUALITÉ MAXIMALE
-                    const hardLimit = 0.95; // Limite augmentée de 0.85 à 0.95 pour meilleure qualité
-                    if (sample > hardLimit) {
-                        sample = hardLimit;
-                    } else if (sample < -hardLimit) {
-                        sample = -hardLimit;
-                    }
+                    // Hard limiter (sécurité)
+                    const hardLimit = 0.98;
+                    if (sample > hardLimit) sample = hardLimit;
+                    else if (sample < -hardLimit) sample = -hardLimit;
                     
-                    // Limiter final (sécurité absolue)
-                    processedData[i] = Math.max(-0.85, Math.min(0.85, sample));
+                    processedData[i] = Math.max(-0.98, Math.min(0.98, sample));
                 }
                 
                 peakLevel = maxAmplitude * gain;
                 
-                // NE PAS copier vers l'output pour éviter l'écho
-                // Remplir avec du silence
-                for (let i = 0; i < outputData.length; i++) {
-                    outputData[i] = 0; // Silence pour éviter l'écho
-                }
-                
-                // Convertir les données PCM traitées en Int16 pour transmission
-                const int16Data = new Int16Array(processedData.length);
-                for (let i = 0; i < processedData.length; i++) {
-                    // Convertir de float32 (-1.0 à 1.0) vers int16 (-32768 à 32767)
-                    const s = Math.max(-1, Math.min(1, processedData[i]));
-                    int16Data[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
-                }
-                
-                // Convertir en base64 (méthode optimisée pour grandes chaînes) - PROTECTION ANTI-CRASH
-                const uint8Array = new Uint8Array(int16Data.buffer);
-                const timestamp = Date.now();
-                
-                // Limiter la taille pour éviter les crashes mémoire
-                const maxArraySize = 100000; // 100KB max par chunk
-                let arrayToEncode = uint8Array;
-                if (uint8Array.length > maxArraySize) {
-                    console.warn(`⚠️ Array trop grand (${uint8Array.length} bytes), tronqué à ${maxArraySize}`);
-                    arrayToEncode = uint8Array.slice(0, maxArraySize);
-                }
-                
-                // Utiliser une méthode plus efficace pour la conversion base64
-                let base64Audio;
-                try {
-                    // Méthode optimisée pour grandes chaînes - PROTECTION ANTI-CRASH
-                    const chunkSize = 8192; // Traiter par chunks pour éviter les erreurs
-                    let binary = '';
-                    
-                    for (let i = 0; i < arrayToEncode.length; i += chunkSize) {
-                        const chunk = arrayToEncode.slice(i, i + chunkSize);
-                        binary += String.fromCharCode.apply(null, chunk);
+                // ACCUMULER dans le buffer continu (au lieu d'envoyer immédiatement)
+                // Ajouter seulement si il y a du son significatif
+                if (rms >= noiseGateThreshold || maxAmplitude >= noiseGateThreshold * 2) {
+                    for (let i = 0; i < processedData.length; i++) {
+                        continuousAudioBuffer.push(processedData[i]);
                     }
+                    bufferAccumulationTime += inputData.length / sampleRate;
                     
-                    base64Audio = btoa(binary);
-                } catch (btoaError) {
-                    console.error('❌ Erreur conversion base64:', btoaError);
-                    // Fallback : méthode alternative avec taille réduite
-                    try {
-                        const reducedArray = arrayToEncode.slice(0, Math.min(50000, arrayToEncode.length));
-                        base64Audio = btoa(String.fromCharCode.apply(null, reducedArray));
-                    } catch (e) {
-                        console.error('❌ Erreur conversion base64 (fallback):', e);
-                        return; // Ignorer ce chunk si conversion impossible
+                    // Envoyer le buffer quand on a accumulé assez de données (stream continu)
+                    if (continuousAudioBuffer.length >= samplesPerBuffer) {
+                        sendContinuousBuffer();
+                    }
+                } else {
+                    // Si silence prolongé, envoyer quand même le buffer accumulé pour continuité
+                    if (continuousAudioBuffer.length > 0 && bufferAccumulationTime > 0.1) {
+                        sendContinuousBuffer();
                     }
                 }
-                
-                // Vérifier qu'il y a du son (pas seulement du silence)
-                if (maxAmplitude < noiseGateThreshold * 2) {
-                    // Pas assez de son, ne pas envoyer
-                    return;
-                }
-                
-                // Envoyer le chunk audio à Firebase - PROTECTION ANTI-CRASH
-                // Limiter la taille du chunk pour éviter les crashes Firebase
-                const maxChunkSize = 200000; // 200KB max par chunk PCM16 (plus grand car non compressé)
-                if (base64Audio.length > maxChunkSize) {
-                    console.warn(`⚠️ Chunk PCM trop grand (${base64Audio.length} bytes), tronqué à ${maxChunkSize}`);
-                    base64Audio = base64Audio.substring(0, maxChunkSize);
-                }
-                
-                database.ref(`radio/audioChunks/${timestamp}`).set({
-                    data: base64Audio,
-                    timestamp: timestamp,
-                    sampleRate: audioContext.sampleRate,
-                    format: 'pcm16',
-                    bufferSize: inputData.length
-                }).then(() => {
-                    chunksSentCount++;
-                    lastSentTime = new Date();
-                    
-                    // Mettre à jour les stats
-                    if (chunksSent) chunksSent.textContent = chunksSentCount;
-                    if (lastSent) {
-                        const timeStr = lastSentTime.toLocaleTimeString();
-                        lastSent.textContent = timeStr;
-                    }
-                    
-                    console.log(`✅ Chunk ${chunksSentCount} envoyé: ${base64Audio.length} chars, amplitude: ${maxAmplitude.toFixed(3)}`);
-                    
-                    // Nettoyer les anciens chunks (plus de 5 secondes) - OPTIMISÉ POUR STABILITÉ
-                    // Nettoyer moins souvent pour éviter les crashes (tous les 30 chunks au lieu de 20)
-                    if (chunksSentCount % 30 === 0) {
-                        const cleanupTime = Date.now() - 5000; // Augmenté à 5 secondes pour stabilité
-                        database.ref('radio/audioChunks').orderByKey().once('value', (snapshot) => {
-                            let cleaned = 0;
-                            snapshot.forEach((child) => {
-                                const chunkTime = parseInt(child.key);
-                                if (chunkTime < cleanupTime) {
-                                    child.ref.remove().catch(err => {
-                                        console.warn('⚠️ Erreur nettoyage chunk:', err);
-                                    });
-                                    cleaned++;
-                                }
-                            });
-                            if (cleaned > 0) {
-                                console.log(`🧹 ${cleaned} anciens chunks nettoyés`);
-                            }
-                        }).catch(err => {
-                            console.warn('⚠️ Erreur nettoyage:', err);
-                        });
-                    }
-                }).catch((error) => {
-                    console.error('❌ Erreur envoi chunk:', error);
-                    voiceStatusText.textContent = '❌ Erreur Firebase - Vérifiez la connexion';
-                });
                 };
             }
             

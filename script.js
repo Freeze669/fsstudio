@@ -472,7 +472,9 @@ function startListeningToAudio() {
     
     isPlayingAudio = true;
     audioChunksQueue = [];
-    lastChunkTimestamp = Date.now() - 5000; // Accepter les chunks des 5 dernières secondes
+    continuousStreamBuffer = []; // Réinitialiser le buffer continu
+    isPlayingStream = false;
+    lastChunkTimestamp = Date.now() - 5000;
     reconnectAttempts = 0;
     lastSuccessfulChunkTime = Date.now();
     
@@ -570,70 +572,223 @@ function startListeningToAudio() {
     }, 100);
 }
 
-// Se connecter aux chunks audio Firebase - SYSTÈME RECRÉÉ ET SIMPLIFIÉ
+// ============================================
+// SYSTÈME DE STREAMING CONTINU (STYLE APPEL)
+// ============================================
+// Buffer continu pour accumuler et jouer les streams
+let continuousStreamBuffer = [];
+let isPlayingStream = false;
+let streamStartTime = 0;
+
+// Se connecter aux streams audio Firebase (système continu)
 function connectToAudioChunks() {
-    console.log('🔄 Connexion aux chunks audio Firebase...');
+    console.log('🔄 Connexion aux streams audio Firebase (système continu)...');
     
-    // Désactiver l'ancien listener s'il existe
-    if (chunksListenerRef) {
-        try {
-            database.ref('radio/audioChunks').off('child_added');
-        } catch (e) {
-            console.warn('⚠️ Erreur désactivation ancien listener:', e);
-        }
+    // Désactiver les anciens listeners
+    try {
+        database.ref('radio/audioChunks').off('child_added');
+        database.ref('radio/audioStream').off('child_added');
+    } catch (e) {
+        console.warn('⚠️ Erreur désactivation anciens listeners:', e);
     }
     
-    const chunksRef = database.ref('radio/audioChunks');
+    // Écouter les nouveaux streams continus
+    const streamRef = database.ref('radio/audioStream');
     
-    // Écouter chaque nouveau chunk - SYSTÈME SIMPLIFIÉ
-    chunksRef.on('child_added', (snapshot) => {
+    streamRef.on('child_added', (snapshot) => {
         try {
             if (!isPlayingAudio) {
-                return; // Ne pas traiter si l'écoute est arrêtée
-            }
-            
-            const chunkData = snapshot.val();
-            if (!chunkData || !chunkData.data) {
-                console.warn('⚠️ Chunk invalide reçu (pas de data)');
                 return;
             }
             
-            const chunkTimestamp = chunkData.timestamp || parseInt(snapshot.key);
-            const age = Date.now() - chunkTimestamp;
+            const streamData = snapshot.val();
+            if (!streamData || !streamData.data) {
+                console.warn('⚠️ Stream invalide reçu');
+                return;
+            }
             
-            // Accepter TOUS les chunks récents (moins de 10 secondes) ou nouveaux
-            if (chunkTimestamp > lastChunkTimestamp || age < 10000) {
-                lastChunkTimestamp = Math.max(lastChunkTimestamp, chunkTimestamp);
+            const streamTimestamp = streamData.timestamp || parseInt(snapshot.key);
+            const age = Date.now() - streamTimestamp;
+            
+            // Accepter les streams récents (moins de 5 secondes) ou nouveaux
+            if (streamTimestamp > lastChunkTimestamp || age < 5000) {
+                lastChunkTimestamp = Math.max(lastChunkTimestamp, streamTimestamp);
                 lastSuccessfulChunkTime = Date.now();
                 reconnectAttempts = 0;
                 
-                // Log pour débogage
-                if (chunksReceivedCount % 10 === 0) {
-                    console.log(`📥 Chunk ${chunksReceivedCount}: timestamp=${chunkTimestamp}, âge=${age}ms, format=${chunkData.format || 'pcm16'}, queue=${audioChunksQueue.length}`);
-                }
-                
-                // Ajouter directement à la queue
-                playAudioChunk(chunkData.data, {
-                    format: chunkData.format || 'pcm16',
-                    sampleRate: chunkData.sampleRate || 44100,
-                    bufferSize: chunkData.bufferSize || 4096,
-                    mimeType: chunkData.mimeType || null
-                });
-            } else {
-                // Chunk trop ancien
-                if (chunksReceivedCount % 50 === 0) {
-                    console.log(`⏭️ Chunk ignoré (trop ancien): ${chunkTimestamp}, âge: ${age}ms`);
-                }
+                // Traiter le stream continu
+                processContinuousStream(streamData);
             }
         } catch (error) {
-            console.error('❌ Erreur traitement chunk:', error);
+            console.error('❌ Erreur traitement stream:', error);
         }
     }, (error) => {
         console.error('❌ Erreur listener Firebase:', error);
         handleAudioChunksError(error);
     });
     
-    console.log('✅ Listener Firebase connecté pour les chunks audio');
+    // Fallback: écouter aussi les anciens chunks pour compatibilité
+    const chunksRef = database.ref('radio/audioChunks');
+    chunksRef.on('child_added', (snapshot) => {
+        try {
+            if (!isPlayingAudio) return;
+            
+            const chunkData = snapshot.val();
+            if (!chunkData || !chunkData.data) return;
+            
+            const chunkTimestamp = chunkData.timestamp || parseInt(snapshot.key);
+            if (chunkTimestamp > lastChunkTimestamp || (Date.now() - chunkTimestamp) < 10000) {
+                lastChunkTimestamp = Math.max(lastChunkTimestamp, chunkTimestamp);
+                playAudioChunk(chunkData.data, {
+                    format: chunkData.format || 'pcm16',
+                    sampleRate: chunkData.sampleRate || 48000,
+                    bufferSize: chunkData.bufferSize || 4096
+                });
+            }
+        } catch (error) {
+            console.error('❌ Erreur traitement chunk (fallback):', error);
+        }
+    });
+    
+    console.log('✅ Listener Firebase connecté pour les streams continus');
+}
+
+// Traiter un stream continu (accumulation et lecture fluide)
+function processContinuousStream(streamData) {
+    try {
+        if (!streamData.data || !streamData.sampleRate) {
+            console.warn('⚠️ Stream incomplet');
+            return;
+        }
+        
+        // Décoder le stream
+        const binaryString = atob(streamData.data);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+        }
+        
+        if (bytes.length % 2 !== 0) {
+            console.warn('⚠️ Taille stream invalide');
+            return;
+        }
+        
+        // Convertir en Float32
+        const int16Data = new Int16Array(bytes.buffer);
+        const float32Data = new Float32Array(int16Data.length);
+        for (let i = 0; i < int16Data.length; i++) {
+            float32Data[i] = Math.max(-1, Math.min(1, int16Data[i] / 32768.0));
+        }
+        
+        // Ajouter au buffer continu
+        for (let i = 0; i < float32Data.length; i++) {
+            continuousStreamBuffer.push(float32Data[i]);
+        }
+        
+        chunksReceivedCount++;
+        
+        // Démarrer la lecture si pas déjà en cours
+        if (!isPlayingStream && continuousStreamBuffer.length > 0) {
+            startContinuousPlayback(streamData.sampleRate);
+        }
+        
+        // Log périodique
+        if (chunksReceivedCount % 10 === 0) {
+            console.log(`📡 Stream ${chunksReceivedCount}: ${streamData.samples} échantillons, buffer: ${continuousStreamBuffer.length}, durée: ${(streamData.samples/streamData.sampleRate).toFixed(2)}s`);
+        }
+        
+    } catch (error) {
+        console.error('❌ Erreur traitement stream continu:', error);
+    }
+}
+
+// Lire le buffer continu de manière fluide (style appel)
+function startContinuousPlayback(sampleRate) {
+    if (isPlayingStream || !audioContextListener || continuousStreamBuffer.length === 0) {
+        return;
+    }
+    
+    isPlayingStream = true;
+    const targetSampleRate = sampleRate || 48000;
+    
+    // Fonction récursive pour lire le buffer par morceaux
+    const playBufferChunk = () => {
+        if (!isPlayingAudio || continuousStreamBuffer.length === 0) {
+            isPlayingStream = false;
+            return;
+        }
+        
+        // Prendre un morceau du buffer (environ 50ms à 48kHz = ~2400 échantillons)
+        const chunkSize = Math.floor(targetSampleRate * 0.05); // 50ms
+        const samplesToPlay = Math.min(chunkSize, continuousStreamBuffer.length);
+        
+        if (samplesToPlay === 0) {
+            // Buffer vide, attendre un peu
+            setTimeout(playBufferChunk, 10);
+            return;
+        }
+        
+        // Extraire les échantillons
+        const audioChunk = continuousStreamBuffer.splice(0, samplesToPlay);
+        
+        // Créer l'AudioBuffer
+        try {
+            if (audioContextListener.state === 'suspended') {
+                audioContextListener.resume();
+            }
+            
+            const audioBuffer = audioContextListener.createBuffer(1, audioChunk.length, targetSampleRate);
+            audioBuffer.getChannelData(0).set(audioChunk);
+            
+            // Créer et jouer la source
+            if (!gainNode) {
+                gainNode = audioContextListener.createGain();
+                gainNode.gain.value = currentVolume || 1.0;
+                gainNode.connect(audioContextListener.destination);
+            }
+            
+            const source = audioContextListener.createBufferSource();
+            source.buffer = audioBuffer;
+            source.connect(gainNode);
+            
+            const duration = audioBuffer.duration;
+            
+            source.onended = () => {
+                // Continuer avec le prochain morceau immédiatement
+                playBufferChunk();
+            };
+            
+            source.onerror = (e) => {
+                console.error('❌ Erreur source:', e);
+                isPlayingStream = false;
+            };
+            
+            source.start(0);
+            updateAudioStatus(true, `Stream: ${chunksReceivedCount} paquets`);
+            
+            // Planifier le prochain morceau (légèrement avant la fin pour continuité)
+            const nextDelay = Math.max(duration * 1000 - 5, 0);
+            setTimeout(() => {
+                if (isPlayingAudio && continuousStreamBuffer.length > 0) {
+                    playBufferChunk();
+                }
+            }, nextDelay);
+            
+        } catch (error) {
+            console.error('❌ Erreur lecture buffer:', error);
+            isPlayingStream = false;
+            // Réessayer après un court délai
+            setTimeout(() => {
+                if (isPlayingAudio && continuousStreamBuffer.length > 0) {
+                    isPlayingStream = false;
+                    startContinuousPlayback(targetSampleRate);
+                }
+            }, 20);
+        }
+    };
+    
+    // Démarrer la lecture
+    playBufferChunk();
 }
 
 // Gérer les erreurs de connexion aux chunks
@@ -685,6 +840,8 @@ function stopListeningToAudio() {
     isPlayingAudio = false;
     audioChunksQueue = [];
     audioBufferQueue = [];
+    continuousStreamBuffer = []; // Arrêter le buffer continu
+    isPlayingStream = false; // Arrêter le streaming continu
     isProcessingBuffer = false;
     
     // Arrêter le health check
@@ -709,9 +866,10 @@ function stopListeningToAudio() {
         }
     }
     
-    // Désactiver tous les listeners Firebase sur audioChunks
+    // Désactiver tous les listeners Firebase (chunks et streams)
     try {
         database.ref('radio/audioChunks').off();
+        database.ref('radio/audioStream').off();
     } catch (e) {
         console.warn('⚠️ Erreur désactivation listeners Firebase:', e);
     }
