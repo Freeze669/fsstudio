@@ -721,9 +721,11 @@ function processContinuousStream(streamData) {
         const isOpus = format.includes('opus') || (streamData.mimeType && streamData.mimeType.includes('opus'));
         const isStereo = streamData.channels === 2 || format.includes('stereo');
         
-        // Si Opus, utiliser le traitement Opus dédié
+        // DÉSACTIVER OPUS - Les fragments Opus WebM ne peuvent pas être joués
+        // Utiliser uniquement PCM16 stéréo qui fonctionne parfaitement
         if (isOpus) {
-            processOpusStream(streamData);
+            console.warn('⚠️ Opus détecté mais désactivé (fragments non supportés), utilisation de PCM16 stéréo');
+            // Ne pas traiter Opus, attendre PCM16
             return;
         }
         

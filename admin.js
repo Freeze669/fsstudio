@@ -516,19 +516,21 @@ function initRadioEvents() {
                 }
             }
             
-            // UTILISER OPUS STÉRÉO 48kHz (COMME DISCORD)
-            // Créer un stream continu Opus au lieu de chunks individuels
-            if (!selectedMimeType) {
-                console.warn('⚠️ Opus non supporté, fallback vers PCM16 stéréo');
-                // Fallback : ScriptProcessor en stéréo
-                const bufferSize = 4096;
-                scriptProcessor = audioContext.createScriptProcessor(bufferSize, 2, 2); // 2 canaux (stéréo)
-            } else {
+            // UTILISER PCM16 STÉRÉO 48kHz (PLUS FIABLE QUE OPUS POUR STREAMING FRAGMENTÉ)
+            // Opus WebM ne peut pas être joué en fragments individuels, donc on utilise PCM16 stéréo
+            console.log('✅ Utilisation de PCM16 STÉRÉO 48kHz (plus fiable pour streaming fragmenté)');
+            selectedMimeType = null; // Forcer PCM16 stéréo
+            const bufferSize = 4096;
+            scriptProcessor = audioContext.createScriptProcessor(bufferSize, 2, 2); // 2 canaux (stéréo)
+            
+            if (false) { // Désactivé - Opus ne fonctionne pas avec fragments
+                // DÉSACTIVÉ - Opus WebM ne fonctionne pas avec fragments
                 // Utiliser MediaRecorder avec Opus STÉRÉO 48kHz (COMME DISCORD)
+                // NOTE: Ce code est désactivé car les fragments Opus ne peuvent pas être joués individuellement
+                if (false) {
                 mediaRecorder = new MediaRecorder(mediaStream, {
                     mimeType: selectedMimeType,
                     audioBitsPerSecond: 128000, // 128 kbps (qualité Discord)
-                    // S'assurer que c'est en stéréo
                     numberOfAudioChannels: 2 // 2 canaux (stéréo)
                 });
                 
@@ -606,6 +608,7 @@ function initRadioEvents() {
                 console.log(`   Sample Rate: 48kHz`);
                 console.log(`   Bitrate: 128 kbps`);
                 console.log(`   Intervalle: 80ms (fluidité Discord)`);
+                }
             }
             
             // ============================================
@@ -777,68 +780,85 @@ function initRadioEvents() {
                     return;
                 }
                 
-                // Traitement audio haute qualité (qualité appel)
+                // Traitement audio haute qualité STÉRÉO (qualité appel)
                 let maxAmplitude = 0;
-                const processedData = new Float32Array(inputData.length);
                 
-                // 1. Calculer RMS pour détection précise
+                // 1. Calculer RMS pour détection précise (sur les deux canaux)
                 let sumSquares = 0;
-                for (let i = 0; i < inputData.length; i++) {
-                    sumSquares += inputData[i] * inputData[i];
-                    maxAmplitude = Math.max(maxAmplitude, Math.abs(inputData[i]));
+                for (let i = 0; i < inputDataLeft.length; i++) {
+                    const left = inputDataLeft[i];
+                    const right = inputDataRight[i];
+                    sumSquares += left * left + right * right;
+                    maxAmplitude = Math.max(maxAmplitude, Math.abs(left), Math.abs(right));
                 }
-                const rms = Math.sqrt(sumSquares / inputData.length);
+                const rms = Math.sqrt(sumSquares / (inputDataLeft.length * 2)); // Diviser par 2 car 2 canaux
                 
                 // 2. Gain adaptatif pour qualité appel
                 const targetGain = targetPeak / Math.max(maxAmplitude, 0.05);
                 adaptiveGain = adaptiveGain * 0.95 + targetGain * 0.05; // Lissage très doux
                 const gain = Math.min(adaptiveGain, maxGain);
                 
-                // 3. Traitement audio professionnel (qualité appel téléphonique)
-                for (let i = 0; i < inputData.length; i++) {
-                    let sample = inputData[i];
+                // 3. Traitement audio professionnel STÉRÉO (qualité appel téléphonique)
+                const processedDataLeft = new Float32Array(inputDataLeft.length);
+                const processedDataRight = new Float32Array(inputDataRight.length);
+                
+                for (let i = 0; i < inputDataLeft.length; i++) {
+                    let sampleLeft = inputDataLeft[i];
+                    let sampleRight = inputDataRight[i];
                     
                     // Suppression de bruit très douce (qualité appel)
-                    const absValue = Math.abs(sample);
-                    if (absValue < noiseGateThreshold) {
-                        const reduction = Math.pow(absValue / noiseGateThreshold, 3) * 0.3; // Plus doux
-                        sample *= reduction;
+                    const absValueLeft = Math.abs(sampleLeft);
+                    const absValueRight = Math.abs(sampleRight);
+                    
+                    if (absValueLeft < noiseGateThreshold) {
+                        const reduction = Math.pow(absValueLeft / noiseGateThreshold, 3) * 0.3;
+                        sampleLeft *= reduction;
+                    }
+                    if (absValueRight < noiseGateThreshold) {
+                        const reduction = Math.pow(absValueRight / noiseGateThreshold, 3) * 0.3;
+                        sampleRight *= reduction;
                     }
                     
                     // Appliquer le gain
-                    sample *= gain;
+                    sampleLeft *= gain;
+                    sampleRight *= gain;
                     
                     // Soft limiter très doux (qualité Discord - son audible)
-                    const softThreshold = 0.97; // Seuil très élevé pour son audible
-                    if (sample > softThreshold) {
-                        const excess = sample - softThreshold;
-                        sample = softThreshold + excess / (1 + excess * 4); // Compression encore plus douce
-                    } else if (sample < -softThreshold) {
-                        const excess = Math.abs(sample) - softThreshold;
-                        sample = -(softThreshold + excess / (1 + excess * 4));
+                    const softThreshold = 0.97;
+                    if (sampleLeft > softThreshold) {
+                        const excess = sampleLeft - softThreshold;
+                        sampleLeft = softThreshold + excess / (1 + excess * 4);
+                    } else if (sampleLeft < -softThreshold) {
+                        const excess = Math.abs(sampleLeft) - softThreshold;
+                        sampleLeft = -(softThreshold + excess / (1 + excess * 4));
+                    }
+                    if (sampleRight > softThreshold) {
+                        const excess = sampleRight - softThreshold;
+                        sampleRight = softThreshold + excess / (1 + excess * 4);
+                    } else if (sampleRight < -softThreshold) {
+                        const excess = Math.abs(sampleRight) - softThreshold;
+                        sampleRight = -(softThreshold + excess / (1 + excess * 4));
                     }
                     
-                    // Hard limiter (sécurité) - limite élevée pour son audible
+                    // Hard limiter (sécurité)
                     const hardLimit = 0.99;
-                    if (sample > hardLimit) sample = hardLimit;
-                    else if (sample < -hardLimit) sample = -hardLimit;
+                    if (sampleLeft > hardLimit) sampleLeft = hardLimit;
+                    else if (sampleLeft < -hardLimit) sampleLeft = -hardLimit;
+                    if (sampleRight > hardLimit) sampleRight = hardLimit;
+                    else if (sampleRight < -hardLimit) sampleRight = -hardLimit;
                     
-                    // Limite finale très élevée pour son audible et clair
-                    processedData[i] = Math.max(-0.99, Math.min(0.99, sample));
+                    processedDataLeft[i] = Math.max(-0.99, Math.min(0.99, sampleLeft));
+                    processedDataRight[i] = Math.max(-0.99, Math.min(0.99, sampleRight));
                 }
                 
                 peakLevel = maxAmplitude * gain;
                 
-                // ACCUMULER dans le buffer continu STÉRÉO (au lieu d'envoyer immédiatement)
-                // Traiter les deux canaux pour stéréo (comme Discord)
-                for (let i = 0; i < processedData.length; i++) {
-                    // Ajouter les deux canaux (stéréo)
-                    continuousAudioBuffer.push(processedData[i]); // Canal gauche
-                    // Pour le canal droit, utiliser les mêmes données traitées (ou dupliquer)
-                    // En production, on pourrait traiter inputDataRight séparément
-                    continuousAudioBuffer.push(processedData[i]); // Canal droit (dupliqué pour l'instant)
+                // ACCUMULER les deux canaux en format interleaved (L, R, L, R, ...)
+                for (let i = 0; i < processedDataLeft.length; i++) {
+                    continuousAudioBuffer.push(processedDataLeft[i]); // Canal gauche
+                    continuousAudioBuffer.push(processedDataRight[i]); // Canal droit
                 }
-                bufferAccumulationTime += inputData.length / sampleRate;
+                bufferAccumulationTime += inputDataLeft.length / sampleRate;
                 
                 const now = Date.now();
                 const timeSinceLastSend = now - lastBufferSendTime;
