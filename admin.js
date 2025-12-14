@@ -26,6 +26,55 @@ const FIREBASE_USERS_PATH = 'publicChat/users';
 const FIREBASE_RADIO_PATH = 'radio';
 const FIREBASE_RADIO_STATUS_PATH = 'radio/status';
 
+// Configuration WebSocket pour streaming audio
+// URL du serveur Railway (toujours en WSS car Railway utilise HTTPS)
+const WS_SERVER_URL = 'wss://fsstudio-production.up.railway.app';
+let audioWebSocket = null;
+
+// Fonction pour se connecter au serveur WebSocket
+function connectWebSocket() {
+    if (audioWebSocket && audioWebSocket.readyState === WebSocket.OPEN) {
+        return; // Déjà connecté
+    }
+    
+    try {
+        audioWebSocket = new WebSocket(WS_SERVER_URL);
+        
+        audioWebSocket.onopen = () => {
+            console.log('✅ Connecté au serveur WebSocket');
+            // S'identifier comme diffuseur
+            audioWebSocket.send(JSON.stringify({ type: 'broadcast' }));
+        };
+        
+        audioWebSocket.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                if (data.type === 'broadcaster-confirmed') {
+                    console.log('✅ Identifié comme diffuseur');
+                }
+            } catch (e) {
+                console.error('❌ Erreur parsing message WebSocket:', e);
+            }
+        };
+        
+        audioWebSocket.onerror = (error) => {
+            console.error('❌ Erreur WebSocket:', error);
+        };
+        
+        audioWebSocket.onclose = () => {
+            console.log('⚠️ Connexion WebSocket fermée');
+            // Tentative de reconnexion après 3 secondes
+            if (isStreaming) {
+                setTimeout(() => {
+                    connectWebSocket();
+                }, 3000);
+            }
+        };
+    } catch (error) {
+        console.error('❌ Erreur connexion WebSocket:', error);
+    }
+}
+
 // Variables
 let messagesRef = null;
 let usersRef = null;
@@ -706,51 +755,46 @@ function initRadioEvents() {
                     return;
                 }
                 
-                // Envoyer le buffer continu STÉRÉO à Firebase
-                database.ref(`radio/audioStream/${timestamp}`).set({
-                    data: base64Audio,
-                    timestamp: timestamp,
-                    sampleRate: sampleRate,
-                    format: 'pcm16-stream-stereo', // Format stream continu STÉRÉO
-                    channels: 2, // STÉRÉO (2 canaux)
-                    samples: totalSamples,
-                    samplesPerChannel: totalSamples / 2, // Échantillons par canal
-                    duration: (totalSamples / 2) / sampleRate // Durée réelle (divisé par 2 car stéréo)
-                }).then(() => {
-                    chunksSentCount++;
-                    lastSentTime = new Date();
-                    
-                    if (chunksSent) chunksSent.textContent = chunksSentCount;
-                    if (lastSent) {
-                        const timeStr = lastSentTime.toLocaleTimeString();
-                        lastSent.textContent = timeStr;
+                // Envoyer le buffer via WebSocket (plus fiable que Firebase)
+                if (audioWebSocket && audioWebSocket.readyState === WebSocket.OPEN) {
+                    try {
+                        audioWebSocket.send(JSON.stringify({
+                            type: 'audio',
+                            data: base64Audio,
+                            sampleRate: sampleRate,
+                            channels: 2, // STÉRÉO
+                            samples: totalSamples,
+                            timestamp: timestamp
+                        }));
+                        
+                        chunksSentCount++;
+                        lastSentTime = new Date();
+                        
+                        if (chunksSent) chunksSent.textContent = chunksSentCount;
+                        if (lastSent) {
+                            const timeStr = lastSentTime.toLocaleTimeString();
+                            lastSent.textContent = timeStr;
+                        }
+                        
+                        // Log tous les 10 buffers
+                        if (chunksSentCount % 10 === 0) {
+                            console.log(`📡 Stream envoyé via WebSocket: ${chunksSentCount}, ${totalSamples} échantillons, ${(totalSamples/sampleRate).toFixed(3)}s`);
+                        }
+                    } catch (error) {
+                        console.error('❌ Erreur envoi WebSocket:', error);
+                        // Tentative de reconnexion
+                        if (isStreaming) {
+                            connectWebSocket();
+                        }
                     }
-                    
-                    // Log pour débogage (tous les buffers au début, puis tous les 10)
-                    if (chunksSentCount <= 5 || chunksSentCount % 10 === 0) {
-                        console.log(`📡 Stream continu envoyé: ${chunksSentCount}, ${totalSamples} échantillons, ${(totalSamples/sampleRate).toFixed(3)}s, taille base64: ${base64Audio.length} chars`);
+                } else {
+                    // WebSocket non connecté, essayer de se connecter
+                    if (isStreaming && (!audioWebSocket || audioWebSocket.readyState === WebSocket.CLOSED)) {
+                        connectWebSocket();
                     }
-                    
-                    // Nettoyer les anciens streams (plus de 3 secondes)
-                    if (chunksSentCount % 20 === 0) {
-                        const cleanupTime = Date.now() - 3000;
-                        database.ref('radio/audioStream').orderByKey().once('value', (snapshot) => {
-                            let cleaned = 0;
-                            snapshot.forEach((child) => {
-                                const streamTime = parseInt(child.key);
-                                if (streamTime < cleanupTime) {
-                                    child.ref.remove().catch(() => {});
-                                    cleaned++;
-                                }
-                            });
-                            if (cleaned > 0) {
-                                console.log(`🧹 ${cleaned} anciens streams nettoyés`);
-                            }
-                        });
-                    }
-                }).catch((error) => {
-                    console.error('❌ Erreur envoi stream:', error);
-                });
+                }
+                
+                // FALLBACK Firebase désactivé - utiliser uniquement WebSocket
                 
                 // Réinitialiser le buffer
                 continuousAudioBuffer = [];
@@ -914,15 +958,26 @@ function initRadioEvents() {
             console.log('   - Filtres audio: Égaliseur multi-bandes actif');
             console.log('   - Écho: COMPLÈTEMENT DÉSACTIVÉ');
             
-            // Mettre à jour l'état dans Firebase
+            // Se connecter au serveur WebSocket
+            connectWebSocket();
+            
+            // Envoyer le statut de diffusion via WebSocket
+            if (audioWebSocket && audioWebSocket.readyState === WebSocket.OPEN) {
+                audioWebSocket.send(JSON.stringify({
+                    type: 'status',
+                    isLive: true
+                }));
+            }
+            
+            // Mettre à jour l'état dans Firebase (pour compatibilité)
             database.ref(FIREBASE_RADIO_STATUS_PATH).set({
                 isLive: true,
                 startedAt: new Date().toISOString(),
                 sampleRate: audioContext.sampleRate,
-                format: selectedMimeType ? 'opus' : 'pcm16', // Format Opus ou PCM fallback
-                codec: selectedMimeType || 'pcm16',
-                bitrate: selectedMimeType ? 128000 : 768000, // 128 kbps pour Opus (qualité supérieure), brut pour PCM
-                quality: 'high' // Qualité vocale haute
+                format: 'pcm16',
+                codec: 'pcm16',
+                bitrate: 768000,
+                quality: 'high'
             });
             
             // Afficher les contrôles
@@ -954,6 +1009,24 @@ function initRadioEvents() {
         
         // Arrêter le streaming immédiatement
         isStreaming = false;
+        
+        // Envoyer le statut d'arrêt via WebSocket
+        if (audioWebSocket && audioWebSocket.readyState === WebSocket.OPEN) {
+            try {
+                audioWebSocket.send(JSON.stringify({
+                    type: 'status',
+                    isLive: false
+                }));
+            } catch (e) {
+                console.error('❌ Erreur envoi statut WebSocket:', e);
+            }
+        }
+        
+        // Fermer la connexion WebSocket
+        if (audioWebSocket) {
+            audioWebSocket.close();
+            audioWebSocket = null;
+        }
         
         // Arrêter le timer de buffer
         if (bufferTimer) {

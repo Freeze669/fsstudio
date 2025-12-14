@@ -6,6 +6,11 @@ const radioConfig = {
 // Chemins Firebase pour la radio
 const FIREBASE_RADIO_STATUS_PATH = 'radio/status';
 
+// Configuration WebSocket pour streaming audio
+// URL du serveur Railway (toujours en WSS car Railway utilise HTTPS)
+const WS_SERVER_URL = 'wss://fsstudio-production.up.railway.app';
+let audioWebSocket = null;
+
 // Éléments DOM
 const audioPlayer = document.getElementById('audioPlayer');
 const playPauseBtn = document.getElementById('playPauseBtn');
@@ -594,87 +599,92 @@ let continuousStreamBuffer = [];
 let isPlayingStream = false;
 let streamStartTime = 0;
 
-// Se connecter aux streams audio Firebase (système continu)
+// Se connecter au serveur WebSocket pour recevoir l'audio
 function connectToAudioChunks() {
-    console.log('🔄 Connexion aux streams audio Firebase (système continu)...');
+    console.log('🔄 Connexion au serveur WebSocket...');
     
-    // Désactiver les anciens listeners
-    try {
-        database.ref('radio/audioChunks').off('child_added');
-        database.ref('radio/audioStream').off('child_added');
-    } catch (e) {
-        console.warn('⚠️ Erreur désactivation anciens listeners:', e);
+    // Fermer l'ancienne connexion si elle existe
+    if (audioWebSocket) {
+        audioWebSocket.close();
+        audioWebSocket = null;
     }
     
-    // Écouter les nouveaux streams continus
-    const streamRef = database.ref('radio/audioStream');
-    
-    streamRef.on('child_added', (snapshot) => {
-        try {
-            if (!isPlayingAudio) {
-                console.log('⏸️ Stream reçu mais écoute arrêtée');
-                return;
-            }
-            
-            const streamData = snapshot.val();
-            if (!streamData || !streamData.data) {
-                console.warn('⚠️ Stream invalide reçu:', streamData);
-                return;
-            }
-            
-            const streamTimestamp = streamData.timestamp || parseInt(snapshot.key);
-            const age = Date.now() - streamTimestamp;
-            
-            // Log pour débogage (premiers streams)
-            if (chunksReceivedCount < 5) {
-                console.log(`📥 Stream reçu: timestamp=${streamTimestamp}, âge=${age}ms, samples=${streamData.samples || 'N/A'}, format=${streamData.format || 'N/A'}`);
-            }
-            
-            // Accepter les streams récents (moins de 5 secondes) ou nouveaux
-            if (streamTimestamp > lastChunkTimestamp || age < 5000) {
-                lastChunkTimestamp = Math.max(lastChunkTimestamp, streamTimestamp);
-                lastSuccessfulChunkTime = Date.now();
-                reconnectAttempts = 0;
+    try {
+        audioWebSocket = new WebSocket(WS_SERVER_URL);
+        
+        audioWebSocket.onopen = () => {
+            console.log('✅ Connecté au serveur WebSocket');
+            // S'identifier comme auditeur
+            audioWebSocket.send(JSON.stringify({ type: 'listen' }));
+        };
+        
+        audioWebSocket.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
                 
-                // Traiter le stream continu
-                processContinuousStream(streamData);
-            } else {
-                if (chunksReceivedCount < 5) {
-                    console.log(`⏭️ Stream ignoré (trop ancien): timestamp=${streamTimestamp}, âge=${age}ms`);
+                if (data.type === 'listener-confirmed') {
+                    console.log('✅ Identifié comme auditeur');
+                } else if (data.type === 'audio') {
+                    // Audio reçu du serveur
+                    if (!isPlayingAudio) {
+                        return;
+                    }
+                    
+                    chunksReceivedCount++;
+                    lastSuccessfulChunkTime = Date.now();
+                    reconnectAttempts = 0;
+                    
+                    // Traiter le stream audio
+                    processContinuousStream({
+                        data: data.data,
+                        sampleRate: data.sampleRate || 48000,
+                        channels: data.channels || 2,
+                        samples: data.samples || 0,
+                        format: 'pcm16-stream-stereo',
+                        timestamp: data.timestamp || Date.now()
+                    });
+                    
+                    if (chunksReceivedCount <= 5 || chunksReceivedCount % 10 === 0) {
+                        console.log(`📥 Audio reçu via WebSocket: ${chunksReceivedCount}, ${data.samples || 0} échantillons, ${data.channels || 2} canaux`);
+                    }
+                } else if (data.type === 'status') {
+                    // Statut de diffusion
+                    if (data.isLive) {
+                        console.log('✅ Diffusion en cours détectée');
+                        if (!isPlayingAudio) {
+                            autoStartAudio();
+                        }
+                    } else {
+                        console.log('⏸️ Diffusion arrêtée');
+                        if (isPlayingAudio) {
+                            stopListeningToAudio();
+                        }
+                    }
                 }
+            } catch (error) {
+                console.error('❌ Erreur traitement message WebSocket:', error);
             }
-        } catch (error) {
-            console.error('❌ Erreur traitement stream:', error);
-        }
-    }, (error) => {
-        console.error('❌ Erreur listener Firebase:', error);
+        };
+        
+        audioWebSocket.onerror = (error) => {
+            console.error('❌ Erreur WebSocket:', error);
+            handleAudioChunksError(error);
+        };
+        
+        audioWebSocket.onclose = () => {
+            console.log('⚠️ Connexion WebSocket fermée');
+            // Tentative de reconnexion après 3 secondes
+            if (isPlayingAudio) {
+                setTimeout(() => {
+                    connectToAudioChunks();
+                }, 3000);
+            }
+        };
+        
+    } catch (error) {
+        console.error('❌ Erreur connexion WebSocket:', error);
         handleAudioChunksError(error);
-    });
-    
-    // Fallback: écouter aussi les anciens chunks pour compatibilité
-    const chunksRef = database.ref('radio/audioChunks');
-    chunksRef.on('child_added', (snapshot) => {
-        try {
-            if (!isPlayingAudio) return;
-            
-            const chunkData = snapshot.val();
-            if (!chunkData || !chunkData.data) return;
-            
-            const chunkTimestamp = chunkData.timestamp || parseInt(snapshot.key);
-            if (chunkTimestamp > lastChunkTimestamp || (Date.now() - chunkTimestamp) < 10000) {
-                lastChunkTimestamp = Math.max(lastChunkTimestamp, chunkTimestamp);
-                playAudioChunk(chunkData.data, {
-                    format: chunkData.format || 'pcm16',
-                    sampleRate: chunkData.sampleRate || 48000,
-                    bufferSize: chunkData.bufferSize || 4096
-                });
-            }
-        } catch (error) {
-            console.error('❌ Erreur traitement chunk (fallback):', error);
-        }
-    });
-    
-    console.log('✅ Listener Firebase connecté pour les streams continus');
+    }
 }
 
 // Traiter un stream continu (accumulation et lecture fluide)
@@ -909,6 +919,13 @@ function stopListeningToAudio() {
     isPlayingStream = false; // Arrêter le streaming continu
     isProcessingBuffer = false;
     
+    // Fermer la connexion WebSocket
+    if (audioWebSocket) {
+        audioWebSocket.close();
+        audioWebSocket = null;
+        console.log('✅ Connexion WebSocket fermée');
+    }
+    
     // Arrêter le health check
     if (healthCheckInterval) {
         clearInterval(healthCheckInterval);
@@ -921,7 +938,7 @@ function stopListeningToAudio() {
         window.audioActiveIntervals = [];
     }
     
-    // Désactiver le listener Firebase
+    // Désactiver le listener Firebase (fallback)
     if (chunksListenerRef) {
         try {
             chunksListenerRef.off('child_added');
@@ -931,7 +948,7 @@ function stopListeningToAudio() {
         }
     }
     
-    // Désactiver tous les listeners Firebase (chunks et streams)
+    // Désactiver tous les listeners Firebase (chunks et streams) - fallback
     try {
         database.ref('radio/audioChunks').off();
         database.ref('radio/audioStream').off();
