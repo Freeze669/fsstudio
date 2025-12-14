@@ -3,6 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="FS STUDIO - Radio Web en direct">
+    
+    <!-- Permissions pour l'audio automatique -->
+    <meta http-equiv="Permissions-Policy" content="autoplay=*, microphone=*">
+    <meta name="autoplay-policy" content="no-user-gesture-required">
+    
     <title>FS STUDIO - Radio Web</title>
     <link rel="stylesheet" href="style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -112,7 +118,7 @@
         </div>
     </div>
 
-    <audio id="audioPlayer" preload="none"></audio>
+    <audio id="audioPlayer" preload="auto" autoplay playsinline></audio>
     
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>

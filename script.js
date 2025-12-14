@@ -335,29 +335,45 @@ function autoStartAudio() {
     
     // Essayer de reprendre le contexte (peut nécessiter une interaction utilisateur)
     if (audioContextListener.state === 'suspended') {
-        audioContextListener.resume().then(() => {
-            console.log('✅ Contexte audio activé automatiquement');
-            // Démarrer l'écoute
-            startListeningToAudio();
-            // Activer l'interface
-            isPlaying = true;
-            playIcon.style.display = 'none';
-            pauseIcon.style.display = 'block';
-            vinylRecord.classList.add('playing');
-        }).catch(err => {
-            console.warn('⚠️ Impossible d\'activer automatiquement, attente interaction utilisateur');
-            // Si échec, attendre l'interaction utilisateur
-            // L'utilisateur devra cliquer sur play
-            updateAudioStatus(false, 'Cliquez sur ▶️ pour démarrer');
-        });
+        // Essayer plusieurs fois de reprendre le contexte
+        const resumeAudio = () => {
+            audioContextListener.resume().then(() => {
+                console.log('✅ Contexte audio activé automatiquement');
+                // Démarrer l'écoute
+                startListeningToAudio();
+                // Activer l'interface
+                isPlaying = true;
+                if (playIcon) playIcon.style.display = 'none';
+                if (pauseIcon) pauseIcon.style.display = 'block';
+                if (vinylRecord) vinylRecord.classList.add('playing');
+            }).catch(err => {
+                console.warn('⚠️ Impossible d\'activer automatiquement, nouvelle tentative...', err);
+                // Réessayer après un court délai
+                setTimeout(() => {
+                    if (audioContextListener && audioContextListener.state === 'suspended') {
+                        resumeAudio();
+                    } else if (audioContextListener && audioContextListener.state === 'running') {
+                        startListeningToAudio();
+                        isPlaying = true;
+                        if (playIcon) playIcon.style.display = 'none';
+                        if (pauseIcon) pauseIcon.style.display = 'block';
+                        if (vinylRecord) vinylRecord.classList.add('playing');
+                    } else {
+                        updateAudioStatus(false, 'Cliquez sur ▶️ pour démarrer');
+                    }
+                }, 500);
+            });
+        };
+        
+        resumeAudio();
     } else {
         // Contexte déjà actif, démarrer directement
         startListeningToAudio();
         // Activer l'interface
         isPlaying = true;
-        playIcon.style.display = 'none';
-        pauseIcon.style.display = 'block';
-        vinylRecord.classList.add('playing');
+        if (playIcon) playIcon.style.display = 'none';
+        if (pauseIcon) pauseIcon.style.display = 'block';
+        if (vinylRecord) vinylRecord.classList.add('playing');
     }
 }
 
@@ -426,11 +442,26 @@ function startListeningToAudio() {
             console.log('✅ Contexte audio activé avec succès');
         }).catch(err => {
             console.error('❌ Erreur activation contexte:', err);
-            alert('⚠️ Le navigateur bloque l\'audio. Cliquez n\'importe où sur la page puis réessayez.');
+            // Ne pas alerter, juste logger - le système réessayera automatiquement
         });
     } else {
         console.log('✅ Contexte audio déjà actif:', audioContextListener.state);
     }
+    
+    // S'assurer que le contexte reste actif - vérification périodique
+    const keepAudioActive = setInterval(() => {
+        if (!isPlayingAudio) {
+            clearInterval(keepAudioActive);
+            return;
+        }
+        
+        if (audioContextListener && audioContextListener.state === 'suspended') {
+            console.log('🔄 Réactivation du contexte audio suspendu...');
+            audioContextListener.resume().catch(err => {
+                console.warn('⚠️ Impossible de réactiver:', err);
+            });
+        }
+    }, 2000); // Vérifier toutes les 2 secondes
     
     isPlayingAudio = true;
     audioChunksQueue = [];
@@ -522,14 +553,24 @@ function startListeningToAudio() {
     
     // Afficher l'indicateur audio
     updateAudioStatus(true, 'En attente des chunks...');
+    
+    // Vérifier immédiatement s'il y a des chunks en attente
+    setTimeout(() => {
+        if (audioChunksQueue.length > 0 && !isProcessingBuffer) {
+            console.log('📦 Chunks en attente détectés, démarrage de la lecture...');
+            processAudioQueue();
+        }
+    }, 100);
 }
 
-// Se connecter aux chunks audio Firebase
+// Se connecter aux chunks audio Firebase - SYSTÈME RECRÉÉ ET SIMPLIFIÉ
 function connectToAudioChunks() {
+    console.log('🔄 Connexion aux chunks audio Firebase...');
+    
     // Désactiver l'ancien listener s'il existe
     if (chunksListenerRef) {
         try {
-            chunksListenerRef.off('child_added');
+            database.ref('radio/audioChunks').off('child_added');
         } catch (e) {
             console.warn('⚠️ Erreur désactivation ancien listener:', e);
         }
@@ -537,31 +578,34 @@ function connectToAudioChunks() {
     
     const chunksRef = database.ref('radio/audioChunks');
     
-    // Écouter chaque nouveau chunk avec gestion d'erreur
-    chunksListenerRef = chunksRef.orderByKey();
-    
-    chunksListenerRef.on('child_added', (snapshot) => {
+    // Écouter chaque nouveau chunk - SYSTÈME SIMPLIFIÉ
+    chunksRef.on('child_added', (snapshot) => {
         try {
+            if (!isPlayingAudio) {
+                return; // Ne pas traiter si l'écoute est arrêtée
+            }
+            
             const chunkData = snapshot.val();
             if (!chunkData || !chunkData.data) {
-                console.warn('⚠️ Chunk invalide reçu');
+                console.warn('⚠️ Chunk invalide reçu (pas de data)');
                 return;
             }
             
             const chunkTimestamp = chunkData.timestamp || parseInt(snapshot.key);
             const age = Date.now() - chunkTimestamp;
             
-            // Accepter les chunks récents (moins de 5 secondes) ou nouveaux
-            if (chunkTimestamp > lastChunkTimestamp || age < 5000) {
+            // Accepter TOUS les chunks récents (moins de 10 secondes) ou nouveaux
+            if (chunkTimestamp > lastChunkTimestamp || age < 10000) {
                 lastChunkTimestamp = Math.max(lastChunkTimestamp, chunkTimestamp);
                 lastSuccessfulChunkTime = Date.now();
-                reconnectAttempts = 0; // Réinitialiser les tentatives de reconnexion
+                reconnectAttempts = 0;
                 
-                // Log seulement tous les 20 chunks pour éviter le spam
-                if (chunksReceivedCount % 20 === 0) {
-                    console.log(`📥 Chunk reçu: ${chunkTimestamp}, âge: ${age}ms, format: ${chunkData.format || 'pcm16'}`);
+                // Log pour débogage
+                if (chunksReceivedCount % 10 === 0) {
+                    console.log(`📥 Chunk ${chunksReceivedCount}: timestamp=${chunkTimestamp}, âge=${age}ms, format=${chunkData.format || 'pcm16'}, queue=${audioChunksQueue.length}`);
                 }
                 
+                // Ajouter directement à la queue
                 playAudioChunk(chunkData.data, {
                     format: chunkData.format || 'pcm16',
                     sampleRate: chunkData.sampleRate || 44100,
@@ -569,7 +613,7 @@ function connectToAudioChunks() {
                     mimeType: chunkData.mimeType || null
                 });
             } else {
-                // Chunk trop ancien, l'ignorer
+                // Chunk trop ancien
                 if (chunksReceivedCount % 50 === 0) {
                     console.log(`⏭️ Chunk ignoré (trop ancien): ${chunkTimestamp}, âge: ${age}ms`);
                 }
@@ -787,8 +831,9 @@ let mediaSource = null;
 let sourceBuffer = null;
 let mediaSourceReady = false;
 
-// TRAITER LA QUEUE AUDIO - SYSTÈME AMÉLIORÉ ET FIABLE
+// TRAITER LA QUEUE AUDIO - SYSTÈME COMPLÈTEMENT RECRÉÉ ET SIMPLIFIÉ
 async function processAudioQueue() {
+    // Vérifications de base
     if (!isPlayingAudio) {
         isProcessingBuffer = false;
         return;
@@ -800,183 +845,119 @@ async function processAudioQueue() {
         return;
     }
     
-    if (isProcessingBuffer) return;
-    isProcessingBuffer = true;
+    if (isProcessingBuffer) {
+        return; // Déjà en train de traiter
+    }
     
-    // Prendre le premier chunk de la queue
+    isProcessingBuffer = true;
     const chunk = audioChunksQueue.shift();
     
     try {
-        // S'assurer que le contexte audio est actif
+        // S'ASSURER QUE LE CONTEXTE AUDIO EST ACTIF
         if (!audioContextListener || audioContextListener.state === 'closed') {
-            console.warn('⚠️ Contexte audio fermé, recréation...');
+            console.log('🔄 Recréation du contexte audio...');
             audioContextListener = new (window.AudioContext || window.webkitAudioContext)({
                 sampleRate: 48000,
                 latencyHint: 'interactive'
             });
         }
         
+        // Toujours essayer de reprendre le contexte
         if (audioContextListener.state === 'suspended') {
             await audioContextListener.resume();
+            console.log('✅ Contexte audio réactivé');
         }
         
-        // FORMAT OPUS - Utiliser directement l'élément Audio HTML (plus fiable)
-        if (chunk.format === 'opus' || chunk.mimeType) {
-            // Format Opus (qualité appel optimale comme WhatsApp/Telegram)
-            const mimeType = chunk.mimeType || 'audio/webm;codecs=opus';
+        // Créer/connecter gainNode si nécessaire
+        if (!gainNode) {
+            gainNode = audioContextListener.createGain();
+            gainNode.gain.value = currentVolume || 1.0;
+            gainNode.connect(audioContextListener.destination);
+            console.log('✅ GainNode créé et connecté');
+        }
+        
+        // TRAITER LE CHUNK - UNIQUEMENT PCM16 (plus fiable)
+        if (chunk.format === 'pcm16' && chunk.sampleRate) {
+            // Décoder base64
+            const binaryString = atob(chunk.data);
+            const bytes = new Uint8Array(binaryString.length);
+            for (let i = 0; i < binaryString.length; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
             
-            try {
-                // Convertir base64 en Blob
-                const binaryString = atob(chunk.data);
-                const bytes = new Uint8Array(binaryString.length);
-                for (let i = 0; i < binaryString.length; i++) {
-                    bytes[i] = binaryString.charCodeAt(i);
+            if (bytes.length % 2 !== 0) {
+                console.warn('⚠️ Taille PCM invalide (impair), ignoré');
+                isProcessingBuffer = false;
+                if (audioChunksQueue.length > 0 && isPlayingAudio) {
+                    processAudioQueue();
                 }
-                
-                const blob = new Blob([bytes], { type: mimeType });
-                const audioUrl = URL.createObjectURL(blob);
-                
-                // Créer/connecter gainNode si nécessaire
-                if (!gainNode) {
-                    gainNode = audioContextListener.createGain();
-                    gainNode.gain.value = currentVolume;
-                    gainNode.connect(audioContextListener.destination);
-                }
-                
-                // LECTURE OPUS SIMPLIFIÉE - Élément Audio HTML direct
-                const audio = new Audio(audioUrl);
-                audio.volume = currentVolume;
-                
-                let cleaned = false;
-                const cleanup = () => {
-                    if (cleaned) return;
-                    cleaned = true;
-                    try {
-                        audio.pause();
-                        audio.src = '';
-                        URL.revokeObjectURL(audioUrl);
-                    } catch (e) {}
+                return;
+            }
+            
+            // Convertir en Int16 puis Float32
+            const int16Data = new Int16Array(bytes.buffer);
+            const float32Data = new Float32Array(int16Data.length);
+            for (let i = 0; i < int16Data.length; i++) {
+                float32Data[i] = Math.max(-1, Math.min(1, int16Data[i] / 32768.0));
+            }
+            
+            // Créer AudioBuffer
+            const sampleRate = chunk.sampleRate || 44100;
+            const audioBuffer = audioContextListener.createBuffer(1, float32Data.length, sampleRate);
+            audioBuffer.getChannelData(0).set(float32Data);
+            
+            // Mettre à jour le volume
+            gainNode.gain.value = currentVolume || 1.0;
+            
+            // Créer et jouer la source
+            const source = audioContextListener.createBufferSource();
+            source.buffer = audioBuffer;
+            source.connect(gainNode);
+            
+            const duration = audioBuffer.duration;
+            
+            // Log pour débogage
+            if (chunksReceivedCount % 20 === 0) {
+                console.log(`🔊 Lecture chunk ${chunksReceivedCount}: ${float32Data.length} échantillons, ${duration.toFixed(3)}s, volume: ${(currentVolume * 100).toFixed(0)}%, queue: ${audioChunksQueue.length}`);
+            }
+            
+            // Gérer la fin de lecture
+            source.onended = () => {
                 isProcessingBuffer = false;
                 // Traiter le prochain chunk immédiatement
                 if (audioChunksQueue.length > 0 && isPlayingAudio) {
                     processAudioQueue();
                 }
-                };
-                
-                audio.addEventListener('ended', cleanup, { once: true });
-                audio.addEventListener('error', (e) => {
-                    console.warn('⚠️ Erreur lecture audio Opus:', e);
-                    cleanup();
-                }, { once: true });
-                
-                // Jouer le chunk
-                const playPromise = audio.play();
-                if (playPromise !== undefined) {
-                    playPromise.then(() => {
-                        updateAudioStatus(true, `Lecture: ${chunksReceivedCount} chunks`);
-                        // Cleanup immédiat après le démarrage
-                        cleanup();
-                    }).catch((err) => {
-                        console.warn('⚠️ Erreur play Opus:', err);
-                        cleanup();
-                    });
-                } else {
-                    cleanup();
-                }
-                
-                return;
-            } catch (error) {
-                console.error('❌ Erreur traitement Opus:', error);
-                isProcessingBuffer = false;
-                if (audioChunksQueue.length > 0 && isPlayingAudio) {
-                    processAudioQueue();
-                }
-                return;
-            }
-        }
-        
-        // FORMAT PCM16 - LECTURE SIMPLIFIÉE ET FIABLE
-        if (chunk.format === 'pcm16' && chunk.sampleRate) {
-            try {
-                // Décoder base64
-                const binaryString = atob(chunk.data);
-                const bytes = new Uint8Array(binaryString.length);
-                for (let i = 0; i < binaryString.length; i++) {
-                    bytes[i] = binaryString.charCodeAt(i);
-                }
-                
-                if (bytes.length % 2 !== 0) {
-                    console.warn('⚠️ Taille PCM invalide (impair)');
-                    isProcessingBuffer = false;
-                    if (audioChunksQueue.length > 0 && isPlayingAudio) {
-                        processAudioQueue();
-                    }
-                    return;
-                }
-                
-                // Convertir en Int16 puis Float32
-                const int16Data = new Int16Array(bytes.buffer);
-                const float32Data = new Float32Array(int16Data.length);
-                for (let i = 0; i < int16Data.length; i++) {
-                    float32Data[i] = int16Data[i] / 32768.0;
-                }
-                
-                // Créer AudioBuffer
-                const sampleRate = chunk.sampleRate || 44100;
-                const audioBuffer = audioContextListener.createBuffer(1, float32Data.length, sampleRate);
-                audioBuffer.getChannelData(0).set(float32Data);
-                
-                // Créer/connecter gainNode
-                if (!gainNode) {
-                    gainNode = audioContextListener.createGain();
-                    gainNode.connect(audioContextListener.destination);
-                }
-                gainNode.gain.value = currentVolume || 1.0;
-                
-                // Créer et jouer la source
-                const source = audioContextListener.createBufferSource();
-                source.buffer = audioBuffer;
-                source.connect(gainNode);
-                
-                const duration = audioBuffer.duration;
-                
-                // Log seulement tous les 50 chunks
-                if (chunksReceivedCount % 50 === 0) {
-                    console.log(`🔊 Chunk PCM: ${float32Data.length} échantillons, ${duration.toFixed(3)}s, volume: ${(currentVolume * 100).toFixed(0)}%`);
-                }
-                
-                source.onended = () => {
-                    isProcessingBuffer = false;
-                    if (audioChunksQueue.length > 0 && isPlayingAudio) {
-                        processAudioQueue();
-                    }
-                };
-                
-                source.onerror = (e) => {
-                    console.warn('⚠️ Erreur source PCM:', e);
-                    isProcessingBuffer = false;
-                    if (audioChunksQueue.length > 0 && isPlayingAudio) {
-                        processAudioQueue();
-                    }
-                };
-                
-                source.start(0);
-                updateAudioStatus(true, `Lecture: ${chunksReceivedCount} chunks`);
-                
-                // Traiter le prochain chunk immédiatement après le démarrage
-                isProcessingBuffer = false;
-                if (audioChunksQueue.length > 0 && isPlayingAudio) {
-                    processAudioQueue();
-                }
-                
-            } catch (error) {
-                console.error('❌ Erreur traitement PCM:', error);
-                isProcessingBuffer = false;
-                if (audioChunksQueue.length > 0 && isPlayingAudio) {
-                    setTimeout(() => processAudioQueue(), 10);
-                }
-            }
+            };
             
+            source.onerror = (e) => {
+                console.error('❌ Erreur source PCM:', e);
+                isProcessingBuffer = false;
+                // Continuer avec le prochain chunk
+                if (audioChunksQueue.length > 0 && isPlayingAudio) {
+                    processAudioQueue();
+                }
+            };
+            
+            // DÉMARRER LA LECTURE
+            source.start(0);
+            updateAudioStatus(true, `Lecture: ${chunksReceivedCount} chunks`);
+            
+            // Planifier le traitement du prochain chunk AVANT la fin (pour continuité)
+            const nextChunkDelay = Math.max(duration * 1000 - 50, 0);
+            setTimeout(() => {
+                if (!isProcessingBuffer && audioChunksQueue.length > 0 && isPlayingAudio) {
+                    processAudioQueue();
+                }
+            }, nextChunkDelay);
+            
+        } else if (chunk.format === 'opus' || chunk.mimeType) {
+            // FORMAT OPUS - Convertir en PCM pour compatibilité
+            console.warn('⚠️ Format Opus détecté, conversion nécessaire (non implémentée, ignoré)');
+            isProcessingBuffer = false;
+            if (audioChunksQueue.length > 0 && isPlayingAudio) {
+                processAudioQueue();
+            }
         } else {
             console.warn('⚠️ Format non supporté:', chunk.format);
             isProcessingBuffer = false;
@@ -991,7 +972,7 @@ async function processAudioQueue() {
         updateAudioStatus(false, 'Erreur traitement');
         // Continuer avec le prochain chunk
         if (audioChunksQueue.length > 0 && isPlayingAudio) {
-            processAudioQueue();
+            setTimeout(() => processAudioQueue(), 50);
         }
     }
 }
@@ -1049,6 +1030,46 @@ if (volumeSlider) {
 updateTime();
 updateTrackTitle();
 setInterval(updateTime, 1000); // Mettre à jour l'heure chaque seconde
+
+// Activer l'audio automatiquement au chargement de la page
+// Cela permet au navigateur de détecter que le site veut jouer de l'audio
+document.addEventListener('DOMContentLoaded', () => {
+    // Créer un contexte audio dès le chargement pour "réserver" les permissions
+    try {
+        if (!audioContextListener || audioContextListener.state === 'closed') {
+            audioContextListener = new (window.AudioContext || window.webkitAudioContext)({
+                sampleRate: 48000,
+                latencyHint: 'interactive'
+            });
+            console.log('✅ Contexte audio pré-initialisé pour autoriser la diffusion');
+            
+            // Essayer de le mettre en état "running" immédiatement
+            if (audioContextListener.state === 'suspended') {
+                audioContextListener.resume().catch(err => {
+                    console.log('ℹ️ Contexte audio suspendu, sera activé lors de la première diffusion');
+                });
+            }
+        }
+    } catch (error) {
+        console.warn('⚠️ Impossible de pré-initialiser le contexte audio:', error);
+    }
+    
+    // Écouter les interactions utilisateur pour débloquer l'audio
+    const unlockAudio = () => {
+        if (audioContextListener && audioContextListener.state === 'suspended') {
+            audioContextListener.resume().then(() => {
+                console.log('✅ Audio débloqué par interaction utilisateur');
+            }).catch(err => {
+                console.warn('⚠️ Impossible de débloquer l\'audio:', err);
+            });
+        }
+    };
+    
+    // Débloquer l'audio au premier clic/touch
+    document.addEventListener('click', unlockAudio, { once: true });
+    document.addEventListener('touchstart', unlockAudio, { once: true });
+    document.addEventListener('keydown', unlockAudio, { once: true });
+});
 
 // Gestion des événements audio player
 audioPlayer.addEventListener('play', () => {
