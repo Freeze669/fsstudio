@@ -598,17 +598,23 @@ function connectToAudioChunks() {
     streamRef.on('child_added', (snapshot) => {
         try {
             if (!isPlayingAudio) {
+                console.log('⏸️ Stream reçu mais écoute arrêtée');
                 return;
             }
             
             const streamData = snapshot.val();
             if (!streamData || !streamData.data) {
-                console.warn('⚠️ Stream invalide reçu');
+                console.warn('⚠️ Stream invalide reçu:', streamData);
                 return;
             }
             
             const streamTimestamp = streamData.timestamp || parseInt(snapshot.key);
             const age = Date.now() - streamTimestamp;
+            
+            // Log pour débogage (premiers streams)
+            if (chunksReceivedCount < 5) {
+                console.log(`📥 Stream reçu: timestamp=${streamTimestamp}, âge=${age}ms, samples=${streamData.samples || 'N/A'}, format=${streamData.format || 'N/A'}`);
+            }
             
             // Accepter les streams récents (moins de 5 secondes) ou nouveaux
             if (streamTimestamp > lastChunkTimestamp || age < 5000) {
@@ -618,6 +624,10 @@ function connectToAudioChunks() {
                 
                 // Traiter le stream continu
                 processContinuousStream(streamData);
+            } else {
+                if (chunksReceivedCount < 5) {
+                    console.log(`⏭️ Stream ignoré (trop ancien): timestamp=${streamTimestamp}, âge=${age}ms`);
+                }
             }
         } catch (error) {
             console.error('❌ Erreur traitement stream:', error);
@@ -692,9 +702,9 @@ function processContinuousStream(streamData) {
             startContinuousPlayback(streamData.sampleRate);
         }
         
-        // Log périodique
-        if (chunksReceivedCount % 10 === 0) {
-            console.log(`📡 Stream ${chunksReceivedCount}: ${streamData.samples} échantillons, buffer: ${continuousStreamBuffer.length}, durée: ${(streamData.samples/streamData.sampleRate).toFixed(2)}s`);
+        // Log pour débogage (tous les streams au début, puis périodique)
+        if (chunksReceivedCount <= 5 || chunksReceivedCount % 10 === 0) {
+            console.log(`📡 Stream ${chunksReceivedCount}: ${streamData.samples} échantillons, buffer: ${continuousStreamBuffer.length}, durée: ${(streamData.samples/streamData.sampleRate).toFixed(3)}s, sampleRate: ${streamData.sampleRate}`);
         }
         
     } catch (error) {

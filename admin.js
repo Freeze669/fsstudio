@@ -47,6 +47,7 @@ let isStreaming = false;
 let mediaRecorder = null;
 let audioChunks = [];
 let streamInterval = null;
+let bufferTimer = null; // Timer pour forcer l'envoi périodique du buffer
 let chunksSentCount = 0;
 let lastSentTime = null;
 let scriptProcessor = null;
@@ -594,9 +595,38 @@ function initRadioEvents() {
             // Buffer continu pour accumuler les données audio
             let continuousAudioBuffer = [];
             let bufferAccumulationTime = 0;
-            const bufferTargetDuration = 0.2; // Accumuler 200ms de données avant d'envoyer (stream continu)
+            let lastBufferSendTime = Date.now();
+            const bufferTargetDuration = 0.15; // Accumuler 150ms de données avant d'envoyer (stream continu)
+            const bufferMaxWaitTime = 200; // Envoyer au maximum toutes les 200ms même si pas plein
             const sampleRate = audioContext.sampleRate;
-            const samplesPerBuffer = Math.floor(sampleRate * bufferTargetDuration); // ~9600 échantillons à 48kHz
+            const samplesPerBuffer = Math.floor(sampleRate * bufferTargetDuration); // ~7200 échantillons à 48kHz
+            
+            // Nettoyer l'ancien timer s'il existe
+            if (bufferTimer) {
+                clearInterval(bufferTimer);
+                bufferTimer = null;
+            }
+            
+            // Timer de sécurité pour forcer l'envoi toutes les 200ms
+            bufferTimer = setInterval(() => {
+                if (!isStreaming) {
+                    if (bufferTimer) {
+                        clearInterval(bufferTimer);
+                        bufferTimer = null;
+                    }
+                    return;
+                }
+                
+                const now = Date.now();
+                const timeSinceLastSend = now - lastBufferSendTime;
+                
+                // Forcer l'envoi si ça fait plus de 200ms et qu'on a des données
+                if (timeSinceLastSend >= bufferMaxWaitTime && continuousAudioBuffer.length > 0) {
+                    console.log(`⏰ Timer: Forcer envoi buffer (${continuousAudioBuffer.length} échantillons, ${timeSinceLastSend}ms depuis dernier)`);
+                    sendContinuousBuffer();
+                    lastBufferSendTime = now;
+                }
+            }, 100); // Vérifier toutes les 100ms
             
             // Variables pour la normalisation et suppression de bruit - QUALITÉ APPEL
             let noiseGateThreshold = 0.0005; // Seuil très bas pour qualité appel (capture tous les détails)
@@ -607,7 +637,14 @@ function initRadioEvents() {
             
             // Fonction pour envoyer le buffer accumulé comme un stream continu
             const sendContinuousBuffer = () => {
-                if (continuousAudioBuffer.length === 0 || !isStreaming) return;
+                if (!isStreaming) {
+                    continuousAudioBuffer = [];
+                    bufferAccumulationTime = 0;
+                    return;
+                }
+                
+                // Envoyer même si le buffer est petit (pour continuité)
+                if (continuousAudioBuffer.length === 0) return;
                 
                 // Convertir le buffer accumulé en Int16
                 const totalSamples = continuousAudioBuffer.length;
@@ -658,9 +695,9 @@ function initRadioEvents() {
                         lastSent.textContent = timeStr;
                     }
                     
-                    // Log tous les 10 buffers
-                    if (chunksSentCount % 10 === 0) {
-                        console.log(`📡 Stream continu envoyé: ${chunksSentCount}, ${totalSamples} échantillons, ${(totalSamples/sampleRate).toFixed(2)}s`);
+                    // Log pour débogage (tous les buffers au début, puis tous les 10)
+                    if (chunksSentCount <= 5 || chunksSentCount % 10 === 0) {
+                        console.log(`📡 Stream continu envoyé: ${chunksSentCount}, ${totalSamples} échantillons, ${(totalSamples/sampleRate).toFixed(3)}s, taille base64: ${base64Audio.length} chars`);
                     }
                     
                     // Nettoyer les anciens streams (plus de 3 secondes)
@@ -757,22 +794,30 @@ function initRadioEvents() {
                 peakLevel = maxAmplitude * gain;
                 
                 // ACCUMULER dans le buffer continu (au lieu d'envoyer immédiatement)
-                // Ajouter seulement si il y a du son significatif
-                if (rms >= noiseGateThreshold || maxAmplitude >= noiseGateThreshold * 2) {
-                    for (let i = 0; i < processedData.length; i++) {
-                        continuousAudioBuffer.push(processedData[i]);
+                // Toujours ajouter les données traitées (même si silence, pour continuité)
+                for (let i = 0; i < processedData.length; i++) {
+                    continuousAudioBuffer.push(processedData[i]);
+                }
+                bufferAccumulationTime += inputData.length / sampleRate;
+                
+                const now = Date.now();
+                const timeSinceLastSend = now - lastBufferSendTime;
+                
+                // Envoyer le buffer si:
+                // 1. On a accumulé assez de données (150ms)
+                // 2. OU si ça fait plus de 200ms depuis le dernier envoi (pour continuité)
+                // 3. OU si on a au moins 50ms de données et ça fait plus de 150ms
+                const shouldSend = continuousAudioBuffer.length >= samplesPerBuffer || 
+                    (timeSinceLastSend >= bufferMaxWaitTime && continuousAudioBuffer.length > 0) ||
+                    (timeSinceLastSend >= 150 && continuousAudioBuffer.length >= Math.floor(sampleRate * 0.05));
+                
+                if (shouldSend) {
+                    // Log pour débogage (premiers envois)
+                    if (chunksSentCount < 3) {
+                        console.log(`📤 Envoi buffer: ${continuousAudioBuffer.length} échantillons, temps depuis dernier: ${timeSinceLastSend}ms`);
                     }
-                    bufferAccumulationTime += inputData.length / sampleRate;
-                    
-                    // Envoyer le buffer quand on a accumulé assez de données (stream continu)
-                    if (continuousAudioBuffer.length >= samplesPerBuffer) {
-                        sendContinuousBuffer();
-                    }
-                } else {
-                    // Si silence prolongé, envoyer quand même le buffer accumulé pour continuité
-                    if (continuousAudioBuffer.length > 0 && bufferAccumulationTime > 0.1) {
-                        sendContinuousBuffer();
-                    }
+                    sendContinuousBuffer();
+                    lastBufferSendTime = now;
                 }
                 };
             }
@@ -847,6 +892,17 @@ function initRadioEvents() {
 
     // Arrêter la diffusion vocale
     stopVoiceBtn.addEventListener('click', () => {
+        // Arrêter le timer de buffer
+        if (bufferTimer) {
+            clearInterval(bufferTimer);
+            bufferTimer = null;
+        }
+        
+        // Envoyer le buffer restant avant d'arrêter
+        if (continuousAudioBuffer && continuousAudioBuffer.length > 0 && isStreaming) {
+            sendContinuousBuffer();
+        }
+        
         // Arrêter MediaRecorder si actif (Opus)
         if (mediaRecorder && mediaRecorder.state !== 'inactive') {
             try {
