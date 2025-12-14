@@ -706,11 +706,11 @@ function initRadioEvents() {
             }, 50); // Vérifier toutes les 50ms (au lieu de 100ms) pour fluidité maximale
             
             // Variables pour la normalisation et suppression de bruit - QUALITÉ MAXIMALE ET CLARTÉ
-            let noiseGateThreshold = 0.0005; // Seuil légèrement plus haut pour éviter le bruit de fond
+            let noiseGateThreshold = 0.0003; // Seuil plus bas pour capturer plus de voix
             let peakLevel = 0;
-            let targetPeak = 0.75; // Niveau cible modéré (75%) pour éviter la distorsion et garder la clarté
+            let targetPeak = 0.70; // Niveau cible à 70% pour éviter la distorsion et garder la clarté maximale
             let adaptiveGain = 1.0;
-            let maxGain = 1.8; // Gain max modéré (1.8x) pour éviter la distorsion
+            let maxGain = 2.0; // Gain max à 2.0x pour meilleure clarté sans distorsion
             
             // Fonction pour envoyer le buffer accumulé comme un stream continu
             const sendContinuousBuffer = () => {

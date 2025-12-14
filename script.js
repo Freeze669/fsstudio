@@ -143,7 +143,7 @@ let silentAudioSource = null; // Source audio silencieuse pour maintenir l'icôn
 let chunksReceivedCount = 0;
 let lastReceivedTime = null;
 let gainNode = null; // Pour contrôler le volume
-let currentVolume = 1.0; // Volume par défaut à 100%
+let currentVolume = 0.95; // Volume par défaut à 95% pour éviter distorsion et garder clarté maximale
 
 // Charger et jouer les chunks audio depuis Firebase
 function loadRadioStream() {
@@ -626,8 +626,10 @@ function connectToAudioChunks() {
                     console.log('✅ Identifié comme auditeur');
                 } else if (data.type === 'audio') {
                     // Audio reçu du serveur
+                    // Démarrer automatiquement si pas déjà en cours
                     if (!isPlayingAudio) {
-                        return;
+                        console.log('🎵 Audio reçu, démarrage automatique...');
+                        autoStartAudio();
                     }
                     
                     chunksReceivedCount++;
@@ -810,11 +812,11 @@ function startContinuousPlayback(sampleRate, channels = 1) {
                 audioBuffer.getChannelData(0).set(audioChunk);
             }
             
-            // Créer et jouer la source - VOLUME OPTIMISÉ POUR CLARTÉ
+            // Créer et jouer la source - VOLUME OPTIMISÉ POUR CLARTÉ MAXIMALE
             if (!gainNode) {
                 gainNode = audioContextListener.createGain();
-                // Volume par défaut à 1.0 (100%) pour éviter la distorsion et garder la clarté
-                gainNode.gain.value = currentVolume || 1.0;
+                // Volume à 0.95 (95%) pour éviter la distorsion et garder la clarté maximale
+                gainNode.gain.value = currentVolume || 0.95;
                 gainNode.connect(audioContextListener.destination);
             } else {
                 // Volume normal pour clarté maximale (pas de sur-amplification)

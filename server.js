@@ -39,6 +39,18 @@ wss.on('connection', (ws, req) => {
                 
                 // Envoyer confirmation
                 ws.send(JSON.stringify({ type: 'broadcaster-confirmed' }));
+                
+                // Notifier tous les auditeurs qu'une diffusion est en cours
+                const statusData = {
+                    type: 'status',
+                    isLive: true,
+                    timestamp: Date.now()
+                };
+                listeners.forEach((listener) => {
+                    if (listener.readyState === WebSocket.OPEN) {
+                        listener.send(JSON.stringify(statusData));
+                    }
+                });
             } else if (data.type === 'listen') {
                 // C'est un auditeur
                 listeners.add(ws);
@@ -47,6 +59,23 @@ wss.on('connection', (ws, req) => {
                 
                 // Envoyer confirmation
                 ws.send(JSON.stringify({ type: 'listener-confirmed' }));
+                
+                // Envoyer le statut actuel (si une diffusion est en cours)
+                if (broadcaster && broadcaster.readyState === WebSocket.OPEN) {
+                    const statusData = {
+                        type: 'status',
+                        isLive: true,
+                        timestamp: Date.now()
+                    };
+                    ws.send(JSON.stringify(statusData));
+                } else {
+                    const statusData = {
+                        type: 'status',
+                        isLive: false,
+                        timestamp: Date.now()
+                    };
+                    ws.send(JSON.stringify(statusData));
+                }
             } else if (data.type === 'audio') {
                 // Audio reçu du diffuseur - rediffuser à tous les auditeurs
                 if (ws.isBroadcaster) {
