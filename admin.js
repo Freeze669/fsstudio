@@ -396,9 +396,9 @@ function initRadioEvents() {
                     echoCancellation: true, // Essentiel pour éviter l'écho
                     noiseSuppression: true, // Supprime le bruit ambiant
                     autoGainControl: true, // Contrôle automatique du volume (meilleur pour appels)
-                    sampleRate: 48000, // 48kHz (qualité maximale - standard professionnel)
-                    channelCount: 1, // Mono (standard pour voix)
-                    latency: 0.01, // Latence minimale (20ms comme les appels)
+                    sampleRate: 48000, // 48kHz (qualité maximale - standard Discord)
+                    channelCount: 2, // STÉRÉO (comme Discord) - 2 canaux
+                    latency: 0.01, // Latence minimale (20ms comme Discord)
                     // Paramètres Google Chrome optimisés pour qualité appel
                     googEchoCancellation: true,
                     googAutoGainControl: true, // Activé pour qualité appel optimale
@@ -415,13 +415,17 @@ function initRadioEvents() {
                 } 
             });
             
-            // Créer le contexte audio pour l'analyse - QUALITÉ MAXIMALE
+            // Créer le contexte audio pour l'analyse - QUALITÉ DISCORD (STÉRÉO 48kHz)
             audioContext = new (window.AudioContext || window.webkitAudioContext)({
-                sampleRate: 48000, // 48kHz qualité maximale
+                sampleRate: 48000, // 48kHz qualité maximale (standard Discord)
                 latencyHint: 'interactive' // Latence minimale
             });
             analyser = audioContext.createAnalyser();
             microphone = audioContext.createMediaStreamSource(mediaStream);
+            
+            // S'assurer que l'analyser est en stéréo (2 canaux)
+            analyser.channelCount = 2;
+            analyser.channelCountMode = 'explicit';
             
             // Augmenter la résolution de l'analyseur pour meilleure qualité
             analyser.fftSize = 2048; // Augmenté de 256 à 2048 pour meilleure résolution
@@ -512,63 +516,80 @@ function initRadioEvents() {
                 }
             }
             
-            // FORCER L'UTILISATION DE PCM16 AU LIEU D'OPUS POUR COMPATIBILITÉ
-            // Les chunks Opus WebM ne peuvent pas être joués individuellement côté client
-            console.log('ℹ️ Opus détecté mais utilisation de PCM16 pour compatibilité');
-            selectedMimeType = null; // Forcer l'utilisation de ScriptProcessor (PCM16)
-            
+            // UTILISER OPUS STÉRÉO 48kHz (COMME DISCORD)
+            // Créer un stream continu Opus au lieu de chunks individuels
             if (!selectedMimeType) {
-                console.log('✅ Utilisation de ScriptProcessor (PCM16) pour compatibilité maximale');
-                // Utiliser ScriptProcessor pour générer du PCM16 - QUALITÉ MAXIMALE
-                // Buffer size plus grand = meilleure qualité mais plus de latence
-                // 4096 = bon compromis qualité/stabilité (évite les crashes)
-                const bufferSize = 4096; // Augmenté de 2048 à 4096 pour meilleure qualité
-                scriptProcessor = audioContext.createScriptProcessor(bufferSize, 1, 1);
+                console.warn('⚠️ Opus non supporté, fallback vers PCM16 stéréo');
+                // Fallback : ScriptProcessor en stéréo
+                const bufferSize = 4096;
+                scriptProcessor = audioContext.createScriptProcessor(bufferSize, 2, 2); // 2 canaux (stéréo)
             } else {
-                // Utiliser MediaRecorder avec Opus (haute qualité vocale)
+                // Utiliser MediaRecorder avec Opus STÉRÉO 48kHz (COMME DISCORD)
                 mediaRecorder = new MediaRecorder(mediaStream, {
                     mimeType: selectedMimeType,
-                    audioBitsPerSecond: 128000 // 128 kbps pour qualité vocale supérieure (au lieu de 64 kbps)
+                    audioBitsPerSecond: 128000, // 128 kbps (qualité Discord)
+                    // S'assurer que c'est en stéréo
+                    numberOfAudioChannels: 2 // 2 canaux (stéréo)
                 });
                 
-                const audioChunks = [];
+                // Buffer pour accumuler les chunks Opus en stream continu
+                const opusStreamChunks = [];
+                let opusStreamStartTime = Date.now();
                 
                 mediaRecorder.ondataavailable = (event) => {
-                    if (event.data.size > 0) {
-                        audioChunks.push(event.data);
+                    if (event.data.size > 0 && isStreaming) {
+                        opusStreamChunks.push(event.data);
                         
-                        // Convertir le blob en base64
-                        const reader = new FileReader();
-                        reader.onloadend = () => {
-                            const base64Audio = reader.result.split(',')[1]; // Enlever le préfixe data:audio/webm;base64,
+                        // Envoyer par paquets (stream continu comme Discord)
+                        // Accumuler ~80-100ms de données avant d'envoyer
+                        const now = Date.now();
+                        const timeSinceLastSend = now - opusStreamStartTime;
+                        
+                        if (timeSinceLastSend >= 80 || opusStreamChunks.length >= 5) {
+                            // Créer un blob combiné pour le stream continu
+                            const combinedBlob = new Blob(opusStreamChunks, { type: selectedMimeType });
                             
-                            // Envoyer le chunk Opus à Firebase
-                            const timestamp = Date.now();
-                            database.ref(`radio/audioChunks/${timestamp}`).set({
-                                data: base64Audio,
-                                timestamp: timestamp,
-                                sampleRate: audioContext.sampleRate,
-                                format: 'opus', // Format Opus (qualité appel)
-                                mimeType: selectedMimeType,
-                                bufferSize: event.data.size
-                            }).then(() => {
-                                chunksSentCount++;
-                                lastSentTime = new Date();
+                            // Convertir le blob en base64
+                            const reader = new FileReader();
+                            reader.onloadend = () => {
+                                const base64Audio = reader.result.split(',')[1];
                                 
-                                // Mettre à jour les stats
-                                if (chunksSent) chunksSent.textContent = chunksSentCount;
-                                if (lastSent) {
-                                    const timeStr = lastSentTime.toLocaleTimeString();
-                                    lastSent.textContent = timeStr;
-                                }
-                                
-                                console.log(`✅ Chunk Opus envoyé: ${chunksSentCount}, taille: ${event.data.size} bytes`);
-                            }).catch((error) => {
-                                console.error('❌ Erreur envoi chunk Opus:', error);
-                                voiceStatusText.textContent = '❌ Erreur Firebase - Vérifiez la connexion';
-                            });
-                        };
-                        reader.readAsDataURL(event.data);
+                                // Envoyer le stream Opus continu à Firebase (comme Discord)
+                                const timestamp = Date.now();
+                                database.ref(`radio/audioStream/${timestamp}`).set({
+                                    data: base64Audio,
+                                    timestamp: timestamp,
+                                    sampleRate: 48000, // 48kHz (standard Discord)
+                                    format: 'opus-stream', // Format stream Opus continu
+                                    mimeType: selectedMimeType,
+                                    channels: 2, // STÉRÉO (2 canaux)
+                                    bufferSize: combinedBlob.size,
+                                    duration: timeSinceLastSend / 1000 // Durée en secondes
+                                }).then(() => {
+                                    chunksSentCount++;
+                                    lastSentTime = new Date();
+                                    
+                                    // Mettre à jour les stats
+                                    if (chunksSent) chunksSent.textContent = chunksSentCount;
+                                    if (lastSent) {
+                                        const timeStr = lastSentTime.toLocaleTimeString();
+                                        lastSent.textContent = timeStr;
+                                    }
+                                    
+                                    if (chunksSentCount <= 5 || chunksSentCount % 10 === 0) {
+                                        console.log(`✅ Stream Opus STÉRÉO envoyé: ${chunksSentCount}, ${combinedBlob.size} bytes, ${timeSinceLastSend}ms, 48kHz`);
+                                    }
+                                }).catch((error) => {
+                                    console.error('❌ Erreur envoi stream Opus:', error);
+                                    voiceStatusText.textContent = '❌ Erreur Firebase - Vérifiez la connexion';
+                                });
+                            };
+                            reader.readAsDataURL(combinedBlob);
+                            
+                            // Réinitialiser pour le prochain stream
+                            opusStreamChunks.length = 0;
+                            opusStreamStartTime = now;
+                        }
                     }
                 };
                 
@@ -577,13 +598,14 @@ function initRadioEvents() {
                     voiceStatusText.textContent = '❌ Erreur enregistrement audio';
                 };
                 
-                // Démarrer l'enregistrement avec intervalles optimisés (100ms pour éviter les crashes)
-                // 100ms = bon compromis entre latence et performance
-                mediaRecorder.start(100); // 100ms = éviter trop de chunks
-                console.log('✅ MediaRecorder démarré avec Opus (haute qualité vocale)');
+                // Démarrer l'enregistrement avec intervalles optimisés (80ms pour fluidité Discord)
+                mediaRecorder.start(80); // 80ms pour fluidité maximale
+                console.log('✅ MediaRecorder démarré avec Opus STÉRÉO 48kHz (comme Discord)');
                 console.log(`   Codec: ${selectedMimeType}`);
-                console.log(`   Bitrate: 128 kbps (qualité vocale supérieure)`);
-                console.log(`   Intervalle: 100ms (optimisé pour stabilité)`);
+                console.log(`   Canaux: 2 (STÉRÉO)`);
+                console.log(`   Sample Rate: 48kHz`);
+                console.log(`   Bitrate: 128 kbps`);
+                console.log(`   Intervalle: 80ms (fluidité Discord)`);
             }
             
             // ============================================
@@ -592,14 +614,15 @@ function initRadioEvents() {
             // Au lieu de chunks individuels, on accumule les données dans un buffer continu
             // et on envoie par paquets plus grands pour créer un flux continu
             
-            // Buffer continu pour accumuler les données audio
+            // Buffer continu pour accumuler les données audio - OPTIMISÉ POUR FLUIDITÉ DISCORD
             let continuousAudioBuffer = [];
             let bufferAccumulationTime = 0;
             let lastBufferSendTime = Date.now();
-            const bufferTargetDuration = 0.15; // Accumuler 150ms de données avant d'envoyer (stream continu)
-            const bufferMaxWaitTime = 200; // Envoyer au maximum toutes les 200ms même si pas plein
+            // Buffers plus petits pour fluidité maximale (comme Discord)
+            const bufferTargetDuration = 0.08; // 80ms seulement (au lieu de 150ms) pour latence minimale
+            const bufferMaxWaitTime = 100; // Envoyer au maximum toutes les 100ms (au lieu de 200ms) pour fluidité
             const sampleRate = audioContext.sampleRate;
-            const samplesPerBuffer = Math.floor(sampleRate * bufferTargetDuration); // ~7200 échantillons à 48kHz
+            const samplesPerBuffer = Math.floor(sampleRate * bufferTargetDuration); // ~3840 échantillons à 48kHz (plus petit = plus fluide)
             
             // Nettoyer l'ancien timer s'il existe
             if (bufferTimer) {
@@ -620,20 +643,22 @@ function initRadioEvents() {
                 const now = Date.now();
                 const timeSinceLastSend = now - lastBufferSendTime;
                 
-                // Forcer l'envoi si ça fait plus de 200ms et qu'on a des données
+                // Forcer l'envoi si ça fait plus de 100ms et qu'on a des données (fluidité Discord)
                 if (timeSinceLastSend >= bufferMaxWaitTime && continuousAudioBuffer.length > 0) {
-                    console.log(`⏰ Timer: Forcer envoi buffer (${continuousAudioBuffer.length} échantillons, ${timeSinceLastSend}ms depuis dernier)`);
+                    if (chunksSentCount < 3) {
+                        console.log(`⏰ Timer: Forcer envoi buffer (${continuousAudioBuffer.length} échantillons, ${timeSinceLastSend}ms depuis dernier)`);
+                    }
                     sendContinuousBuffer();
                     lastBufferSendTime = now;
                 }
-            }, 100); // Vérifier toutes les 100ms
+            }, 50); // Vérifier toutes les 50ms (au lieu de 100ms) pour fluidité maximale
             
-            // Variables pour la normalisation et suppression de bruit - QUALITÉ APPEL
-            let noiseGateThreshold = 0.0005; // Seuil très bas pour qualité appel (capture tous les détails)
+            // Variables pour la normalisation et suppression de bruit - QUALITÉ DISCORD (TRÈS FLUIDE ET AUDIBLE)
+            let noiseGateThreshold = 0.0003; // Seuil encore plus bas pour capturer tous les détails
             let peakLevel = 0;
-            let targetPeak = 0.90; // Niveau cible très élevé pour qualité appel (90%)
+            let targetPeak = 0.95; // Niveau cible très élevé (95%) pour son audible et clair
             let adaptiveGain = 1.0;
-            let maxGain = 2.0; // Gain max élevé pour qualité appel
+            let maxGain = 2.5; // Gain max très élevé (2.5x) pour son audible même à faible volume
             
             // Fonction pour envoyer le buffer accumulé comme un stream continu
             const sendContinuousBuffer = () => {
@@ -646,7 +671,8 @@ function initRadioEvents() {
                 // Envoyer même si le buffer est petit (pour continuité)
                 if (continuousAudioBuffer.length === 0) return;
                 
-                // Convertir le buffer accumulé en Int16
+                // Convertir le buffer accumulé STÉRÉO en Int16
+                // Le buffer contient des échantillons interleaved: [L, R, L, R, ...]
                 const totalSamples = continuousAudioBuffer.length;
                 const int16Data = new Int16Array(totalSamples);
                 
@@ -677,14 +703,16 @@ function initRadioEvents() {
                     return;
                 }
                 
-                // Envoyer le buffer continu à Firebase
+                // Envoyer le buffer continu STÉRÉO à Firebase
                 database.ref(`radio/audioStream/${timestamp}`).set({
                     data: base64Audio,
                     timestamp: timestamp,
                     sampleRate: sampleRate,
-                    format: 'pcm16-stream', // Format stream continu
+                    format: 'pcm16-stream-stereo', // Format stream continu STÉRÉO
+                    channels: 2, // STÉRÉO (2 canaux)
                     samples: totalSamples,
-                    duration: totalSamples / sampleRate
+                    samplesPerChannel: totalSamples / 2, // Échantillons par canal
+                    duration: (totalSamples / 2) / sampleRate // Durée réelle (divisé par 2 car stéréo)
                 }).then(() => {
                     chunksSentCount++;
                     lastSentTime = new Date();
@@ -726,15 +754,22 @@ function initRadioEvents() {
                 bufferAccumulationTime = 0;
             };
             
-            // ScriptProcessor pour capturer et accumuler les données
+            // ScriptProcessor pour capturer et accumuler les données (FALLBACK STÉRÉO)
             if (scriptProcessor) {
                 scriptProcessor.onaudioprocess = (event) => {
-                const inputData = event.inputBuffer.getChannelData(0);
-                const outputData = event.outputBuffer.getChannelData(0);
+                // STÉRÉO : 2 canaux (comme Discord)
+                const inputDataLeft = event.inputBuffer.getChannelData(0);
+                const inputDataRight = event.inputBuffer.getChannelData(1);
+                const outputDataLeft = event.outputBuffer.getChannelData(0);
+                const outputDataRight = event.outputBuffer.getChannelData(1);
                 
-                // Toujours mettre du silence en output pour éviter l'écho
-                for (let i = 0; i < outputData.length; i++) {
-                    outputData[i] = 0;
+                // Traiter les deux canaux
+                const inputData = inputDataLeft; // Utiliser le canal gauche pour l'analyse
+                
+                // Toujours mettre du silence en output pour éviter l'écho (STÉRÉO)
+                for (let i = 0; i < outputDataLeft.length; i++) {
+                    outputDataLeft[i] = 0;
+                    outputDataRight[i] = 0;
                 }
                 
                 if (!isStreaming) {
@@ -773,49 +808,50 @@ function initRadioEvents() {
                     // Appliquer le gain
                     sample *= gain;
                     
-                    // Soft limiter très doux (qualité appel)
-                    const softThreshold = 0.95; // Seuil très élevé
+                    // Soft limiter très doux (qualité Discord - son audible)
+                    const softThreshold = 0.97; // Seuil très élevé pour son audible
                     if (sample > softThreshold) {
                         const excess = sample - softThreshold;
-                        sample = softThreshold + excess / (1 + excess * 3); // Compression très douce
+                        sample = softThreshold + excess / (1 + excess * 4); // Compression encore plus douce
                     } else if (sample < -softThreshold) {
                         const excess = Math.abs(sample) - softThreshold;
-                        sample = -(softThreshold + excess / (1 + excess * 3));
+                        sample = -(softThreshold + excess / (1 + excess * 4));
                     }
                     
-                    // Hard limiter (sécurité)
-                    const hardLimit = 0.98;
+                    // Hard limiter (sécurité) - limite élevée pour son audible
+                    const hardLimit = 0.99;
                     if (sample > hardLimit) sample = hardLimit;
                     else if (sample < -hardLimit) sample = -hardLimit;
                     
-                    processedData[i] = Math.max(-0.98, Math.min(0.98, sample));
+                    // Limite finale très élevée pour son audible et clair
+                    processedData[i] = Math.max(-0.99, Math.min(0.99, sample));
                 }
                 
                 peakLevel = maxAmplitude * gain;
                 
-                // ACCUMULER dans le buffer continu (au lieu d'envoyer immédiatement)
-                // Toujours ajouter les données traitées (même si silence, pour continuité)
+                // ACCUMULER dans le buffer continu STÉRÉO (au lieu d'envoyer immédiatement)
+                // Traiter les deux canaux pour stéréo (comme Discord)
                 for (let i = 0; i < processedData.length; i++) {
-                    continuousAudioBuffer.push(processedData[i]);
+                    // Ajouter les deux canaux (stéréo)
+                    continuousAudioBuffer.push(processedData[i]); // Canal gauche
+                    // Pour le canal droit, utiliser les mêmes données traitées (ou dupliquer)
+                    // En production, on pourrait traiter inputDataRight séparément
+                    continuousAudioBuffer.push(processedData[i]); // Canal droit (dupliqué pour l'instant)
                 }
                 bufferAccumulationTime += inputData.length / sampleRate;
                 
                 const now = Date.now();
                 const timeSinceLastSend = now - lastBufferSendTime;
                 
-                // Envoyer le buffer si:
-                // 1. On a accumulé assez de données (150ms)
-                // 2. OU si ça fait plus de 200ms depuis le dernier envoi (pour continuité)
-                // 3. OU si on a au moins 50ms de données et ça fait plus de 150ms
+                // Envoyer le buffer si (optimisé pour fluidité Discord):
+                // 1. On a accumulé assez de données (80ms)
+                // 2. OU si ça fait plus de 100ms depuis le dernier envoi (pour continuité maximale)
+                // 3. OU si on a au moins 30ms de données et ça fait plus de 80ms (pour fluidité)
                 const shouldSend = continuousAudioBuffer.length >= samplesPerBuffer || 
                     (timeSinceLastSend >= bufferMaxWaitTime && continuousAudioBuffer.length > 0) ||
-                    (timeSinceLastSend >= 150 && continuousAudioBuffer.length >= Math.floor(sampleRate * 0.05));
+                    (timeSinceLastSend >= 80 && continuousAudioBuffer.length >= Math.floor(sampleRate * 0.03));
                 
                 if (shouldSend) {
-                    // Log pour débogage (premiers envois)
-                    if (chunksSentCount < 3) {
-                        console.log(`📤 Envoi buffer: ${continuousAudioBuffer.length} échantillons, temps depuis dernier: ${timeSinceLastSend}ms`);
-                    }
                     sendContinuousBuffer();
                     lastBufferSendTime = now;
                 }

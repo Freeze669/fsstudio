@@ -314,18 +314,30 @@ let lastSuccessfulChunkTime = null;
 let healthCheckInterval = null;
 let autoPlayEnabled = true; // Activer la lecture automatique par défaut
 
+// Détection mobile pour optimisations
+const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+const isAndroid = /Android/i.test(navigator.userAgent);
+
 // Démarrer automatiquement l'audio (sans interaction utilisateur requise)
 function autoStartAudio() {
     console.log('🎵 Démarrage automatique de l\'audio...');
     
-    // Créer le contexte audio s'il n'existe pas
+    // Sur mobile, l'autoplay est plus strict - nécessite souvent une interaction
+    if (isMobile) {
+        console.log('📱 Détection mobile - autoplay optimisé');
+    }
+    
+    // Créer le contexte audio s'il n'existe pas - OPTIMISÉ POUR MOBILE
     if (!audioContextListener || audioContextListener.state === 'closed') {
         try {
+            // Sur mobile, utiliser 'playback' pour meilleure performance
+            const latencyHint = isMobile ? 'playback' : 'interactive';
             audioContextListener = new (window.AudioContext || window.webkitAudioContext)({
                 sampleRate: 48000,
-                latencyHint: 'interactive'
+                latencyHint: latencyHint // 'playback' sur mobile pour meilleure performance
             });
-            console.log('✅ Contexte audio créé automatiquement');
+            console.log(`✅ Contexte audio créé automatiquement (${isMobile ? 'mobile' : 'desktop'})`);
         } catch (error) {
             console.error('❌ Erreur création contexte:', error);
             // Si échec, essayer avec startListeningToAudio qui demande l'interaction
@@ -422,14 +434,16 @@ function startListeningToAudio() {
     }
     
     // Sinon, utiliser le streaming vocal Firebase
-    // Créer le contexte audio s'il n'existe pas
+    // Créer le contexte audio s'il n'existe pas - OPTIMISÉ POUR MOBILE
     if (!audioContextListener || audioContextListener.state === 'closed') {
         try {
+            // Sur mobile, utiliser 'playback' pour meilleure performance et fluidité
+            const latencyHint = isMobile ? 'playback' : 'interactive';
             audioContextListener = new (window.AudioContext || window.webkitAudioContext)({
                 sampleRate: 48000,
-                latencyHint: 'interactive'
+                latencyHint: latencyHint
             });
-            console.log('✅ Contexte audio créé pour streaming vocal');
+            console.log(`✅ Contexte audio créé pour streaming vocal (${isMobile ? 'mobile' : 'desktop'})`);
         } catch (error) {
             console.error('❌ Erreur création contexte:', error);
             return;
@@ -702,9 +716,26 @@ function processContinuousStream(streamData) {
             startContinuousPlayback(streamData.sampleRate);
         }
         
+        // Détecter le format (Opus ou PCM16)
+        const format = (streamData.format || '').toLowerCase();
+        const isOpus = format.includes('opus') || (streamData.mimeType && streamData.mimeType.includes('opus'));
+        const isStereo = streamData.channels === 2 || format.includes('stereo');
+        
+        // Si Opus, utiliser le traitement Opus dédié
+        if (isOpus) {
+            processOpusStream(streamData);
+            return;
+        }
+        
         // Log pour débogage (tous les streams au début, puis périodique)
         if (chunksReceivedCount <= 5 || chunksReceivedCount % 10 === 0) {
-            console.log(`📡 Stream ${chunksReceivedCount}: ${streamData.samples} échantillons, buffer: ${continuousStreamBuffer.length}, durée: ${(streamData.samples/streamData.sampleRate).toFixed(3)}s, sampleRate: ${streamData.sampleRate}`);
+            const samples = streamData.samples || (int16Data.length / (isStereo ? 2 : 1));
+            console.log(`📡 Stream ${chunksReceivedCount}: ${samples} échantillons, ${isStereo ? 'STÉRÉO' : 'MONO'}, buffer: ${continuousStreamBuffer.length}, durée: ${(samples/streamData.sampleRate).toFixed(3)}s, 48kHz`);
+        }
+        
+        // Démarrer la lecture si pas déjà en cours
+        if (!isPlayingStream && continuousStreamBuffer.length > 0) {
+            startContinuousPlayback(streamData.sampleRate, isStereo ? 2 : 1);
         }
         
     } catch (error) {
@@ -712,14 +743,86 @@ function processContinuousStream(streamData) {
     }
 }
 
-// Lire le buffer continu de manière fluide (style appel)
-function startContinuousPlayback(sampleRate) {
+// Traiter un stream Opus STÉRÉO (comme Discord)
+let opusStreamBlobs = [];
+let opusMediaSource = null;
+let opusSourceBuffer = null;
+let opusAudioElement = null;
+let opusBlobUrl = null;
+
+function processOpusStream(streamData) {
+    try {
+        // Décoder base64 en ArrayBuffer
+        const binaryString = atob(streamData.data);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+        }
+        
+        // Créer un blob Opus WebM
+        const mimeType = streamData.mimeType || 'audio/webm;codecs=opus';
+        const blob = new Blob([bytes], { type: mimeType });
+        
+        chunksReceivedCount++;
+        
+        // Utiliser un élément audio avec blob URL (méthode simple et fiable)
+        playOpusBlobStream(blob);
+        
+        if (chunksReceivedCount <= 5 || chunksReceivedCount % 10 === 0) {
+            console.log(`🎵 Stream Opus STÉRÉO ${chunksReceivedCount}: ${bytes.length} bytes, 48kHz, 2 canaux (comme Discord)`);
+        }
+        
+    } catch (error) {
+        console.error('❌ Erreur traitement stream Opus:', error);
+    }
+}
+
+// Jouer un stream Opus via blob URL (méthode simple)
+function playOpusBlobStream(blob) {
+    try {
+        // Créer un élément audio dédié pour Opus
+        if (!opusAudioElement) {
+            opusAudioElement = new Audio();
+            opusAudioElement.autoplay = true;
+            opusAudioElement.volume = (currentVolume || 1.0) * 1.2; // Volume augmenté
+            opusAudioElement.addEventListener('ended', () => {
+                // Continuer avec le prochain blob si disponible
+                if (opusStreamBlobs.length > 0) {
+                    const nextBlob = opusStreamBlobs.shift();
+                    playOpusBlobStream(nextBlob);
+                }
+            });
+        }
+        
+        // Créer un blob URL et le jouer
+        if (opusBlobUrl) {
+            URL.revokeObjectURL(opusBlobUrl);
+        }
+        
+        opusBlobUrl = URL.createObjectURL(blob);
+        opusAudioElement.src = opusBlobUrl;
+        
+        // Jouer si pas déjà en cours
+        if (opusAudioElement.paused) {
+            opusAudioElement.play().catch(err => {
+                console.warn('⚠️ Erreur lecture Opus:', err);
+            });
+        }
+        
+    } catch (error) {
+        console.error('❌ Erreur lecture blob Opus:', error);
+    }
+}
+
+// Lire le buffer continu de manière fluide (style Discord - STÉRÉO)
+function startContinuousPlayback(sampleRate, channels = 1) {
     if (isPlayingStream || !audioContextListener || continuousStreamBuffer.length === 0) {
         return;
     }
     
     isPlayingStream = true;
     const targetSampleRate = sampleRate || 48000;
+    const numChannels = channels || 1; // 1 = mono, 2 = stéréo
     
     // Fonction récursive pour lire le buffer par morceaux
     const playBufferChunk = () => {
@@ -728,13 +831,14 @@ function startContinuousPlayback(sampleRate) {
             return;
         }
         
-        // Prendre un morceau du buffer (environ 50ms à 48kHz = ~2400 échantillons)
-        const chunkSize = Math.floor(targetSampleRate * 0.05); // 50ms
+        // Prendre un morceau du buffer - OPTIMISÉ POUR FLUIDITÉ DISCORD
+        // Buffers plus petits (30ms) pour latence minimale et fluidité maximale
+        const chunkSize = Math.floor(targetSampleRate * 0.03); // 30ms (au lieu de 50ms) pour fluidité
         const samplesToPlay = Math.min(chunkSize, continuousStreamBuffer.length);
         
         if (samplesToPlay === 0) {
-            // Buffer vide, attendre un peu
-            setTimeout(playBufferChunk, 10);
+            // Buffer vide, attendre très peu (5ms au lieu de 10ms) pour réactivité
+            setTimeout(playBufferChunk, 5);
             return;
         }
         
@@ -747,14 +851,31 @@ function startContinuousPlayback(sampleRate) {
                 audioContextListener.resume();
             }
             
-            const audioBuffer = audioContextListener.createBuffer(1, audioChunk.length, targetSampleRate);
-            audioBuffer.getChannelData(0).set(audioChunk);
+            // Créer l'AudioBuffer STÉRÉO ou MONO
+            const audioBuffer = audioContextListener.createBuffer(numChannels, audioChunk.length / numChannels, targetSampleRate);
             
-            // Créer et jouer la source
+            if (numChannels === 2) {
+                // STÉRÉO : séparer les canaux (interleaved: L, R, L, R, ...)
+                const leftChannel = audioBuffer.getChannelData(0);
+                const rightChannel = audioBuffer.getChannelData(1);
+                for (let i = 0; i < audioChunk.length / 2; i++) {
+                    leftChannel[i] = audioChunk[i * 2];
+                    rightChannel[i] = audioChunk[i * 2 + 1];
+                }
+            } else {
+                // MONO : un seul canal
+                audioBuffer.getChannelData(0).set(audioChunk);
+            }
+            
+            // Créer et jouer la source - VOLUME AUGMENTÉ POUR SON AUDIBLE
             if (!gainNode) {
                 gainNode = audioContextListener.createGain();
-                gainNode.gain.value = currentVolume || 1.0;
+                // Volume par défaut à 1.2 (120%) pour son audible même à faible volume
+                gainNode.gain.value = (currentVolume || 1.0) * 1.2;
                 gainNode.connect(audioContextListener.destination);
+            } else {
+                // S'assurer que le volume est toujours élevé pour son audible
+                gainNode.gain.value = Math.max((currentVolume || 1.0) * 1.2, 1.0);
             }
             
             const source = audioContextListener.createBufferSource();
@@ -776,8 +897,9 @@ function startContinuousPlayback(sampleRate) {
             source.start(0);
             updateAudioStatus(true, `Stream: ${chunksReceivedCount} paquets`);
             
-            // Planifier le prochain morceau (légèrement avant la fin pour continuité)
-            const nextDelay = Math.max(duration * 1000 - 5, 0);
+            // Planifier le prochain morceau (AVANT la fin pour continuité maximale - style Discord)
+            // Réduire le délai pour fluidité maximale
+            const nextDelay = Math.max(duration * 1000 - 10, 0); // 10ms avant la fin (au lieu de 5ms)
             setTimeout(() => {
                 if (isPlayingAudio && continuousStreamBuffer.length > 0) {
                     playBufferChunk();
@@ -1285,21 +1407,45 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     // Écouter les interactions utilisateur pour débloquer l'audio
+    // Fonction améliorée pour débloquer l'audio (optimisée pour mobile)
     const unlockAudio = () => {
+        if (isMobile) {
+            console.log('📱 Déblocage audio mobile...');
+        }
         if (audioContextListener && audioContextListener.state === 'suspended') {
             audioContextListener.resume().then(() => {
                 console.log('✅ Audio débloqué par interaction utilisateur');
+                // Sur mobile, aussi démarrer l'écoute si une diffusion est en cours
+                if (isMobile && !isPlayingAudio) {
+                    database.ref(FIREBASE_RADIO_STATUS_PATH).once('value', (snapshot) => {
+                        const status = snapshot.val();
+                        if (status && status.isLive === true) {
+                            console.log('📱 Mobile: Démarrage automatique après déblocage');
+                            autoStartAudio();
+                        }
+                    });
+                }
             }).catch(err => {
                 console.warn('⚠️ Impossible de débloquer l\'audio:', err);
             });
         }
     };
     
-    // Débloquer l'audio au premier clic/touch - PLUS AGRESSIF
-    const events = ['click', 'touchstart', 'keydown', 'mousedown', 'pointerdown', 'mousemove'];
+    // Débloquer l'audio au premier clic/touch - OPTIMISÉ POUR MOBILE
+    // Sur mobile, privilégier les événements tactiles
+    const events = isMobile 
+        ? ['touchstart', 'touchend', 'click', 'pointerdown', 'pointerup'] // Mobile-first
+        : ['click', 'touchstart', 'keydown', 'mousedown', 'pointerdown', 'mousemove'];
+    
     events.forEach(eventType => {
         document.addEventListener(eventType, unlockAudio, { once: true, passive: true });
     });
+    
+    // Sur mobile, aussi écouter sur le bouton play/pause spécifiquement
+    if (isMobile && playPauseBtn) {
+        playPauseBtn.addEventListener('touchstart', unlockAudio, { once: true, passive: true });
+        playPauseBtn.addEventListener('click', unlockAudio, { once: true, passive: true });
+    }
 });
 
 // Gestion des événements audio player
