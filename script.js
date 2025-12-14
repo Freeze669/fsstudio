@@ -721,11 +721,10 @@ function processContinuousStream(streamData) {
         const isOpus = format.includes('opus') || (streamData.mimeType && streamData.mimeType.includes('opus'));
         const isStereo = streamData.channels === 2 || format.includes('stereo');
         
-        // DÉSACTIVER OPUS - Les fragments Opus WebM ne peuvent pas être joués
-        // Utiliser uniquement PCM16 stéréo qui fonctionne parfaitement
+        // DÉSACTIVER COMPLÈTEMENT OPUS - Les fragments Opus WebM ne peuvent pas être joués
+        // Ignorer silencieusement les streams Opus
         if (isOpus) {
-            console.warn('⚠️ Opus détecté mais désactivé (fragments non supportés), utilisation de PCM16 stéréo');
-            // Ne pas traiter Opus, attendre PCM16
+            // Ne pas logger pour éviter le spam dans la console
             return;
         }
         
@@ -745,76 +744,8 @@ function processContinuousStream(streamData) {
     }
 }
 
-// Traiter un stream Opus STÉRÉO (comme Discord)
-let opusStreamBlobs = [];
-let opusMediaSource = null;
-let opusSourceBuffer = null;
-let opusAudioElement = null;
-let opusBlobUrl = null;
-
-function processOpusStream(streamData) {
-    try {
-        // Décoder base64 en ArrayBuffer
-        const binaryString = atob(streamData.data);
-        const bytes = new Uint8Array(binaryString.length);
-        for (let i = 0; i < binaryString.length; i++) {
-            bytes[i] = binaryString.charCodeAt(i);
-        }
-        
-        // Créer un blob Opus WebM
-        const mimeType = streamData.mimeType || 'audio/webm;codecs=opus';
-        const blob = new Blob([bytes], { type: mimeType });
-        
-        chunksReceivedCount++;
-        
-        // Utiliser un élément audio avec blob URL (méthode simple et fiable)
-        playOpusBlobStream(blob);
-        
-        if (chunksReceivedCount <= 5 || chunksReceivedCount % 10 === 0) {
-            console.log(`🎵 Stream Opus STÉRÉO ${chunksReceivedCount}: ${bytes.length} bytes, 48kHz, 2 canaux (comme Discord)`);
-        }
-        
-    } catch (error) {
-        console.error('❌ Erreur traitement stream Opus:', error);
-    }
-}
-
-// Jouer un stream Opus via blob URL (méthode simple)
-function playOpusBlobStream(blob) {
-    try {
-        // Créer un élément audio dédié pour Opus
-        if (!opusAudioElement) {
-            opusAudioElement = new Audio();
-            opusAudioElement.autoplay = true;
-            opusAudioElement.volume = (currentVolume || 1.0) * 1.2; // Volume augmenté
-            opusAudioElement.addEventListener('ended', () => {
-                // Continuer avec le prochain blob si disponible
-                if (opusStreamBlobs.length > 0) {
-                    const nextBlob = opusStreamBlobs.shift();
-                    playOpusBlobStream(nextBlob);
-                }
-            });
-        }
-        
-        // Créer un blob URL et le jouer
-        if (opusBlobUrl) {
-            URL.revokeObjectURL(opusBlobUrl);
-        }
-        
-        opusBlobUrl = URL.createObjectURL(blob);
-        opusAudioElement.src = opusBlobUrl;
-        
-        // Jouer si pas déjà en cours
-        if (opusAudioElement.paused) {
-            opusAudioElement.play().catch(err => {
-                console.warn('⚠️ Erreur lecture Opus:', err);
-            });
-        }
-        
-    } catch (error) {
-        console.error('❌ Erreur lecture blob Opus:', error);
-    }
-}
+// OPUS DÉSACTIVÉ - Les fragments Opus WebM ne peuvent pas être joués individuellement
+// Le système utilise uniquement PCM16 stéréo qui fonctionne parfaitement
 
 // Lire le buffer continu de manière fluide (style Discord - STÉRÉO)
 function startContinuousPlayback(sampleRate, channels = 1) {

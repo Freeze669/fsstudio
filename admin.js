@@ -948,76 +948,115 @@ function initRadioEvents() {
 
     // Arrêter la diffusion vocale
     stopVoiceBtn.addEventListener('click', () => {
+        console.log('⏹️ Arrêt de la diffusion vocale...');
+        
+        // Arrêter le streaming immédiatement
+        isStreaming = false;
+        
         // Arrêter le timer de buffer
         if (bufferTimer) {
             clearInterval(bufferTimer);
             bufferTimer = null;
-        }
-        
-        // Envoyer le buffer restant avant d'arrêter
-        if (continuousAudioBuffer && continuousAudioBuffer.length > 0 && isStreaming) {
-            sendContinuousBuffer();
+            console.log('✅ Timer de buffer arrêté');
         }
         
         // Arrêter MediaRecorder si actif (Opus)
         if (mediaRecorder && mediaRecorder.state !== 'inactive') {
             try {
                 mediaRecorder.stop();
-                console.log('⏹️ MediaRecorder arrêté');
+                mediaRecorder = null;
+                console.log('✅ MediaRecorder arrêté');
             } catch (e) {
-                console.error('Erreur arrêt MediaRecorder:', e);
+                console.error('❌ Erreur arrêt MediaRecorder:', e);
             }
-            mediaRecorder = null;
         }
         
-        // Déconnecter le script processor (fallback)
+        // Déconnecter le script processor (PCM16)
         if (scriptProcessor) {
             try {
                 scriptProcessor.disconnect();
+                scriptProcessor.onaudioprocess = null; // Désactiver le handler
                 scriptProcessor = null;
+                console.log('✅ ScriptProcessor arrêté');
             } catch (e) {
-                console.error('Erreur déconnexion scriptProcessor:', e);
+                console.error('❌ Erreur déconnexion scriptProcessor:', e);
             }
         }
         
+        // Arrêter le mediaStream
         if (mediaStream) {
-            mediaStream.getTracks().forEach(track => track.stop());
+            mediaStream.getTracks().forEach(track => {
+                track.stop();
+                console.log('✅ Piste audio arrêtée:', track.kind);
+            });
             mediaStream = null;
         }
         
+        // Fermer le contexte audio
         if (audioContext) {
-            audioContext.close();
+            try {
+                audioContext.close().then(() => {
+                    console.log('✅ Contexte audio fermé');
+                }).catch(e => {
+                    console.error('❌ Erreur fermeture contexte:', e);
+                });
+            } catch (e) {
+                console.error('❌ Erreur fermeture contexte:', e);
+            }
             audioContext = null;
         }
         
+        // Arrêter l'animation
         if (animationFrame) {
             cancelAnimationFrame(animationFrame);
             animationFrame = null;
         }
         
+        // Arrêter les intervalles
         if (streamInterval) {
             clearInterval(streamInterval);
             streamInterval = null;
         }
         
-        // Supprimer tous les chunks audio
-        database.ref('radio/audioChunks').remove();
+        // Supprimer tous les chunks audio et streams
+        database.ref('radio/audioChunks').remove().then(() => {
+            console.log('✅ Chunks audio supprimés');
+        }).catch(e => {
+            console.error('❌ Erreur suppression chunks:', e);
+        });
+        
+        database.ref('radio/audioStream').remove().then(() => {
+            console.log('✅ Streams audio supprimés');
+        }).catch(e => {
+            console.error('❌ Erreur suppression streams:', e);
+        });
         
         // Mettre à jour l'état dans Firebase
         database.ref(FIREBASE_RADIO_STATUS_PATH).set({
             isLive: false,
             stoppedAt: new Date().toISOString()
+        }).then(() => {
+            console.log('✅ Statut Firebase mis à jour (hors ligne)');
+        }).catch(e => {
+            console.error('❌ Erreur mise à jour statut:', e);
         });
         
         // Masquer les contrôles
         startVoiceBtn.style.display = 'inline-flex';
         stopVoiceBtn.style.display = 'none';
         voiceInfo.style.display = 'none';
-        isStreaming = false;
+        if (streamStats) streamStats.style.display = 'none';
+        isStreaming = false; // IMPORTANT: Mettre à false AVANT de masquer les contrôles
         
-        audioLevel.style.width = '0%';
-        voiceStatusText.textContent = 'Diffusion arrêtée';
+        if (audioLevel) {
+            audioLevel.style.width = '0%';
+        }
+        if (voiceStatusText) {
+            voiceStatusText.textContent = '⏹️ Diffusion arrêtée';
+        }
         updateRadioStatus(false);
+        
+        console.log('✅ Diffusion vocale arrêtée avec succès');
         
         console.log('⏹️ Diffusion vocale arrêtée');
     });
