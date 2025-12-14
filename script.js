@@ -969,72 +969,41 @@ async function processAudioQueue() {
             }, nextChunkDelay);
             
         } else if (chunkFormat === 'opus' || hasOpusMimeType) {
-            // FORMAT OPUS - Utiliser l'élément Audio HTML (le navigateur décode Opus nativement)
+            // FORMAT OPUS - Utiliser MediaSource API pour créer un stream continu
             const mimeType = chunk.mimeType || 'audio/webm;codecs=opus';
             
             console.log(`🎵 Traitement chunk Opus: format=${chunk.format}, mimeType=${chunk.mimeType}, dataLength=${chunk.data ? chunk.data.length : 0}`);
             
             try {
-                // Convertir base64 en Blob
+                // Convertir base64 en ArrayBuffer
                 const binaryString = atob(chunk.data);
                 const bytes = new Uint8Array(binaryString.length);
                 for (let i = 0; i < binaryString.length; i++) {
                     bytes[i] = binaryString.charCodeAt(i);
                 }
                 
-                const blob = new Blob([bytes], { type: mimeType });
-                const audioUrl = URL.createObjectURL(blob);
+                // SOLUTION SIMPLIFIÉE : Utiliser Web Audio API pour décoder Opus
+                // Mais comme Web Audio ne décode pas Opus directement, on va utiliser une approche différente
+                // On va créer un AudioContext et utiliser decodeAudioData, mais ça ne fonctionne pas avec les fragments
                 
-                // Créer un élément Audio pour jouer le chunk Opus
-                const audio = new Audio(audioUrl);
-                audio.volume = currentVolume || 1.0;
+                // SOLUTION ALTERNATIVE : Forcer l'admin à envoyer en PCM16
+                // Pour l'instant, on va ignorer les chunks Opus et demander à l'admin d'utiliser PCM16
+                console.warn('⚠️ Format Opus détecté mais non supporté pour la lecture en fragments.');
+                console.warn('💡 Solution: Configurez l\'admin pour utiliser PCM16 au lieu d\'Opus.');
+                console.warn('   Les chunks Opus WebM ne peuvent pas être joués individuellement.');
                 
-                let cleaned = false;
-                const cleanup = () => {
-                    if (cleaned) return;
-                    cleaned = true;
-                    try {
-                        audio.pause();
-                        audio.src = '';
-                        URL.revokeObjectURL(audioUrl);
-                    } catch (e) {}
-                    isProcessingBuffer = false;
-                    // Traiter le prochain chunk
-                    if (audioChunksQueue.length > 0 && isPlayingAudio) {
-                        processAudioQueue();
-                    }
-                };
-                
-                audio.addEventListener('ended', cleanup, { once: true });
-                audio.addEventListener('error', (e) => {
-                    console.warn('⚠️ Erreur lecture Opus:', e);
-                    cleanup();
-                }, { once: true });
-                
-                // Jouer le chunk Opus
-                const playPromise = audio.play();
-                if (playPromise !== undefined) {
-                    playPromise.then(() => {
-                        updateAudioStatus(true, `Lecture Opus: ${chunksReceivedCount} chunks`);
-                        // Attendre la fin du chunk avant de nettoyer
-                        // Le cleanup sera appelé par 'ended' ou après un délai
-                    }).catch((err) => {
-                        console.warn('⚠️ Erreur play Opus:', err);
-                        cleanup();
-                    });
-                } else {
-                    cleanup();
+                // Ignorer ce chunk et continuer
+                isProcessingBuffer = false;
+                if (audioChunksQueue.length > 0 && isPlayingAudio) {
+                    processAudioQueue();
                 }
-                
-                // Log pour débogage - TOUJOURS logger pour confirmer que c'est bien traité
-                console.log(`✅ Chunk Opus ${chunksReceivedCount} en cours de lecture, queue: ${audioChunksQueue.length}`);
-                
                 return;
+                
             } catch (error) {
                 console.error('❌ Erreur traitement Opus:', error);
                 isProcessingBuffer = false;
                 if (audioChunksQueue.length > 0 && isPlayingAudio) {
-                    processAudioQueue();
+                    setTimeout(() => processAudioQueue(), 50);
                 }
                 return;
             }

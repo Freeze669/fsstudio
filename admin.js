@@ -506,9 +506,14 @@ function initRadioEvents() {
                 }
             }
             
+            // FORCER L'UTILISATION DE PCM16 AU LIEU D'OPUS POUR COMPATIBILITÉ
+            // Les chunks Opus WebM ne peuvent pas être joués individuellement côté client
+            console.log('ℹ️ Opus détecté mais utilisation de PCM16 pour compatibilité');
+            selectedMimeType = null; // Forcer l'utilisation de ScriptProcessor (PCM16)
+            
             if (!selectedMimeType) {
-                console.warn('⚠️ Opus non supporté, utilisation de ScriptProcessor (qualité réduite)');
-                // Fallback vers l'ancienne méthode
+                console.log('✅ Utilisation de ScriptProcessor (PCM16) pour compatibilité maximale');
+                // Utiliser ScriptProcessor pour générer du PCM16
                 const bufferSize = 2048;
                 scriptProcessor = audioContext.createScriptProcessor(bufferSize, 1, 1);
             } else {
