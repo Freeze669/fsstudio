@@ -11,6 +11,8 @@ class MediasoupListener {
         this.consumer = null;
         this.audioContext = null;
         this.audioElement = null;
+        this.audioNodes = {}; // Stocke les nodes audio pour modification
+        this.audioParams = null; // Paramètres audio reçus
         this.isConnected = false;
         this.isPlaying = false;
     }
@@ -43,6 +45,12 @@ class MediasoupListener {
                     this.socket.on('connect_error', (error) => {
                         console.error('❌ Erreur connexion Mediasoup:', error);
                         reject(error);
+                    });
+                    
+                    // Recevoir les paramètres audio du diffuseur
+                    this.socket.on('audio-params', (params) => {
+                        this.audioParams = params;
+                        this.applyAudioParams();
                     });
                     
                     // Écouter les nouveaux producers (diffuseur)
@@ -190,28 +198,32 @@ class MediasoupListener {
                 
                 // === TRAITEMENT AUDIO RADIO FM (côté réception) ===
                 
-                // High-pass filter (50Hz)
+                // High-pass filter
                 const highPass = this.audioContext.createBiquadFilter();
                 highPass.type = 'highpass';
-                highPass.frequency.value = 50;
+                highPass.frequency.value = this.audioParams?.highPassFreq || 50;
                 highPass.Q.value = 0.7;
+                this.audioNodes.highPass = highPass;
                 
-                // Low-pass filter (15kHz - bande passante FM)
+                // Low-pass filter
                 const lowPass = this.audioContext.createBiquadFilter();
                 lowPass.type = 'lowpass';
-                lowPass.frequency.value = 15000;
+                lowPass.frequency.value = this.audioParams?.lowPassFreq || 15000;
                 lowPass.Q.value = 0.7;
+                this.audioNodes.lowPass = lowPass;
                 
-                // Égaliseur léger pour améliorer la clarté FM
+                // Égaliseur
                 const eq = this.audioContext.createBiquadFilter();
                 eq.type = 'peaking';
-                eq.frequency.value = 2000; // Boost fréquences vocales
-                eq.gain.value = 1.5; // Boost léger
-                eq.Q.value = 1.0;
+                eq.frequency.value = this.audioParams?.eqMidFreq || 2000;
+                eq.gain.value = this.audioParams?.eqMidGain || 1.5;
+                eq.Q.value = this.audioParams?.eqMidQ || 1.0;
+                this.audioNodes.eq = eq;
                 
-                // Gain node pour volume optimal (pas de distorsion)
+                // Gain node
                 const gainNode = this.audioContext.createGain();
                 gainNode.gain.value = 0.95; // 95% pour éviter distorsion
+                this.audioNodes.gain = gainNode;
                 
                 // Connecter : source -> highpass -> lowpass -> EQ -> gain -> destination
                 source.connect(highPass);
@@ -277,6 +289,29 @@ class MediasoupListener {
         
         this.isPlaying = false;
         console.log('⏸️ Écoute arrêtée');
+    }
+    
+    // Appliquer les paramètres audio reçus
+    applyAudioParams() {
+        if (!this.audioParams || !this.audioNodes) return;
+        
+        try {
+            if (this.audioNodes.highPass) {
+                this.audioNodes.highPass.frequency.value = this.audioParams.highPassFreq || 50;
+            }
+            if (this.audioNodes.lowPass) {
+                this.audioNodes.lowPass.frequency.value = this.audioParams.lowPassFreq || 15000;
+            }
+            if (this.audioNodes.eq) {
+                this.audioNodes.eq.frequency.value = this.audioParams.eqMidFreq || 2000;
+                this.audioNodes.eq.gain.value = this.audioParams.eqMidGain || 1.5;
+                this.audioNodes.eq.Q.value = this.audioParams.eqMidQ || 1.0;
+            }
+            
+            console.log('✅ Paramètres audio appliqués côté listener');
+        } catch (error) {
+            console.error('❌ Erreur application paramètres audio:', error);
+        }
     }
     
     disconnect() {

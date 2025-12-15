@@ -140,6 +140,86 @@ function showAdmin() {
     
     connectToFirebase();
     initRadio();
+    initAudioControlPanel();
+}
+
+// Initialiser le panneau de contrôle audio
+function initAudioControlPanel() {
+    // Attendre que MediasoupBroadcaster soit disponible
+    if (typeof MediasoupBroadcaster !== 'undefined') {
+        const serverUrl = 'https://fsstudio-production.up.railway.app';
+        const broadcaster = new MediasoupBroadcaster(serverUrl);
+        window.audioControlPanel = new AudioControlPanel(broadcaster);
+        
+        // Afficher la section de contrôle audio
+        const audioControlSection = document.getElementById('audioControlSection');
+        if (audioControlSection) {
+            audioControlSection.style.display = 'block';
+        }
+        
+        // Initialiser les contrôles
+        setupAudioControls();
+    } else {
+        // Réessayer après un court délai
+        setTimeout(initAudioControlPanel, 500);
+    }
+}
+
+// Configurer les contrôles audio
+function setupAudioControls() {
+    const panel = window.audioControlPanel;
+    if (!panel) return;
+    
+    // Charger les valeurs sauvegardées
+    panel.updateUI();
+    
+    // Écouter tous les changements de sliders
+    const paramKeys = [
+        'highPassFreq', 'lowPassFreq', 'preEmphasisGain', 'preEmphasisFreq',
+        'eqLowFreq', 'eqLowGain', 'eqLowQ',
+        'eqMidFreq', 'eqMidGain', 'eqMidQ',
+        'eqHighFreq', 'eqHighGain', 'eqHighQ',
+        'compressorThreshold', 'compressorKnee', 'compressorRatio', 'compressorAttack', 'compressorRelease',
+        'agcGain',
+        'limiterThreshold', 'limiterKnee', 'limiterRatio', 'limiterAttack', 'limiterRelease',
+        'deEmphasisGain', 'deEmphasisFreq'
+    ];
+    
+    paramKeys.forEach(key => {
+        const input = document.getElementById(`audio-${key}`);
+        if (input) {
+            input.addEventListener('input', (e) => {
+                const value = parseFloat(e.target.value);
+                panel.updateParam(key, value);
+                
+                // Mettre à jour l'affichage
+                const display = document.getElementById(`audio-${key}-display`);
+                if (display) {
+                    display.textContent = panel.formatValue(key, value);
+                }
+            });
+        }
+    });
+    
+    // Bouton réinitialiser
+    const resetBtn = document.getElementById('resetAudioParamsBtn');
+    if (resetBtn) {
+        resetBtn.addEventListener('click', () => {
+            if (confirm('Réinitialiser tous les paramètres audio aux valeurs par défaut ?')) {
+                panel.resetToDefaults();
+                panel.updateUI();
+            }
+        });
+    }
+    
+    // Bouton sauvegarder
+    const saveBtn = document.getElementById('saveAudioParamsBtn');
+    if (saveBtn) {
+        saveBtn.addEventListener('click', () => {
+            panel.saveParams();
+            alert('✅ Paramètres audio sauvegardés !');
+        });
+    }
 }
 
 // Connexion

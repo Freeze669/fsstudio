@@ -195,6 +195,167 @@
                 </div>
             </div>
 
+            <!-- Section Contrôle Audio en Temps Réel -->
+            <div class="admin-section" id="audioControlSection" style="display: none;">
+                <div class="section-header">
+                    <h2>🎛️ Contrôle Audio en Temps Réel</h2>
+                    <div class="audio-control-actions">
+                        <button class="action-btn" id="resetAudioParamsBtn">🔄 Réinitialiser</button>
+                        <button class="action-btn" id="saveAudioParamsBtn">💾 Sauvegarder</button>
+                    </div>
+                </div>
+
+                <div class="audio-control-panel">
+                    <!-- Filtres -->
+                    <div class="audio-control-group">
+                        <h3>🔊 Filtres</h3>
+                        <div class="control-row">
+                            <label>High-Pass (Hz): <span id="audio-highPassFreq-display">50 Hz</span></label>
+                            <input type="range" id="audio-highPassFreq" min="20" max="200" step="1" value="50">
+                        </div>
+                        <div class="control-row">
+                            <label>Low-Pass (Hz): <span id="audio-lowPassFreq-display">15000 Hz</span></label>
+                            <input type="range" id="audio-lowPassFreq" min="5000" max="20000" step="100" value="15000">
+                        </div>
+                    </div>
+
+                    <!-- Pré-emphasis -->
+                    <div class="audio-control-group">
+                        <h3>📈 Pré-emphasis FM</h3>
+                        <div class="control-row">
+                            <label>Gain (dB): <span id="audio-preEmphasisGain-display">+3.0 dB</span></label>
+                            <input type="range" id="audio-preEmphasisGain" min="0" max="10" step="0.1" value="3">
+                        </div>
+                        <div class="control-row">
+                            <label>Fréquence (Hz): <span id="audio-preEmphasisFreq-display">3000 Hz</span></label>
+                            <input type="range" id="audio-preEmphasisFreq" min="1000" max="8000" step="100" value="3000">
+                        </div>
+                    </div>
+
+                    <!-- Égaliseur -->
+                    <div class="audio-control-group">
+                        <h3>🎚️ Égaliseur</h3>
+                        <div class="eq-band">
+                            <h4>Basse (200Hz)</h4>
+                            <div class="control-row">
+                                <label>Fréquence (Hz): <span id="audio-eqLowFreq-display">200 Hz</span></label>
+                                <input type="range" id="audio-eqLowFreq" min="50" max="500" step="10" value="200">
+                            </div>
+                            <div class="control-row">
+                                <label>Gain (dB): <span id="audio-eqLowGain-display">+1.5 dB</span></label>
+                                <input type="range" id="audio-eqLowGain" min="-10" max="10" step="0.1" value="1.5">
+                            </div>
+                            <div class="control-row">
+                                <label>Q: <span id="audio-eqLowQ-display">1.00</span></label>
+                                <input type="range" id="audio-eqLowQ" min="0.1" max="5" step="0.1" value="1.0">
+                            </div>
+                        </div>
+                        <div class="eq-band">
+                            <h4>Médium (2kHz)</h4>
+                            <div class="control-row">
+                                <label>Fréquence (Hz): <span id="audio-eqMidFreq-display">2000 Hz</span></label>
+                                <input type="range" id="audio-eqMidFreq" min="500" max="5000" step="50" value="2000">
+                            </div>
+                            <div class="control-row">
+                                <label>Gain (dB): <span id="audio-eqMidGain-display">+2.5 dB</span></label>
+                                <input type="range" id="audio-eqMidGain" min="-10" max="10" step="0.1" value="2.5">
+                            </div>
+                            <div class="control-row">
+                                <label>Q: <span id="audio-eqMidQ-display">1.20</span></label>
+                                <input type="range" id="audio-eqMidQ" min="0.1" max="5" step="0.1" value="1.2">
+                            </div>
+                        </div>
+                        <div class="eq-band">
+                            <h4>Haute (6kHz)</h4>
+                            <div class="control-row">
+                                <label>Fréquence (Hz): <span id="audio-eqHighFreq-display">6000 Hz</span></label>
+                                <input type="range" id="audio-eqHighFreq" min="2000" max="12000" step="100" value="6000">
+                            </div>
+                            <div class="control-row">
+                                <label>Gain (dB): <span id="audio-eqHighGain-display">+2.0 dB</span></label>
+                                <input type="range" id="audio-eqHighGain" min="-10" max="10" step="0.1" value="2">
+                            </div>
+                            <div class="control-row">
+                                <label>Q: <span id="audio-eqHighQ-display">1.00</span></label>
+                                <input type="range" id="audio-eqHighQ" min="0.1" max="5" step="0.1" value="1.0">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Compresseur -->
+                    <div class="audio-control-group">
+                        <h3>🎚️ Compresseur</h3>
+                        <div class="control-row">
+                            <label>Seuil (dB): <span id="audio-compressorThreshold-display">-18.0 dB</span></label>
+                            <input type="range" id="audio-compressorThreshold" min="-60" max="0" step="1" value="-18">
+                        </div>
+                        <div class="control-row">
+                            <label>Knee (dB): <span id="audio-compressorKnee-display">15.0 dB</span></label>
+                            <input type="range" id="audio-compressorKnee" min="0" max="40" step="1" value="15">
+                        </div>
+                        <div class="control-row">
+                            <label>Ratio: <span id="audio-compressorRatio-display">3.0:1</span></label>
+                            <input type="range" id="audio-compressorRatio" min="1" max="20" step="0.1" value="3">
+                        </div>
+                        <div class="control-row">
+                            <label>Attack (ms): <span id="audio-compressorAttack-display">3.0 ms</span></label>
+                            <input type="range" id="audio-compressorAttack" min="0.001" max="0.1" step="0.001" value="0.003">
+                        </div>
+                        <div class="control-row">
+                            <label>Release (ms): <span id="audio-compressorRelease-display">150.0 ms</span></label>
+                            <input type="range" id="audio-compressorRelease" min="0.01" max="1" step="0.01" value="0.15">
+                        </div>
+                    </div>
+
+                    <!-- AGC -->
+                    <div class="audio-control-group">
+                        <h3>🔊 AGC (Auto Gain Control)</h3>
+                        <div class="control-row">
+                            <label>Gain: <span id="audio-agcGain-display">1.00</span></label>
+                            <input type="range" id="audio-agcGain" min="0.1" max="2" step="0.01" value="1.0">
+                        </div>
+                    </div>
+
+                    <!-- Limiter -->
+                    <div class="audio-control-group">
+                        <h3>🛡️ Limiter</h3>
+                        <div class="control-row">
+                            <label>Seuil (dB): <span id="audio-limiterThreshold-display">-0.3 dB</span></label>
+                            <input type="range" id="audio-limiterThreshold" min="-3" max="0" step="0.1" value="-0.3">
+                        </div>
+                        <div class="control-row">
+                            <label>Knee (dB): <span id="audio-limiterKnee-display">0.0 dB</span></label>
+                            <input type="range" id="audio-limiterKnee" min="0" max="10" step="0.1" value="0">
+                        </div>
+                        <div class="control-row">
+                            <label>Ratio: <span id="audio-limiterRatio-display">20.0:1</span></label>
+                            <input type="range" id="audio-limiterRatio" min="5" max="30" step="0.1" value="20">
+                        </div>
+                        <div class="control-row">
+                            <label>Attack (ms): <span id="audio-limiterAttack-display">1.0 ms</span></label>
+                            <input type="range" id="audio-limiterAttack" min="0.001" max="0.01" step="0.001" value="0.001">
+                        </div>
+                        <div class="control-row">
+                            <label>Release (ms): <span id="audio-limiterRelease-display">50.0 ms</span></label>
+                            <input type="range" id="audio-limiterRelease" min="0.01" max="0.2" step="0.01" value="0.05">
+                        </div>
+                    </div>
+
+                    <!-- De-emphasis -->
+                    <div class="audio-control-group">
+                        <h3>📉 De-emphasis</h3>
+                        <div class="control-row">
+                            <label>Gain (dB): <span id="audio-deEmphasisGain-display">-1.0 dB</span></label>
+                            <input type="range" id="audio-deEmphasisGain" min="-5" max="0" step="0.1" value="-1">
+                        </div>
+                        <div class="control-row">
+                            <label>Fréquence (Hz): <span id="audio-deEmphasisFreq-display">3000 Hz</span></label>
+                            <input type="range" id="audio-deEmphasisFreq" min="1000" max="8000" step="100" value="3000">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Section Statistiques -->
             <div class="admin-section">
                 <div class="section-header">
@@ -233,6 +394,9 @@
     
     <!-- Configuration Firebase -->
     <script src="firebase-config.js"></script>
+    
+    <!-- Panneau de contrôle audio -->
+    <script src="audio-control-panel.js"></script>
     
     <!-- Script Admin -->
     <script src="admin.js"></script>

@@ -79,7 +79,7 @@ class MediasoupBroadcaster {
     async startBroadcasting() {
         try {
             // Obtenir le stream audio du microphone - 44.1kHz 16-bit (qualité CD)
-            this.mediaStream = await navigator.mediaDevices.getUserMedia({
+            const rawStream = await navigator.mediaDevices.getUserMedia({
                 audio: {
                     // Paramètres optimisés pour qualité vocale maximale
                     echoCancellation: true, // Essentiel pour éviter l'écho
@@ -101,8 +101,15 @@ class MediasoupBroadcaster {
                 }
             });
             
-            // Appliquer des filtres audio supplémentaires pour qualité maximale
-            await this.applyAudioFilters();
+            // Appliquer des filtres audio avec le panneau de contrôle
+            if (window.audioControlPanel) {
+                const filteredStream = await window.audioControlPanel.applyAudioFilters(rawStream);
+                this.mediaStream = filteredStream || rawStream;
+            } else {
+                // Fallback si le panneau n'est pas disponible
+                this.mediaStream = rawStream;
+                await this.applyAudioFilters();
+            }
             
             // Créer le transport
             this.socket.emit('create-transport', {

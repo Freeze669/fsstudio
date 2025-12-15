@@ -351,6 +351,28 @@ io.on('connection', (socket) => {
     });
     
     // Déconnexion
+    // Recevoir et relayer les paramètres audio du diffuseur
+    socket.on('audio-params', ({ roomId, params }) => {
+        try {
+            const room = rooms.get(roomId);
+            if (!room || room.broadcaster !== socket.id) {
+                return; // Seul le diffuseur peut envoyer des paramètres
+            }
+            
+            // Relayer les paramètres à tous les auditeurs
+            room.listeners.forEach((listenerId) => {
+                const listenerSocket = io.sockets.sockets.get(listenerId);
+                if (listenerSocket) {
+                    listenerSocket.emit('audio-params', params);
+                }
+            });
+            
+            console.log(`📡 Paramètres audio relayés à ${room.listeners.size} auditeur(s)`);
+        } catch (error) {
+            console.error('❌ Erreur audio-params:', error);
+        }
+    });
+    
     socket.on('disconnect', () => {
         console.log(`⚠️ Client déconnecté: ${socket.id}`);
         
