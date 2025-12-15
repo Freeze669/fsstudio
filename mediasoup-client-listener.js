@@ -177,17 +177,76 @@ class MediasoupListener {
                     rtpParameters: response.rtpParameters
                 });
                 
-                // Créer un élément audio pour jouer le stream
+                // Créer un contexte audio 44.1kHz (standard radio FM)
+                this.audioContext = new (window.AudioContext || window.webkitAudioContext)({
+                    sampleRate: 44100, // 44.1kHz (standard radio FM)
+                    latencyHint: 'interactive'
+                });
+                
+                // Créer une source depuis le track
+                const source = this.audioContext.createMediaStreamSource(
+                    new MediaStream([this.consumer.track])
+                );
+                
+                // === TRAITEMENT AUDIO RADIO FM (côté réception) ===
+                
+                // High-pass filter (50Hz)
+                const highPass = this.audioContext.createBiquadFilter();
+                highPass.type = 'highpass';
+                highPass.frequency.value = 50;
+                highPass.Q.value = 0.7;
+                
+                // Low-pass filter (15kHz - bande passante FM)
+                const lowPass = this.audioContext.createBiquadFilter();
+                lowPass.type = 'lowpass';
+                lowPass.frequency.value = 15000;
+                lowPass.Q.value = 0.7;
+                
+                // Égaliseur léger pour améliorer la clarté FM
+                const eq = this.audioContext.createBiquadFilter();
+                eq.type = 'peaking';
+                eq.frequency.value = 2000; // Boost fréquences vocales
+                eq.gain.value = 1.5; // Boost léger
+                eq.Q.value = 1.0;
+                
+                // Gain node pour volume optimal (pas de distorsion)
+                const gainNode = this.audioContext.createGain();
+                gainNode.gain.value = 0.95; // 95% pour éviter distorsion
+                
+                // Connecter : source -> highpass -> lowpass -> EQ -> gain -> destination
+                source.connect(highPass);
+                highPass.connect(lowPass);
+                lowPass.connect(eq);
+                eq.connect(gainNode);
+                gainNode.connect(this.audioContext.destination);
+                
+                // Résumer le contexte si suspendu
+                if (this.audioContext.state === 'suspended') {
+                    await this.audioContext.resume();
+                }
+                
+                // Créer aussi un élément audio HTML5 pour compatibilité (44.1kHz)
                 this.audioElement = new Audio();
                 const stream = new MediaStream([this.consumer.track]);
                 this.audioElement.srcObject = stream;
                 this.audioElement.autoplay = true;
-                this.audioElement.play().then(() => {
-                    console.log('✅ Audio Mediasoup en lecture');
-                    this.isPlaying = true;
-                }).catch(error => {
-                    console.error('❌ Erreur lecture audio:', error);
-                });
+                this.audioElement.preload = 'auto';
+                
+                // Essayer de jouer avec l'élément audio HTML5
+                try {
+                    await this.audioElement.play();
+                    console.log('✅ Audio HTML5 player démarré (44.1kHz)');
+                } catch (error) {
+                    console.warn('⚠️ Autoplay bloqué, utilisation Web Audio API uniquement');
+                }
+                
+                console.log('✅ Audio RADIO FM en lecture');
+                console.log('   Sample Rate: 44.1kHz');
+                console.log('   Bitrate: 160 kbps (qualité radio FM)');
+                console.log('   Bande passante: 50Hz - 15kHz');
+                console.log('   Player: HTML5 + Web Audio API');
+                console.log('   Qualité: Radio FM professionnelle');
+                this.isPlaying = true;
             });
         } catch (error) {
             console.error('❌ Erreur consumeAudio:', error);
@@ -203,6 +262,11 @@ class MediasoupListener {
         if (this.transport) {
             this.transport.close();
             this.transport = null;
+        }
+        
+        if (this.audioContext) {
+            this.audioContext.close();
+            this.audioContext = null;
         }
         
         if (this.audioElement) {

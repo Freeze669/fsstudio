@@ -75,11 +75,20 @@ async function getOrCreateRoom(roomId) {
             {
                 kind: 'audio',
                 mimeType: 'audio/opus',
-                clockRate: 48000,
-                channels: 2, // Stéréo
+                clockRate: 44100, // 44.1kHz (standard radio FM)
+                channels: 2, // Stéréo (standard FM)
                 parameters: {
                     minptime: 10,
-                    useinbandfec: 1
+                    useinbandfec: 1, // Forward Error Correction pour meilleure qualité
+                    // Paramètres Opus optimisés pour qualité RADIO FM
+                    maxplaybackrate: 44100, // 44.1kHz (standard radio FM)
+                    maxaveragebitrate: 160000, // 160 kbps (qualité radio FM professionnelle)
+                    stereo: 1, // Stéréo activé
+                    sprop_stereo: 1, // Stéréo supporté
+                    // Paramètres de qualité
+                    complexity: 10, // Complexité max (0-10) pour meilleure qualité
+                    signal: 'music', // Optimisé pour musique/voix (radio)
+                    application: 'audio' // Application audio (meilleure qualité)
                 }
             }
         ]

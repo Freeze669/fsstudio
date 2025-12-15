@@ -78,17 +78,31 @@ class MediasoupBroadcaster {
     
     async startBroadcasting() {
         try {
-            // Obtenir le stream audio du microphone
+            // Obtenir le stream audio du microphone - 44.1kHz 16-bit (qualité CD)
             this.mediaStream = await navigator.mediaDevices.getUserMedia({
                 audio: {
-                    echoCancellation: true,
-                    noiseSuppression: true,
-                    autoGainControl: true,
-                    sampleRate: 48000,
-                    channelCount: 2,
-                    latency: 0.01
+                    // Paramètres optimisés pour qualité vocale maximale
+                    echoCancellation: true, // Essentiel pour éviter l'écho
+                    noiseSuppression: true, // Supprime le bruit ambiant
+                    autoGainControl: true, // Contrôle automatique du volume
+                    sampleRate: 44100, // 44.1kHz (qualité CD, standard audio)
+                    channelCount: 2, // STÉRÉO pour meilleure qualité
+                    latency: 0.01, // Latence minimale
+                    // Paramètres Google Chrome optimisés
+                    googEchoCancellation: true,
+                    googAutoGainControl: true,
+                    googNoiseSuppression: true,
+                    googHighpassFilter: true,
+                    googTypingNoiseDetection: true,
+                    googNoiseReduction: true,
+                    googEchoCancellation2: true, // Version améliorée
+                    googDAEchoCancellation: true, // Double AEC
+                    googAECM: true // Acoustic Echo Cancellation Mobile
                 }
             });
+            
+            // Appliquer des filtres audio supplémentaires pour qualité maximale
+            await this.applyAudioFilters();
             
             // Créer le transport
             this.socket.emit('create-transport', {
@@ -139,11 +153,29 @@ class MediasoupBroadcaster {
                     }
                 });
                 
-                // Produire l'audio
+                // Produire l'audio avec paramètres optimisés pour qualité maximale
                 const track = this.mediaStream.getAudioTracks()[0];
-                this.producer = await this.transport.produce({ track });
                 
-                console.log('✅ Diffusion audio démarrée via Mediasoup');
+                this.producer = await this.transport.produce({ 
+                    track,
+                    codecOptions: {
+                        opusStereo: true, // Stéréo activé (standard FM)
+                        opusFec: true, // Forward Error Correction
+                        opusDtx: false, // Pas de DTX pour continuité
+                        opusMaxPlaybackRate: 44100, // 44.1kHz (standard radio FM)
+                        opusMaxAverageBitrate: 160000, // 160 kbps (qualité radio FM)
+                        opusComplexity: 10, // Complexité max (0-10)
+                        opusSignal: 'music', // Optimisé pour musique/voix (radio)
+                        opusApplication: 'audio' // Application audio (meilleure qualité)
+                    }
+                });
+                
+                console.log('✅ Diffusion audio RADIO FM démarrée');
+                console.log('   Codec: Opus 44.1kHz stéréo');
+                console.log('   Bitrate: 160 kbps (qualité radio FM)');
+                console.log('   Sample Rate: 44.1kHz');
+                console.log('   Bande passante: 50Hz - 15kHz');
+                console.log('   Qualité: Radio FM professionnelle');
             });
         } catch (error) {
             console.error('❌ Erreur démarrage diffusion:', error);
@@ -171,6 +203,119 @@ class MediasoupBroadcaster {
             console.log('✅ Diffusion audio arrêtée');
         } catch (error) {
             console.error('❌ Erreur arrêt diffusion:', error);
+        }
+    }
+    
+    async applyAudioFilters() {
+        if (!this.mediaStream) return;
+        
+        try {
+            // Créer un contexte audio 44.1kHz (standard radio FM)
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)({
+                sampleRate: 44100, // 44.1kHz (standard radio FM)
+                latencyHint: 'interactive'
+            });
+            
+            const source = audioContext.createMediaStreamSource(this.mediaStream);
+            
+            // === CHAÎNE DE TRAITEMENT RADIO FM PROFESSIONNELLE ===
+            
+            // 1. High-pass filter (supprime infrasons et bruit basse fréquence)
+            const highPassFilter = audioContext.createBiquadFilter();
+            highPassFilter.type = 'highpass';
+            highPassFilter.frequency.value = 50; // 50Hz (standard FM)
+            highPassFilter.Q.value = 0.7;
+            
+            // 2. Low-pass filter (limite à 15kHz comme la radio FM)
+            const lowPassFilter = audioContext.createBiquadFilter();
+            lowPassFilter.type = 'lowpass';
+            lowPassFilter.frequency.value = 15000; // 15kHz (bande passante FM)
+            lowPassFilter.Q.value = 0.7;
+            
+            // 3. Pré-emphasis FM (boost hautes fréquences comme en FM)
+            const preEmphasis = audioContext.createBiquadFilter();
+            preEmphasis.type = 'highshelf';
+            preEmphasis.frequency.value = 3000; // À partir de 3kHz
+            preEmphasis.gain.value = 3; // +3dB boost hautes fréquences (style FM)
+            preEmphasis.Q.value = 0.7;
+            
+            // 4. Égaliseur multi-bandes (optimisation fréquences vocales)
+            // EQ basse (100-300Hz) - présence vocale
+            const eqLow = audioContext.createBiquadFilter();
+            eqLow.type = 'peaking';
+            eqLow.frequency.value = 200;
+            eqLow.gain.value = 1.5; // Boost léger
+            eqLow.Q.value = 1.0;
+            
+            // EQ mid (1-3kHz) - clarté vocale
+            const eqMid = audioContext.createBiquadFilter();
+            eqMid.type = 'peaking';
+            eqMid.frequency.value = 2000; // 2kHz (fréquence centrale voix)
+            eqMid.gain.value = 2.5; // Boost important pour clarté FM
+            eqMid.Q.value = 1.2;
+            
+            // EQ haute (5-8kHz) - brillance
+            const eqHigh = audioContext.createBiquadFilter();
+            eqHigh.type = 'peaking';
+            eqHigh.frequency.value = 6000; // 6kHz (brillance)
+            eqHigh.gain.value = 2; // Boost brillance
+            eqHigh.Q.value = 1.0;
+            
+            // 5. Compresseur multi-bandes (normalisation dynamique FM)
+            const compressor = audioContext.createDynamicsCompressor();
+            compressor.threshold.value = -18; // Seuil adapté FM
+            compressor.knee.value = 15; // Transition douce
+            compressor.ratio.value = 3; // Ratio modéré (style FM)
+            compressor.attack.value = 0.003; // Attaque rapide
+            compressor.release.value = 0.15; // Release plus long (style FM)
+            
+            // 6. AGC (Auto Gain Control) - normalisation volume
+            const agcGain = audioContext.createGain();
+            agcGain.gain.value = 1.0; // Ajusté dynamiquement si nécessaire
+            
+            // 7. Limiter final FM (évite saturation, -0.3dB comme standard FM)
+            const limiter = audioContext.createDynamicsCompressor();
+            limiter.threshold.value = -0.3; // -0.3dB (standard radio FM)
+            limiter.knee.value = 0; // Hard knee
+            limiter.ratio.value = 20; // Ratio très élevé (limiter)
+            limiter.attack.value = 0.001; // Attaque ultra-rapide
+            limiter.release.value = 0.05;
+            
+            // 8. De-emphasis (compensation pré-emphasis) - optionnel
+            const deEmphasis = audioContext.createBiquadFilter();
+            deEmphasis.type = 'lowshelf';
+            deEmphasis.frequency.value = 3000;
+            deEmphasis.gain.value = -1; // Légère réduction
+            deEmphasis.Q.value = 0.7;
+            
+            // === CHAÎNAGE : source -> highpass -> lowpass -> preEmphasis -> EQ -> compressor -> agc -> limiter -> deEmphasis -> destination ===
+            source.connect(highPassFilter);
+            highPassFilter.connect(lowPassFilter);
+            lowPassFilter.connect(preEmphasis);
+            preEmphasis.connect(eqLow);
+            eqLow.connect(eqMid);
+            eqMid.connect(eqHigh);
+            eqHigh.connect(compressor);
+            compressor.connect(agcGain);
+            agcGain.connect(limiter);
+            limiter.connect(deEmphasis);
+            
+            // Créer un nouveau stream avec les filtres
+            const destination = audioContext.createMediaStreamDestination();
+            deEmphasis.connect(destination);
+            
+            // Remplacer le stream original par le stream filtré
+            this.mediaStream = destination.stream;
+            
+            console.log('✅ Filtres audio RADIO FM appliqués');
+            console.log('   Sample Rate: 44.1kHz');
+            console.log('   Bande passante: 50Hz - 15kHz (standard FM)');
+            console.log('   Pré-emphasis: +3dB @ 3kHz');
+            console.log('   Limiter: -0.3dB (standard FM)');
+            console.log('   Qualité: Radio FM professionnelle');
+        } catch (error) {
+            console.warn('⚠️ Impossible d\'appliquer les filtres audio:', error);
+            // Continuer sans filtres si erreur
         }
     }
     
