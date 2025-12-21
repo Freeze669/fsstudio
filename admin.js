@@ -441,13 +441,14 @@ function switchTab(tabId) {
     
     // Charger le contenu spécifique à l'onglet
     if (tabId === 'finance') {
+        // Permettre l'accès à l'onglet finance même sans permission complète
+        if (!financialData.transactions) {
+            initializeFinancialData();
+        } else {
+            updateFinancialDashboard();
+        }
+        // loadFinances() sera appelé seulement si permission finance
         if (hasPermission(currentUser, 'finance')) {
-            // S'assurer que les données financières sont chargées
-            if (!financialData.transactions) {
-                initializeFinancialData();
-            } else {
-                updateFinancialDashboard();
-            }
             loadFinances();
         }
     } else if (tabId === 'member-wallet-view') {
@@ -783,19 +784,9 @@ function showAdmin() {
         const chatTab = document.querySelector('[data-tab="chat"]');
         if (chatTab) chatTab.style.display = 'none';
     }
-    
-    // Masquer l'onglet Finance pour les utilisateurs sans permission finance
-    if (!hasPermission(currentUser, 'finance')) {
-        const financeTab = document.querySelector('[data-tab="finance"]');
-        if (financeTab) financeTab.style.display = 'none';
-        
-        // Masquer aussi le bouton de l'onglet Finance
-        const financeTabBtn = document.querySelector('.tab-btn[data-tab="finance"]');
-        if (financeTabBtn) financeTabBtn.style.display = 'none';
-    } else {
-        // Si l'utilisateur a la permission finance, initialiser les données financières
-        initializeFinancialData();
-    }
+
+    // Initialiser les données financières pour tous les utilisateurs (vue limitée pour ceux sans permission)
+    initializeFinancialData();
     
     // Afficher la vue membre simple pour les utilisateurs sans permission finance
     if (!hasPermission(currentUser, 'finance') && currentUser) {
@@ -3084,17 +3075,176 @@ function recalculateFinancialTotals() {
 
 // Mise à jour du tableau de bord financier
 function updateFinancialDashboard() {
-    if (!currentUser || !hasPermission(currentUser, 'finance')) {
-        // Si l'utilisateur n'a pas la permission finance, mettre à jour uniquement sa vue membre
+    if (!currentUser) return;
+
+    if (hasPermission(currentUser, 'finance')) {
+        // Utilisateur avec permission finance : voir tout
+        updateFinancialMetrics();
+        updateCharts();
+        updateTransactionsTable();
+        updateBudgetsDisplay();
+        updateWalletsDisplay();
+    } else {
+        // Utilisateur sans permission finance : voir seulement son wallet
         updateMemberWalletDisplay();
-        return;
+        // Masquer les éléments auxquels il n'a pas accès
+        hideFinanceElementsForNonFinanceUsers();
     }
-    
-    updateFinancialMetrics();
-    updateCharts();
-    updateTransactionsTable();
-    updateBudgetsDisplay();
-    updateWalletsDisplay();
+}
+
+// Masquer les éléments financiers pour les utilisateurs sans permission finance
+function hideFinanceElementsForNonFinanceUsers() {
+    // Masquer les métriques générales
+    const metricsGrid = document.querySelector('.finance-metrics-grid');
+    if (metricsGrid) metricsGrid.style.display = 'none';
+
+    // Masquer les graphiques
+    const charts = document.querySelector('.finance-charts');
+    if (charts) charts.style.display = 'none';
+
+    // Masquer la section transactions
+    const transactionsSection = document.querySelector('.transactions-section');
+    if (transactionsSection) transactionsSection.style.display = 'none';
+
+    // Masquer la section budgets
+    const budgetsSection = document.querySelector('.budget-section');
+    if (budgetsSection) budgetsSection.style.display = 'none';
+
+    // Masquer la section portefeuilles (liste de tous les utilisateurs)
+    const walletsSection = document.querySelector('.wallets-section');
+    if (walletsSection) walletsSection.style.display = 'none';
+
+    // Masquer les actions administratives financières
+    const adminActions = document.querySelector('.admin-financial-actions');
+    if (adminActions) adminActions.style.display = 'none';
+
+    // Afficher seulement la section wallet personnel
+    showPersonalWalletSection();
+}
+
+// Afficher la section wallet personnel pour les utilisateurs sans permission finance
+function showPersonalWalletSection() {
+    // Créer ou afficher une section dédiée au wallet personnel
+    let personalWalletSection = document.querySelector('.personal-wallet-section');
+
+    if (!personalWalletSection) {
+        // Créer la section si elle n'existe pas
+        personalWalletSection = document.createElement('div');
+        personalWalletSection.className = 'personal-wallet-section';
+        personalWalletSection.innerHTML = `
+            <div class="section-header">
+                <h3>💰 Mon Portefeuille</h3>
+            </div>
+            <div class="personal-wallet-container">
+                <!-- Le wallet personnel sera affiché ici -->
+            </div>
+        `;
+
+        // Insérer au début de finance-dashboard
+        const financeDashboard = document.querySelector('.finance-dashboard');
+        if (financeDashboard) {
+            financeDashboard.insertBefore(personalWalletSection, financeDashboard.firstChild);
+        }
+    }
+
+    personalWalletSection.style.display = 'block';
+    updatePersonalWalletDisplay();
+}
+
+// Afficher le wallet personnel de l'utilisateur connecté
+function updatePersonalWalletDisplay() {
+    const container = document.querySelector('.personal-wallet-container');
+    if (!container || !currentUser) return;
+
+    const user = ADMIN_USERS[currentUser.code] || dynamicModerators[currentUser.code];
+    if (!user) return;
+
+    const balance = user.wallet || 0;
+    const earnings = user.earnings || [];
+    const totalEarned = earnings.reduce((sum, earning) => sum + (earning.amount > 0 ? earning.amount : 0), 0);
+    const recentChange = earnings.length > 0 ? earnings[earnings.length - 1].amount : 0;
+
+    container.innerHTML = `
+        <div class="personal-wallet-card">
+            <div class="wallet-header">
+                <div class="user-info-large">
+                    <div class="user-avatar-large">${user.name.charAt(0).toUpperCase()}</div>
+                    <div class="user-details">
+                        <div class="user-name-large">${user.name}</div>
+                        <div class="user-role-large">${user.role}</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="wallet-balance-large">
+                <div class="balance-main">
+                    <div class="balance-label">Solde actuel</div>
+                    <div class="balance-amount-large">$${balance.toFixed(2)}</div>
+                </div>
+                <div class="balance-stats">
+                    <div class="stat-item">
+                        <div class="stat-label">Total gagné</div>
+                        <div class="stat-value">$${totalEarned.toFixed(2)}</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Dernier changement</div>
+                        <div class="stat-value ${recentChange >= 0 ? 'positive' : 'negative'}">
+                            ${recentChange >= 0 ? '+' : ''}$${recentChange.toFixed(2)}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="wallet-actions-large">
+                <div class="quick-actions">
+                    <button class="quick-btn" onclick="requestBonus(10)">+10 💰</button>
+                    <button class="quick-btn" onclick="requestBonus(25)">+25 💰</button>
+                    <button class="quick-btn" onclick="requestBonus(50)">+50 💰</button>
+                </div>
+                <div class="earnings-history">
+                    <h4>Historique des gains</h4>
+                    <div class="earnings-list">
+                        ${earnings.length > 0 ?
+                            earnings.slice(-5).reverse().map(earning => `
+                                <div class="earning-item ${earning.type}">
+                                    <div class="earning-date">${new Date(earning.date).toLocaleDateString()}</div>
+                                    <div class="earning-amount ${earning.amount >= 0 ? 'positive' : 'negative'}">
+                                        ${earning.amount >= 0 ? '+' : ''}$${earning.amount.toFixed(2)}
+                                    </div>
+                                    <div class="earning-type">${earning.type === 'bonus' ? 'Bonus' : earning.type === 'deduction' ? 'Déduction' : earning.type}</div>
+                                    <div class="earning-desc">${earning.description || ''}</div>
+                                </div>
+                            `).join('') :
+                            '<div class="no-earnings">Aucun gain enregistré</div>'
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// Fonction pour demander un bonus (notification à l'admin)
+function requestBonus(amount) {
+    if (!currentUser) return;
+
+    // Créer une notification pour les admins
+    const notification = {
+        type: 'bonus_request',
+        user: currentUser.code,
+        userName: currentUser.name,
+        amount: amount,
+        date: new Date().toISOString(),
+        status: 'pending'
+    };
+
+    // Sauvegarder dans Firebase
+    database.ref('notifications').push(notification);
+
+    alert(`✅ Demande de bonus de $${amount} envoyée aux administrateurs !\n\nVotre demande sera traitée sous peu.`);
+
+    // Actualiser l'affichage
+    updatePersonalWalletDisplay();
 }
 
 // Mise à jour des métriques financières
@@ -3681,6 +3831,40 @@ function resetFinancialData() {
     saveFinancialData();
     updateFinancialDashboard();
     alert('✅ Données financières réinitialisées');
+}
+
+function resetAllFinancialData() {
+    if (!hasPermission(currentUser, 'finance')) {
+        alert('❌ Accès refusé : Vous n\'avez pas la permission de gérer les finances');
+        return;
+    }
+
+    if (!confirm('🚨 ATTENTION CRITIQUE 🚨\n\nCette action va SUPPRIMER DÉFINITIVEMENT :\n• Tous les revenus\n• Toutes les dépenses\n• Toutes les transactions\n• Tous les budgets\n• Toutes les données financières\n\nCette action est IRRÉVERSIBLE et ne peut pas être annulée.\n\nÊtes-vous ABSOLUMENT sûr de vouloir continuer ?')) {
+        return;
+    }
+
+    if (!confirm('🔥 DERNIER AVERTISSEMENT 🔥\n\nTapez "OUI" pour confirmer la suppression totale :')) {
+        return;
+    }
+
+    // Réinitialiser complètement les données financières
+    financialData = {
+        revenue: { streaming: 0, donations: 0, ads: 0, total: 0 },
+        expenses: { server: 0, marketing: 0, staff: 0, other: 0, total: 0 },
+        transactions: [],
+        budgets: [],
+        wallets: []
+    };
+
+    // Sauvegarder dans Firebase
+    database.ref('finance').set(financialData).then(() => {
+        updateFinancialDashboard();
+        alert('💥 RÉINITIALISATION TOTALE TERMINÉE\n\nToutes les données financières ont été supprimées définitivement.');
+        console.log('💥 Données financières complètement réinitialisées');
+    }).catch((error) => {
+        console.error('❌ Erreur lors de la réinitialisation:', error);
+        alert('❌ Erreur lors de la réinitialisation des données');
+    });
 }
 
 // Initialisation lors du chargement de la page admin

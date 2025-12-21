@@ -185,6 +185,13 @@
                                 <button class="action-btn danger" onclick="resetFinancialData()">🔄 Réinitialiser</button>
                             </div>
                         </div>
+
+                        <div class="action-card">
+                            <h4>⚠️ Actions Dangereuses</h4>
+                            <div class="action-buttons">
+                                <button class="action-btn danger" onclick="if(confirm('ATTENTION: Cette action va supprimer TOUTES les données financières (revenus, dépenses, transactions, budgets). Cette action est IRRÉVERSIBLE. Êtes-vous sûr ?')) resetAllFinancialData()">💥 RESET TOTAL</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
