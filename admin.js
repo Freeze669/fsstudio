@@ -364,6 +364,31 @@ let scriptProcessor = null;
 
 // Vérifier si déjà connecté
 function checkAuth() {
+    // Charger les modérateurs dynamiques depuis Firebase d'abord
+    if (typeof firebase !== 'undefined' && firebase.apps.length > 0) {
+        database.ref('admin/moderators').once('value', (snapshot) => {
+            const firebaseModerators = snapshot.val() || {};
+            // Fusionner avec les modérateurs locaux
+            dynamicModerators = { ...dynamicModerators, ...firebaseModerators };
+            localStorage.setItem('dynamicModerators', JSON.stringify(dynamicModerators));
+            console.log('✅ Modérateurs chargés depuis Firebase:', Object.keys(dynamicModerators).length);
+            
+            // Maintenant vérifier l'authentification
+            performAuthCheck();
+        }).catch((error) => {
+            console.error('❌ Erreur chargement modérateurs:', error);
+            // En cas d'erreur, utiliser seulement les modérateurs locaux
+            performAuthCheck();
+        });
+    } else {
+        // Firebase pas disponible, utiliser seulement localStorage
+        console.warn('⚠️ Firebase non disponible, utilisation des modérateurs locaux seulement');
+        performAuthCheck();
+    }
+}
+
+// Fonction séparée pour vérifier l'authentification
+function performAuthCheck() {
     const savedAuth = localStorage.getItem('adminAuth');
     if (savedAuth) {
         // Vérifier d'abord les utilisateurs statiques
@@ -591,6 +616,29 @@ function showAdmin() {
             updateUptime();
         }
     }, 1000);
+    
+    // Recharger les modérateurs depuis Firebase toutes les 60 secondes pour rester synchronisé
+    setInterval(() => {
+        if (isAuthenticated && typeof firebase !== 'undefined' && firebase.apps.length > 0) {
+            database.ref('admin/moderators').once('value', (snapshot) => {
+                const firebaseModerators = snapshot.val() || {};
+                const oldCount = Object.keys(dynamicModerators).length;
+                dynamicModerators = { ...dynamicModerators, ...firebaseModerators };
+                localStorage.setItem('dynamicModerators', JSON.stringify(dynamicModerators));
+                
+                const newCount = Object.keys(dynamicModerators).length;
+                if (newCount !== oldCount) {
+                    console.log('🔄 Modérateurs synchronisés:', newCount, 'modérateurs');
+                    // Rafraîchir l'affichage si nécessaire
+                    if (currentUser && currentUser.role === 'directeur_general') {
+                        displayModerators();
+                    }
+                }
+            }).catch((error) => {
+                console.error('❌ Erreur synchronisation modérateurs:', error);
+            });
+        }
+    }, 60000);
 }
 
 // Initialiser le panneau de contrôle audio
@@ -676,6 +724,24 @@ function setupAudioControls() {
 loginBtn.addEventListener('click', () => {
     const code = adminCodeInput.value.trim();
     
+    // Recharger les modérateurs depuis Firebase avant de vérifier
+    if (typeof firebase !== 'undefined' && firebase.apps.length > 0) {
+        database.ref('admin/moderators').once('value', (snapshot) => {
+            const firebaseModerators = snapshot.val() || {};
+            dynamicModerators = { ...dynamicModerators, ...firebaseModerators };
+            localStorage.setItem('dynamicModerators', JSON.stringify(dynamicModerators));
+            performLogin(code);
+        }).catch((error) => {
+            console.error('❌ Erreur rechargement modérateurs:', error);
+            performLogin(code); // Continuer avec les modérateurs locaux
+        });
+    } else {
+        performLogin(code);
+    }
+});
+
+// Fonction séparée pour effectuer la connexion
+function performLogin(code) {
     // Vérifier d'abord les utilisateurs statiques
     let user = ADMIN_USERS[code];
     
@@ -695,7 +761,7 @@ loginBtn.addEventListener('click', () => {
         errorMessage.style.display = 'block';
         adminCodeInput.value = '';
     }
-});
+}
 
 // Déconnexion
 logoutBtn.addEventListener('click', () => {
