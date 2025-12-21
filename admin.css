@@ -1009,6 +1009,30 @@ body {
     .audio-actions .action-btn {
         width: 100%;
     }
+
+    .voice-controls {
+        flex-direction: column;
+    }
+
+    .voice-btn {
+        width: 100%;
+        min-width: auto;
+    }
+
+    .permissions-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .moderator-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+
+    .moderator-actions {
+        width: 100%;
+        justify-content: flex-end;
+    }
 }
 .audio-control-panel {
     display: flex;
@@ -1877,5 +1901,181 @@ body {
 .audio-actions .action-btn {
     flex: 1;
     min-width: 120px;
+}
+
+/* Styles pour les contrôles radio/streaming */
+.voice-controls {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+.voice-btn {
+    flex: 1;
+    min-width: 150px;
+    padding: 12px 20px;
+    background: rgba(67, 181, 129, 0.2);
+    border: 1px solid rgba(67, 181, 129, 0.3);
+    border-radius: 8px;
+    color: #43b581;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.voice-btn:hover {
+    background: rgba(67, 181, 129, 0.3);
+    transform: translateY(-2px);
+}
+
+.voice-info {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+.audio-level-bar {
+    width: 100px;
+    height: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.audio-level-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #43b581, #28a745);
+    width: 0%;
+    transition: width 0.1s;
+}
+
+.stream-stats {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 12px;
+    padding: 16px;
+}
+
+.stat-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.stat-item:last-child {
+    border-bottom: none;
+}
+
+.stat-label {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 13px;
+}
+
+.stat-value {
+    color: rgba(255, 255, 255, 0.9);
+    font-weight: 600;
+    font-size: 13px;
+}
+
+/* Styles pour la gestion des modérateurs */
+.moderator-form {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.moderator-form .form-group {
+    margin-bottom: 16px;
+}
+
+.moderator-form .form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.moderator-form input {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.3);
+    color: white;
+    font-size: 14px;
+}
+
+.permissions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 12px;
+}
+
+.permissions-grid label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.permissions-grid input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: #43b581;
+}
+
+.moderators-list h3 {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 16px;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.moderator-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    margin-bottom: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.moderator-info {
+    color: rgba(255, 255, 255, 0.9);
+    font-weight: 500;
+}
+
+.moderator-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.moderator-actions button {
+    padding: 6px 12px;
+    border: none;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.moderator-actions .edit-btn {
+    background: rgba(255, 193, 7, 0.2);
+    color: #ffc107;
+    border: 1px solid rgba(255, 193, 7, 0.3);
+}
+
+.moderator-actions .delete-btn {
+    background: rgba(220, 53, 69, 0.2);
+    color: #dc3545;
+    border: 1px solid rgba(220, 53, 69, 0.3);
 }
 

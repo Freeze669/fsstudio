@@ -126,6 +126,46 @@
                     </div>
                 </div>
 
+                <!-- Section Création de Modérateurs (Directeur Général seulement) -->
+                <div class="admin-section" id="createModeratorSection" style="display: none;">
+                    <div class="section-header">
+                        <h2>👑 Gestion des Modérateurs</h2>
+                    </div>
+
+                    <div class="moderator-form">
+                        <div class="form-group">
+                            <label>Nom du modérateur:</label>
+                            <input type="text" id="moderatorName" placeholder="Ex: John Doe">
+                        </div>
+                        <div class="form-group">
+                            <label>Label d'affichage:</label>
+                            <input type="text" id="moderatorDisplayLabel" placeholder="Ex: STAFF" value="STAFF">
+                        </div>
+                        <div class="form-group">
+                            <label>Code d'accès (6 caractères minimum):</label>
+                            <input type="text" id="moderatorCode" placeholder="Ex: MOD2024">
+                        </div>
+                        <div class="form-group">
+                            <label>Permissions:</label>
+                            <div class="permissions-grid">
+                                <label><input type="checkbox" id="permBroadcast" checked> Diffusion</label>
+                                <label><input type="checkbox" id="permChat" checked> Chat</label>
+                                <label><input type="checkbox" id="permFinance" checked> Finance</label>
+                            </div>
+                        </div>
+                        <button class="action-btn primary" id="createModeratorBtn">➕ Créer Modérateur</button>
+                    </div>
+
+                    <div class="moderators-list">
+                        <h3>Modérateurs Actifs</h3>
+                        <div id="moderatorsListContainer">
+                            <div class="moderator-item">
+                                <span class="moderator-info">Chargement...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Section État du Serveur -->
                 <div class="admin-section">
                     <div class="section-header">
@@ -345,6 +385,52 @@
                 </div>
 
                 <!-- Section Radio / Streaming -->
+                <div class="admin-section">
+                    <div class="section-header">
+                        <h2>🎙️ Radio / Streaming</h2>
+                        <div class="radio-status" id="radioStatus">
+                            <span class="status-indicator" id="radioStatusIndicator"></span>
+                            <span id="radioStatusText">Hors ligne</span>
+                        </div>
+                    </div>
+
+                    <!-- Contrôles de diffusion vocale -->
+                    <div class="voice-controls">
+                        <button class="voice-btn" id="startVoiceBtn">🎤 Démarrer la diffusion vocale</button>
+                        <button class="voice-btn" id="stopVoiceBtn" style="display: none;">⏹️ Arrêter la diffusion</button>
+                    </div>
+
+                    <div class="voice-info" id="voiceInfo" style="display: none;">
+                        <div class="info-item">
+                            <span class="info-label">Statut:</span>
+                            <span class="info-value" id="voiceStatusText">Initialisation...</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Niveau audio:</span>
+                            <span class="info-value">
+                                <div class="audio-level-bar">
+                                    <div class="audio-level-fill" id="audioLevel"></div>
+                                </div>
+                            </span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Auditeurs:</span>
+                            <span class="info-value" id="listenersCount">0</span>
+                        </div>
+                    </div>
+
+                    <!-- Statistiques du stream -->
+                    <div class="stream-stats" id="streamStats" style="display: none;">
+                        <div class="stat-item">
+                            <span class="stat-label">Chunks envoyés:</span>
+                            <span class="stat-value" id="chunksSent">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Dernier envoi:</span>
+                            <span class="stat-value" id="lastSent">-</span>
+                        </div>
+                    </div>
+                </div>
                 <div class="admin-section">
                     <div class="section-header">
                         <h2>🎙️ Radio / Streaming</h2>
