@@ -1712,7 +1712,14 @@ if (typeof firebase !== 'undefined' && firebase.apps.length > 0) {
 
 // Fonction pour charger les informations de diffusion
 function loadBroadcastInfo() {
-    if (typeof database === 'undefined') return;
+    console.log('🔄 Chargement des informations de diffusion...');
+    console.log('📊 Éléments trouvés - scheduleDayEl:', !!scheduleDayEl, 'scheduleTimeEl:', !!scheduleTimeEl);
+    console.log('📞 Éléments contact trouvés:', contactValueEls ? contactValueEls.length : 'null');
+    
+    if (typeof database === 'undefined') {
+        console.warn('❌ Database non disponible');
+        return;
+    }
     
     // Charger les horaires et écouter les changements
     database.ref(FIREBASE_BROADCAST_INFO_PATH + '/schedule').on('value', (snapshot) => {
@@ -1724,13 +1731,29 @@ function loadBroadcastInfo() {
     });
     
     // Charger les contacts et écouter les changements
-    database.ref(FIREBASE_BROADCAST_INFO_PATH + '/contact').on('value', (snapshot) => {
+    // D'abord charger les données actuelles
+    database.ref(FIREBASE_BROADCAST_INFO_PATH + '/contact').once('value', (snapshot) => {
         const contact = snapshot.val();
-        if (contact && contactValueEls.length >= 4) {
+        console.log('📞 Chargement initial des contacts:', contact);
+        if (contact && contactValueEls && contactValueEls.length >= 4) {
             contactValueEls[0].textContent = contact.email || 'contact@fsstudio.com';
             contactValueEls[1].textContent = contact.website || 'www.fsstudio.com';
             contactValueEls[2].textContent = contact.phone || '+33 1 23 45 67 89';
             contactValueEls[3].textContent = contact.address || '123 Rue de la Radio, 75001 Paris, France';
+            console.log('✅ Contacts chargés initialement');
+        }
+    });
+    
+    // Puis écouter les changements
+    database.ref(FIREBASE_BROADCAST_INFO_PATH + '/contact').on('value', (snapshot) => {
+        const contact = snapshot.val();
+        console.log('📞 Mise à jour des contacts (changement):', contact);
+        if (contact && contactValueEls && contactValueEls.length >= 4) {
+            contactValueEls[0].textContent = contact.email || 'contact@fsstudio.com';
+            contactValueEls[1].textContent = contact.website || 'www.fsstudio.com';
+            contactValueEls[2].textContent = contact.phone || '+33 1 23 45 67 89';
+            contactValueEls[3].textContent = contact.address || '123 Rue de la Radio, 75001 Paris, France';
+            console.log('✅ Contacts mis à jour sur le site');
         }
     });
 }

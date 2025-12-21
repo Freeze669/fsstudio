@@ -2087,8 +2087,11 @@ function saveContactInfo() {
         updatedAt: new Date().toISOString()
     };
     
+    console.log('💾 Sauvegarde des contacts:', contactData);
+    
     database.ref(FIREBASE_BROADCAST_INFO_PATH + '/contact').set(contactData)
         .then(() => {
+            console.log('✅ Contacts sauvegardés dans Firebase');
             alert('✅ Informations de contact sauvegardées !');
             loadBroadcastInfo(); // Recharger pour mettre à jour l'affichage
         })
