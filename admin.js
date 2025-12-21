@@ -364,14 +364,19 @@ let scriptProcessor = null;
 
 // Vérifier si déjà connecté
 function checkAuth() {
+    console.log('🔐 Vérification de l\'authentification...');
+    
     // Charger les modérateurs dynamiques depuis Firebase d'abord
-    if (typeof firebase !== 'undefined' && firebase.apps.length > 0) {
+    if (typeof firebase !== 'undefined' && firebase.apps.length > 0 && typeof database !== 'undefined') {
+        console.log('🔄 Chargement des modérateurs depuis Firebase...');
         database.ref('admin/moderators').once('value', (snapshot) => {
             const firebaseModerators = snapshot.val() || {};
+            console.log('📋 Modérateurs trouvés dans Firebase:', Object.keys(firebaseModerators));
+            
             // Fusionner avec les modérateurs locaux
             dynamicModerators = { ...dynamicModerators, ...firebaseModerators };
             localStorage.setItem('dynamicModerators', JSON.stringify(dynamicModerators));
-            console.log('✅ Modérateurs chargés depuis Firebase:', Object.keys(dynamicModerators).length);
+            console.log('✅ Modérateurs chargés et fusionnés:', Object.keys(dynamicModerators).length, 'modérateurs');
             
             // Maintenant vérifier l'authentification
             performAuthCheck();
@@ -381,8 +386,8 @@ function checkAuth() {
             performAuthCheck();
         });
     } else {
-        // Firebase pas disponible, utiliser seulement localStorage
         console.warn('⚠️ Firebase non disponible, utilisation des modérateurs locaux seulement');
+        console.log('📋 Modérateurs locaux:', Object.keys(dynamicModerators));
         performAuthCheck();
     }
 }
@@ -390,22 +395,37 @@ function checkAuth() {
 // Fonction séparée pour vérifier l'authentification
 function performAuthCheck() {
     const savedAuth = localStorage.getItem('adminAuth');
+    console.log('🔑 Code sauvegardé dans localStorage:', savedAuth);
+    
     if (savedAuth) {
         // Vérifier d'abord les utilisateurs statiques
         let user = ADMIN_USERS[savedAuth];
+        console.log('👑 Vérification utilisateurs statiques:', user ? 'Trouvé' : 'Non trouvé');
         
         // Si pas trouvé, vérifier les modérateurs dynamiques
         if (!user) {
             user = dynamicModerators[savedAuth];
+            console.log('👥 Vérification modérateurs dynamiques:', user ? 'Trouvé' : 'Non trouvé');
+            if (user) {
+                console.log('✅ Utilisateur modérateur trouvé:', user.name, '- Rôle:', user.role);
+            }
+        } else {
+            console.log('✅ Utilisateur statique trouvé:', user.name, '- Rôle:', user.role);
         }
         
         if (user) {
             currentUser = user;
             isAuthenticated = true;
+            console.log('🎉 Authentification réussie pour:', user.name);
             showAdmin();
             return;
+        } else {
+            console.log('❌ Aucun utilisateur trouvé pour le code:', savedAuth);
         }
+    } else {
+        console.log('📝 Aucun code sauvegardé trouvé');
     }
+    console.log('🔒 Affichage de l\'écran de connexion');
     showLogin();
 }
 
@@ -742,12 +762,17 @@ loginBtn.addEventListener('click', () => {
 
 // Fonction séparée pour effectuer la connexion
 function performLogin(code) {
+    console.log('🔐 Tentative de connexion avec le code:', code);
+    console.log('📋 Modérateurs disponibles:', Object.keys(dynamicModerators));
+    
     // Vérifier d'abord les utilisateurs statiques
     let user = ADMIN_USERS[code];
+    console.log('👑 Vérification utilisateurs statiques:', user ? 'Trouvé (' + user.name + ')' : 'Non trouvé');
     
     // Si pas trouvé, vérifier les modérateurs dynamiques
     if (!user) {
         user = dynamicModerators[code];
+        console.log('👥 Vérification modérateurs dynamiques:', user ? 'Trouvé (' + user.name + ')' : 'Non trouvé');
     }
     
     if (user) {
@@ -755,8 +780,10 @@ function performLogin(code) {
         adminCodeInput.value = '';
         errorMessage.style.display = 'none';
         currentUser = user;
+        console.log('✅ Connexion réussie pour:', user.name, '- Rôle:', user.role);
         showAdmin();
     } else {
+        console.log('❌ Code incorrect:', code);
         errorMessage.textContent = 'Code incorrect';
         errorMessage.style.display = 'block';
         adminCodeInput.value = '';
