@@ -415,6 +415,7 @@ function switchTab(tabId) {
     // Masquer tous les contenus
     tabContents.forEach(content => {
         content.classList.remove('active');
+        content.style.display = 'none';
     });
     
     // Désactiver tous les boutons
@@ -428,6 +429,8 @@ function switchTab(tabId) {
     
     if (selectedTab) {
         selectedTab.classList.add('active');
+        selectedTab.style.display = 'block';
+        selectedTab.classList.add('active');
     }
     if (selectedBtn) {
         selectedBtn.classList.add('active');
@@ -438,7 +441,11 @@ function switchTab(tabId) {
     
     // Charger le contenu spécifique à l'onglet
     if (tabId === 'finance') {
-        loadFinances();
+        if (hasPermission(currentUser, 'finance')) {
+            loadFinances();
+        }
+    } else if (tabId === 'member-wallet-view') {
+        updateMemberWalletDisplay();
     }
 }
 
@@ -750,6 +757,29 @@ function showAdmin() {
     if (!hasPermission(currentUser, 'chat')) {
         const chatTab = document.querySelector('[data-tab="chat"]');
         if (chatTab) chatTab.style.display = 'none';
+    }
+    
+    // Masquer l'onglet Finance pour les utilisateurs sans permission finance
+    if (!hasPermission(currentUser, 'finance')) {
+        const financeTab = document.querySelector('[data-tab="finance"]');
+        if (financeTab) financeTab.style.display = 'none';
+        
+        // Masquer aussi le bouton de l'onglet Finance
+        const financeTabBtn = document.querySelector('.tab-btn[data-tab="finance"]');
+        if (financeTabBtn) financeTabBtn.style.display = 'none';
+    } else {
+        // Si l'utilisateur a la permission finance, initialiser les données financières
+        initializeFinancialData();
+    }
+    
+    // Afficher la vue membre simple pour les utilisateurs sans permission finance
+    if (!hasPermission(currentUser, 'finance') && currentUser) {
+        showMemberWalletView();
+    }
+    
+    // Mettre à jour le wallet du membre si nécessaire
+    if (currentUser) {
+        updateMemberWalletDisplay();
     }
     
     // Masquer la section de création de modérateurs si pas directeur_general
@@ -2981,8 +3011,46 @@ function saveFinancialData() {
     database.ref('finance').set(financialData);
 }
 
+// Recalculer les totaux financiers depuis les transactions
+function recalculateFinancialTotals() {
+    // Réinitialiser les totaux
+    financialData.revenue = { streaming: 0, donations: 0, ads: 0, total: 0 };
+    financialData.expenses = { server: 0, marketing: 0, staff: 0, other: 0, total: 0 };
+    
+    // Recalculer depuis les transactions
+    financialData.transactions.forEach(transaction => {
+        if (transaction.type === 'revenue') {
+            if (transaction.category === 'streaming') {
+                financialData.revenue.streaming += transaction.amount;
+            } else if (transaction.category === 'donations') {
+                financialData.revenue.donations += transaction.amount;
+            } else if (transaction.category === 'ads') {
+                financialData.revenue.ads += transaction.amount;
+            }
+            financialData.revenue.total += transaction.amount;
+        } else if (transaction.type === 'expense') {
+            if (transaction.category === 'server') {
+                financialData.expenses.server += transaction.amount;
+            } else if (transaction.category === 'marketing') {
+                financialData.expenses.marketing += transaction.amount;
+            } else if (transaction.category === 'staff') {
+                financialData.expenses.staff += transaction.amount;
+            } else {
+                financialData.expenses.other += transaction.amount;
+            }
+            financialData.expenses.total += transaction.amount;
+        }
+    });
+}
+
 // Mise à jour du tableau de bord financier
 function updateFinancialDashboard() {
+    if (!currentUser || !hasPermission(currentUser, 'finance')) {
+        // Si l'utilisateur n'a pas la permission finance, mettre à jour uniquement sa vue membre
+        updateMemberWalletDisplay();
+        return;
+    }
+    
     updateFinancialMetrics();
     updateCharts();
     updateTransactionsTable();
@@ -2992,14 +3060,22 @@ function updateFinancialDashboard() {
 
 // Mise à jour des métriques financières
 function updateFinancialMetrics() {
+    // Recalculer les totaux depuis les transactions si nécessaire
+    recalculateFinancialTotals();
+    
     const profit = financialData.revenue.total - financialData.expenses.total;
     const roi = financialData.expenses.total > 0 ? ((profit / financialData.expenses.total) * 100) : 0;
 
     // Mise à jour des cartes de métriques
-    document.querySelector('.metric-card.revenue .metric-value').textContent = `$${financialData.revenue.total.toFixed(2)}`;
-    document.querySelector('.metric-card.expenses .metric-value').textContent = `$${financialData.expenses.total.toFixed(2)}`;
-    document.querySelector('.metric-card.profit .metric-value').textContent = `$${profit.toFixed(2)}`;
-    document.querySelector('.metric-card.roi .metric-value').textContent = `${roi.toFixed(1)}%`;
+    const revenueCard = document.querySelector('.metric-card.revenue .metric-value');
+    const expensesCard = document.querySelector('.metric-card.expenses .metric-value');
+    const profitCard = document.querySelector('.metric-card.profit .metric-value');
+    const roiCard = document.querySelector('.metric-card.roi .metric-value');
+    
+    if (revenueCard) revenueCard.textContent = `$${financialData.revenue.total.toFixed(2)}`;
+    if (expensesCard) expensesCard.textContent = `$${financialData.expenses.total.toFixed(2)}`;
+    if (profitCard) profitCard.textContent = `$${profit.toFixed(2)}`;
+    if (roiCard) roiCard.textContent = `${roi.toFixed(1)}%`;
 
     // Calcul des changements (simulation basée sur les 30 derniers jours)
     const thirtyDaysAgo = new Date();
@@ -3265,16 +3341,47 @@ function addRevenue(amount, source, description) {
 }
 
 function addExpense(amount, category, description) {
+    if (!hasPermission(currentUser, 'finance')) {
+        alert('❌ Accès refusé : Vous n\'avez pas la permission de gérer les finances');
+        return;
+    }
+    
+    const amountValue = parseFloat(amount);
+    if (isNaN(amountValue) || amountValue <= 0) {
+        alert('❌ Montant invalide');
+        return;
+    }
+    
     const transaction = {
         id: Date.now(),
         type: 'expense',
-        amount: parseFloat(amount),
+        amount: amountValue,
         category: category,
-        description: description,
+        description: description || 'Dépense',
         date: new Date().toISOString()
     };
 
     financialData.transactions.push(transaction);
+    
+    // Mettre à jour les dépenses par catégorie
+    if (category === 'server') {
+        financialData.expenses.server += amountValue;
+    } else if (category === 'marketing') {
+        financialData.expenses.marketing += amountValue;
+    } else if (category === 'staff') {
+        financialData.expenses.staff += amountValue;
+    } else {
+        financialData.expenses.other += amountValue;
+    }
+    
+    // Recalculer le total des dépenses
+    financialData.expenses.total = financialData.expenses.server + financialData.expenses.marketing + financialData.expenses.staff + financialData.expenses.other;
+    
+    saveFinancialData();
+    updateFinancialDashboard();
+    
+    console.log('✅ Dépense ajoutée:', transaction);
+}
     financialData.expenses[category] += transaction.amount;
     financialData.expenses.total += transaction.amount;
 
@@ -3338,6 +3445,68 @@ function adjustWallet(userCode, amount) {
     }
 
     updateWalletsDisplay();
+}
+
+// Fonction pour afficher la vue membre simple (wallet uniquement)
+function showMemberWalletView() {
+    if (!currentUser) return;
+    
+    // Afficher la vue membre et masquer l'onglet Finance
+    const memberView = document.getElementById('member-wallet-view');
+    const financeTab = document.querySelector('[data-tab="finance"]');
+    
+    if (memberView) {
+        memberView.style.display = 'block';
+        // Ajouter un onglet pour la vue membre si nécessaire
+        const tabNav = document.querySelector('.tab-navigation');
+        if (tabNav && !document.querySelector('[data-tab="member-wallet-view"]')) {
+            const memberTabBtn = document.createElement('button');
+            memberTabBtn.className = 'tab-btn';
+            memberTabBtn.setAttribute('data-tab', 'member-wallet-view');
+            memberTabBtn.textContent = '💰 Mon Portefeuille';
+            memberTabBtn.addEventListener('click', () => switchTab('member-wallet-view'));
+            tabNav.appendChild(memberTabBtn);
+        }
+    }
+    
+    // Mettre à jour le wallet du membre
+    updateMemberWalletDisplay();
+}
+
+// Fonction pour mettre à jour l'affichage du wallet du membre
+function updateMemberWalletDisplay() {
+    if (!currentUser) return;
+    
+    const walletAmount = document.getElementById('memberWalletAmount');
+    const walletGoal = document.getElementById('memberWalletGoal');
+    const walletEarnings = document.getElementById('memberWalletEarnings');
+    
+    const wallet = currentUser.wallet || 0;
+    const goal = currentUser.goal || 0;
+    const earnings = currentUser.earnings || [];
+    
+    if (walletAmount) {
+        walletAmount.textContent = wallet.toFixed(2) + '€';
+    }
+    
+    if (walletGoal) {
+        walletGoal.textContent = `Objectif: ${goal}€`;
+    }
+    
+    if (walletEarnings) {
+        if (earnings.length === 0) {
+            walletEarnings.innerHTML = '<div class="no-earnings">Aucun gain enregistré</div>';
+        } else {
+            const recentEarnings = earnings.slice(-5).reverse(); // Les 5 derniers
+            walletEarnings.innerHTML = recentEarnings.map(earning => `
+                <div class="earning-item">
+                    <div class="earning-date">${formatDate(earning.date || new Date().toISOString())}</div>
+                    <div class="earning-description">${earning.description || 'Gain'}</div>
+                    <div class="earning-amount">+${earning.amount.toFixed(2)}€</div>
+                </div>
+            `).join('');
+        }
+    }
 }
 
 function viewWalletHistory(userCode) {

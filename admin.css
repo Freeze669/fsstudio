@@ -2122,6 +2122,110 @@ body.admin-active {
     border-bottom: none;
 }
 
+/* Vue Membre Simple (Wallet uniquement) */
+.member-wallet-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.wallet-display-card {
+    background: linear-gradient(135deg, rgba(67, 181, 129, 0.2) 0%, rgba(67, 181, 129, 0.1) 100%);
+    border-radius: 16px;
+    padding: 30px;
+    margin-bottom: 30px;
+    border: 1px solid rgba(67, 181, 129, 0.3);
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.wallet-icon {
+    font-size: 48px;
+    opacity: 0.8;
+}
+
+.wallet-info {
+    flex: 1;
+}
+
+.wallet-label {
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.7);
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.wallet-amount {
+    font-size: 36px;
+    font-weight: 700;
+    color: #43b581;
+    margin-bottom: 8px;
+}
+
+.wallet-goal {
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.wallet-earnings-section {
+    background: rgba(30, 30, 30, 0.95);
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.wallet-earnings-section h3 {
+    font-size: 18px;
+    margin-bottom: 15px;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.wallet-earnings-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.no-earnings {
+    text-align: center;
+    padding: 30px;
+    color: rgba(255, 255, 255, 0.5);
+    font-style: italic;
+}
+
+.earning-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 8px;
+    border-left: 3px solid #43b581;
+}
+
+.earning-date {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.6);
+    min-width: 100px;
+}
+
+.earning-description {
+    flex: 1;
+    margin: 0 15px;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.earning-amount {
+    font-size: 16px;
+    font-weight: 600;
+    color: #43b581;
+    min-width: 80px;
+    text-align: right;
+}
+
 .earning-amount {
     color: #28a745;
     font-weight: 600;
