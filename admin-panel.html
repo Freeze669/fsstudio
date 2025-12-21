@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel Admin - FS STUDIO</title>
+    <link rel="stylesheet" href="admin.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="admin-active">
+    <!-- Interface Admin -->
+    <div class="admin-container" id="adminContainer">
+        <header class="admin-header">
+            <div class="admin-title">
+                <h1>⚙️ Administration FS STUDIO</h1>
+                <span class="admin-badge" id="userInfo">ADMIN</span>
+            </div>
+            <button class="logout-btn" id="logoutBtn">Déconnexion</button>
+        </header>
+
+        <div class="admin-content">
+            <!-- Navigation par onglets -->
+            <div class="tab-navigation">
+                <button class="tab-btn active" data-tab="site-info">📊 Informations du Site</button>
+                <button class="tab-btn" data-tab="broadcasting">📡 Diffusion</button>
+                <button class="tab-btn" data-tab="chat">💬 Chat</button>
+                <button class="tab-btn" data-tab="finance">💰 Finance</button>
+            </div>
+
+            <!-- Onglet Informations du Site -->
+            <div class="tab-content active" id="site-info">
+                <!-- Section Statistiques étendues -->
+                <div class="admin-section">
+                    <div class="section-header">
+                        <h2>📊 Statistiques du Site</h2>
+                        <div class="real-time-indicator">
+                            <span class="pulse-dot"></span>
+                            <span>Temps réel</span>
+                        </div>
+                    </div>
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-icon">💬</div>
+                            <div class="stat-info">
+                                <div class="stat-number" id="totalMessages">0</div>
+                                <div class="stat-label">Messages totaux</div>
+                                <div class="stat-change" id="messagesChange">+0 aujourd'hui</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">👥</div>
+                            <div class="stat-info">
+                                <div class="stat-number" id="totalUsers">0</div>
+                                <div class="stat-label">Utilisateurs uniques</div>
+                                <div class="stat-change" id="usersChange">+0 aujourd'hui</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">🎙️</div>
+                            <div class="stat-info">
+                                <div class="stat-number" id="listenersCount">0</div>
+                                <div class="stat-label">Auditeurs actifs</div>
+                                <div class="stat-percentage" id="listenersPercentage">0%</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">🟢</div>
+                            <div class="stat-info">
+                                <div class="stat-number" id="onlineUsers">0</div>
+                                <div class="stat-label">Utilisateurs en ligne</div>
+                                <div class="stat-percentage" id="onlinePercentage">0%</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">⏱️</div>
+                            <div class="stat-info">
+                                <div class="stat-number" id="uptime">00:00:00</div>
+                                <div class="stat-label">Temps de fonctionnement</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">📈</div>
+                            <div class="stat-info">
+                                <div class="stat-number" id="engagementRate">0%</div>
+                                <div class="stat-label">Taux d'engagement</div>
+                                <div class="stat-change" id="engagementChange">+0%</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Graphiques et métriques avancées -->
+                    <div class="advanced-metrics">
+                        <div class="metric-row">
+                            <div class="metric-item">
+                                <h4>Activité par heure</h4>
+                                <div class="activity-chart" id="activityChart">
+                                    <div class="chart-placeholder">Chargement des données...</div>
+                                </div>
+                            </div>
+                            <div class="metric-item">
+                                <h4>Top messages</h4>
+                                <div class="top-messages" id="topMessages">
+                                    <div class="message-item">
+                                        <span class="message-text">Aucun message récent</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section Gestion des Modérateurs (Directeur Général seulement) -->
+                <div class="admin-section" id="createModeratorSection" style="display: none;">
+                    <div class="section-header">
+                        <h2>👑 Gestion des Modérateurs</h2>
+                        <p style="font-size: 12px; color: rgba(255,255,255,0.6); margin: 0;">Créer et gérer les comptes modérateurs</p>
+                    </div>
+
+                    <!-- Création de modérateur -->
+                    <div class="send-message-form">
+                        <div class="form-group">
+                            <label>Nom du modérateur:</label>
+                            <input type="text" id="moderatorName" placeholder="Ex: Modérateur Chat" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; font-size: 14px;">
+                        </div>
+                        <div class="form-group">
+                            <label>Label affiché (dans les parenthèses):</label>
+                            <input type="text" id="moderatorDisplayLabel" placeholder="Ex: STAFF, MOD, ADMIN..." value="STAFF" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; font-size: 14px;">
+                        </div>
+                        <div class="form-group">
+                            <label>Code d'accès (auto-généré):</label>
+                            <input type="text" id="moderatorCode" placeholder="Généré automatiquement" readonly style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.5); color: rgba(255,255,255,0.7); font-size: 14px;">
+                        </div>
+                        <div class="form-group">
+                            <label>Permissions:</label>
+                            <div style="display: flex; gap: 15px; margin-top: 5px;">
+                                <label style="display: flex; align-items: center; gap: 5px; color: rgba(255,255,255,0.8);">
+                                    <input type="checkbox" id="moderatorChatPermission" checked> 💬 Chat
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 5px; color: rgba(255,255,255,0.8);">
+                                    <input type="checkbox" id="moderatorBroadcastPermission"> 📡 Diffusion
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 5px; color: rgba(255,255,255,0.8);">
+                                    <input type="checkbox" id="moderatorFinancePermission"> 💰 Finance
+                                </label>
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button class="send-btn" id="generateCodeBtn">🎲 Générer Code</button>
+                            <button class="send-btn" id="createModeratorBtn">✅ Créer Modérateur</button>
+                        </div>
+                        <p style="margin-top: 10px; font-size: 12px; color: rgba(255,255,255,0.6);">
+                            ⚠️ Le code généré sera le mot de passe du modérateur. Notez-le bien !
+                        </p>
+                    </div>
+
+                    <!-- Liste des modérateurs -->
+                    <div class="moderator-list" id="moderatorList" style="margin-top: 20px;">
+                        <!-- Les modérateurs seront affichés ici -->
+                    </div>
+                </div>
+
+                <!-- Section État du Serveur -->
+                <div class="admin-section">
+                    <div class="section-header">
+                        <h2>🖥️ État du Serveur</h2>
+                    </div>
+                    <div class="server-status">
+                        <div class="status-item">
+                            <span class="status-label">WebSocket:</span>
+                            <span class="status-value" id="websocketStatus">🔄 Connexion...</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">Firebase:</span>
+                            <span class="status-value" id="firebaseStatus">🔄 Connexion...</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">Streaming:</span>
+                            <span class="status-value" id="streamingStatus">⏸️ Arrêté</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">Dernière activité:</span>
+                            <span class="status-value" id="lastActivity">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section Programmation et Contact -->
+                <div class="admin-section">
+                    <div class="section-header">
+                        <h2>📅 Programmation & Contact</h2>
+                    </div>
+
+                    <!-- Horaires de diffusion -->
+                    <div class="schedule-section">
+                        <h3>Horaires de Diffusion</h3>
+                        <div class="schedule-editor">
+                            <div class="form-group">
+                                <label>Jour:</label>
+                                <select id="scheduleDay">
+                                    <option value="Tous les jours">Tous les jours</option>
+                                    <option value="Lundi">Lundi</option>
+                                    <option value="Mardi">Mardi</option>
+                                    <option value="Mercredi">Mercredi</option>
+                                    <option value="Jeudi">Jeudi</option>
+                                    <option value="Vendredi">Vendredi</option>
+                                    <option value="Samedi">Samedi</option>
+                                    <option value="Dimanche">Dimanche</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Heure de début:</label>
+                                <input type="time" id="scheduleStart" value="14:00">
+                            </div>
+                            <div class="form-group">
+                                <label>Heure de fin:</label>
+                                <input type="time" id="scheduleEnd" value="16:00">
+                            </div>
+                            <div class="form-actions">
+                                <button class="save-btn" id="saveScheduleBtn">💾 Sauvegarder Horaires</button>
+                            </div>
+                        </div>
+                        <div class="schedule-display">
+                            <div class="schedule-item">
+                                <span class="schedule-day" id="currentScheduleDay">Tous les jours</span>
+                                <span class="schedule-time" id="currentScheduleTime">14h00 - 16h00</span>
+                                <span class="schedule-status">🟢 Actif</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Informations de contact -->
+                    <div class="contact-section">
+                        <h3>Informations de Contact</h3>
+                        <div class="contact-form">
+                            <div class="form-group">
+                                <label>Email:</label>
+                                <input type="email" id="contactEmail" value="contact@fsstudio.com">
+                            </div>
+                            <div class="form-group">
+                                <label>Site web:</label>
+                                <input type="url" id="contactWebsite" value="www.fsstudio.com">
+                            </div>
+                            <div class="form-group">
+                                <label>Téléphone:</label>
+                                <input type="tel" id="contactPhone" value="+33 1 23 45 67 89">
+                            </div>
+                            <div class="form-group">
+                                <label>Adresse:</label>
+                                <textarea id="contactAddress" rows="2">123 Rue de la Radio, 75001 Paris, France</textarea>
+                            </div>
+                            <div class="form-actions">
+                                <button class="save-btn" id="saveContactBtn">💾 Sauvegarder Contact</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Statistiques de diffusion -->
+                    <div class="broadcast-stats">
+                        <h3>Statistiques de Diffusion</h3>
+                        <div class="stats-grid">
+                            <div class="stat-card">
+                                <div class="stat-icon">⏰</div>
+                                <div class="stat-info">
+                                    <div class="stat-number" id="broadcastHours">2h</div>
+                                    <div class="stat-label">Durée quotidienne</div>
+                                </div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-icon">📊</div>
+                                <div class="stat-info">
+                                    <div class="stat-number" id="broadcastDays">7/7</div>
+                                    <div class="stat-label">Jours par semaine</div>
+                                </div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-icon">🎯</div>
+                                <div class="stat-info">
+                                    <div class="stat-number" id="broadcastReach">0</div>
+                                    <div class="stat-label">Audience cumulée</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Onglet Diffusion -->
+            <div class="tab-content" id="broadcasting">
+                <!-- Contenu de diffusion (identique à admin.html) -->
+                <div class="admin-section">
+                    <div class="section-header">
+                        <h2>📡 Configuration Stream Audio</h2>
+                    </div>
+                    <div class="send-message-form">
+                        <div class="form-group">
+                            <label>URL du Stream Audio:</label>
+                            <input type="text" id="streamUrlInput" placeholder="https://..." style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; font-size: 14px;">
+                        </div>
+                        <div class="form-actions">
+                            <button class="send-btn" id="saveStreamUrlBtn">💾 Enregistrer l'URL</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section Radio / Streaming -->
+                <div class="admin-section">
+                    <div class="section-header">
+                        <h2>🎙️ Radio / Streaming</h2>
+                        <div class="radio-status" id="radioStatus">
+                            <span class="status-indicator" id="radioStatusIndicator"></span>
+                            <span id="radioStatusText">Hors ligne</span>
+                        </div>
+                    </div>
+
+                    <div class="voice-controls">
+                        <button class="voice-btn" id="startVoiceBtn">🎤 Démarrer la diffusion vocale</button>
+                        <button class="voice-btn" id="stopVoiceBtn" style="display: none;">⏹️ Arrêter la diffusion</button>
+                    </div>
+
+                    <div class="voice-info" id="voiceInfo" style="display: none;">
+                        <div class="info-item">
+                            <span class="info-label">Statut:</span>
+                            <span class="info-value" id="voiceStatusText">Initialisation...</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Niveau audio:</span>
+                            <span class="info-value">
+                                <div class="audio-level-bar">
+                                    <div class="audio-level-fill" id="audioLevel"></div>
+                                </div>
+                            </span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Auditeurs:</span>
+                            <span class="info-value" id="listenersCount">0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Onglet Chat -->
+            <div class="tab-content" id="chat">
+                <div class="admin-section">
+                    <div class="section-header">
+                        <h2>💬 Gestion du Chat</h2>
+                        <div class="online-stats">
+                            <span class="stat-item">
+                                <span class="stat-label">En ligne:</span>
+                                <span class="stat-value" id="adminOnlineCount">0</span>
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="chat-admin-container">
+                        <div class="chat-messages-admin" id="chatMessagesAdmin">
+                            <div class="loading-message">Chargement des messages...</div>
+                        </div>
+                    </div>
+
+                    <div class="admin-actions">
+                        <button class="action-btn danger" id="clearAllBtn">🗑️ Supprimer tous les messages</button>
+                        <button class="action-btn" id="refreshBtn">🔄 Actualiser</button>
+                    </div>
+                </div>
+
+                <div class="admin-section">
+                    <div class="section-header">
+                        <h2>📢 Envoyer un message</h2>
+                    </div>
+                    <div class="send-message-form">
+                        <div class="form-group">
+                            <label>Nom d'affichage:</label>
+                            <input type="text" id="adminUsername" value="Admin FS Studio" maxlength="20">
+                        </div>
+                        <div class="form-group">
+                            <label>Message:</label>
+                            <textarea id="adminMessage" placeholder="Tapez votre message..." maxlength="500" rows="3"></textarea>
+                        </div>
+                        <div class="form-actions">
+                            <button class="send-btn" id="adminSendBtn">📤 Envoyer</button>
+                            <span class="char-count"><span id="charCount">0</span>/500</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Onglet Finance -->
+            <div class="tab-content" id="finance">
+                <div class="finance-dashboard">
+                    <div class="finance-metrics-grid">
+                        <div class="metric-card revenue">
+                            <div class="metric-icon">💰</div>
+                            <div class="metric-content">
+                                <div class="metric-value">$0.00</div>
+                                <div class="metric-label">Revenus totaux</div>
+                                <div class="metric-change">+0.00 (30j)</div>
+                            </div>
+                        </div>
+                        <div class="metric-card expenses">
+                            <div class="metric-icon">💸</div>
+                            <div class="metric-content">
+                                <div class="metric-value">$0.00</div>
+                                <div class="metric-label">Dépenses totales</div>
+                                <div class="metric-change">+0.00 (30j)</div>
+                            </div>
+                        </div>
+                        <div class="metric-card profit">
+                            <div class="metric-icon">📈</div>
+                            <div class="metric-content">
+                                <div class="metric-value">$0.00</div>
+                                <div class="metric-label">Bénéfice net</div>
+                                <div class="metric-change">+0.00 (30j)</div>
+                            </div>
+                        </div>
+                        <div class="metric-card roi">
+                            <div class="metric-icon">🎯</div>
+                            <div class="metric-content">
+                                <div class="metric-value">0.0%</div>
+                                <div class="metric-label">ROI</div>
+                                <div class="metric-change">+0.0% (30j)</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    
+    <!-- Configuration Firebase -->
+    <script src="firebase-config.js"></script>
+    
+    <!-- Mediasoup Client -->
+    <script src="mediasoup-client-admin.js"></script>
+    
+    <!-- Panneau de contrôle audio -->
+    <script src="audio-control-panel.js"></script>
+    
+    <!-- Script Admin -->
+    <script src="admin.js"></script>
+</body>
+</html>
+

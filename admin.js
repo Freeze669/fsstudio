@@ -653,47 +653,15 @@ function performAuthCheck() {
         }
     }
     
-    // Pas de session valide, afficher l'écran de connexion
-    showLogin();
+    // Pas de session valide, rediriger vers la page de connexion
+    console.log('⚠️ Aucune session valide, redirection vers login.html');
+    window.location.href = 'login.html';
 }
 
 // Afficher l'écran de connexion
 function showLogin() {
-    // Afficher l'écran de connexion
-    if (loginScreen) {
-        loginScreen.style.display = 'flex';
-        loginScreen.style.visibility = 'visible';
-        loginScreen.style.opacity = '1';
-        loginScreen.style.pointerEvents = 'auto';
-        loginScreen.style.position = 'fixed';
-        loginScreen.style.zIndex = '99999';
-    }
-    
-    // Masquer complètement l'interface admin
-    if (adminContainer) {
-        adminContainer.style.display = 'none';
-        adminContainer.style.visibility = 'hidden';
-        adminContainer.style.opacity = '0';
-    }
-    
-    // Changer la classe du body
-    document.body.classList.remove('admin-active');
-    document.body.classList.add('login-active');
-    
-    isAuthenticated = false;
-    
-    // Réinitialiser le champ de code
-    if (adminCodeInput) {
-        adminCodeInput.value = '';
-        setTimeout(() => {
-            adminCodeInput.focus();
-        }, 100);
-    }
-    
-    // Masquer les erreurs
-    if (loginError) {
-        loginError.style.display = 'none';
-    }
+    // Rediriger vers la page de connexion
+    window.location.href = 'login.html';
 }
 
 // Fonction pour déconnecter tous les membres/utilisateurs
@@ -751,16 +719,6 @@ function disconnectAllMembers() {
 
 // Afficher l'interface admin
 function showAdmin() {
-    // Masquer complètement l'écran de connexion
-    if (loginScreen) {
-        loginScreen.style.display = 'none';
-        loginScreen.style.visibility = 'hidden';
-        loginScreen.style.opacity = '0';
-        loginScreen.style.pointerEvents = 'none';
-        loginScreen.style.position = 'fixed';
-        loginScreen.style.zIndex = '-1';
-    }
-    
     // Afficher l'interface admin
     if (adminContainer) {
         adminContainer.style.display = 'block';
@@ -1507,7 +1465,8 @@ function performAutoLogin() {
 if (logoutBtn) {
     logoutBtn.addEventListener('click', () => {
         localStorage.removeItem('adminAuth');
-        showLogin();
+        // Rediriger vers la page de connexion
+        window.location.href = 'login.html';
     });
 }
 
