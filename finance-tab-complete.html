@@ -1,0 +1,182 @@
+        <!-- Onglet Finance -->
+        <div class="tab-content" id="finance">
+            <div class="finance-dashboard">
+                <!-- Métriques financières principales -->
+                <div class="finance-metrics-grid">
+                    <div class="metric-card revenue">
+                        <div class="metric-icon">💰</div>
+                        <div class="metric-content">
+                            <div class="metric-value">$0.00</div>
+                            <div class="metric-label">Revenus totaux</div>
+                            <div class="metric-change">+0.00 (30j)</div>
+                        </div>
+                    </div>
+
+                    <div class="metric-card expenses">
+                        <div class="metric-icon">💸</div>
+                        <div class="metric-content">
+                            <div class="metric-value">$0.00</div>
+                            <div class="metric-label">Dépenses totales</div>
+                            <div class="metric-change">+0.00 (30j)</div>
+                        </div>
+                    </div>
+
+                    <div class="metric-card profit">
+                        <div class="metric-icon">📈</div>
+                        <div class="metric-content">
+                            <div class="metric-value">$0.00</div>
+                            <div class="metric-label">Bénéfice net</div>
+                            <div class="metric-change">+0.00 (30j)</div>
+                        </div>
+                    </div>
+
+                    <div class="metric-card roi">
+                        <div class="metric-icon">🎯</div>
+                        <div class="metric-content">
+                            <div class="metric-value">0.0%</div>
+                            <div class="metric-label">ROI</div>
+                            <div class="metric-change">+0.0% (30j)</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Graphiques financiers -->
+                <div class="finance-charts">
+                    <div class="chart-container">
+                        <h3>📊 Revenus par Source</h3>
+                        <div class="chart-placeholder">
+                            <div class="chart-bar" data-value="$0.00" style="height: 20%"></div>
+                            <div class="chart-bar" data-value="$0.00" style="height: 40%"></div>
+                            <div class="chart-bar" data-value="$0.00" style="height: 60%"></div>
+                        </div>
+                    </div>
+
+                    <div class="chart-container">
+                        <h3>📈 Répartition des Dépenses</h3>
+                        <div class="pie-chart">
+                            <div class="pie-center">
+                                <div class="pie-value">$0.00</div>
+                                <div class="pie-label">Total</div>
+                            </div>
+                        </div>
+                        <div class="pie-legend">
+                            <div class="legend-item">
+                                <div class="legend-color server"></div>
+                                <div class="legend-label">Serveur</div>
+                                <div class="legend-value">$0.00 (0.0%)</div>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-color marketing"></div>
+                                <div class="legend-label">Marketing</div>
+                                <div class="legend-value">$0.00 (0.0%)</div>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-color staff"></div>
+                                <div class="legend-label">Staff</div>
+                                <div class="legend-value">$0.00 (0.0%)</div>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-color other"></div>
+                                <div class="legend-label">Autre</div>
+                                <div class="legend-value">$0.00 (0.0%)</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section Transactions -->
+                <div class="transactions-section">
+                    <div class="section-header">
+                        <h3>📋 Historique des Transactions</h3>
+                        <div class="transaction-filters">
+                            <select id="transaction-type-filter" class="filter-select">
+                                <option value="all">Toutes les transactions</option>
+                                <option value="revenue">Revenus</option>
+                                <option value="expense">Dépenses</option>
+                                <option value="transfer">Transferts</option>
+                            </select>
+                            <select id="transaction-sort" class="sort-select">
+                                <option value="date-desc">Plus récent</option>
+                                <option value="date-asc">Plus ancien</option>
+                                <option value="amount-desc">Montant ↓</option>
+                                <option value="amount-asc">Montant ↑</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="transactions-table">
+                        <div class="transaction-header">
+                            <div class="transaction-col">Date</div>
+                            <div class="transaction-col">Type</div>
+                            <div class="transaction-col">Description</div>
+                            <div class="transaction-col">Montant</div>
+                            <div class="transaction-col">Catégorie</div>
+                        </div>
+                        <div class="transaction-body">
+                            <div class="transaction-row empty">Aucune transaction trouvée</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section Budgets -->
+                <div class="budget-section">
+                    <div class="section-header">
+                        <h3>🎯 Gestion des Budgets</h3>
+                        <button class="action-btn primary" onclick="createBudget('Nouveau Budget', 100)">➕ Nouveau Budget</button>
+                    </div>
+
+                    <div class="budgets-grid">
+                        <!-- Les budgets seront ajoutés dynamiquement -->
+                    </div>
+                </div>
+
+                <!-- Section Portefeuilles -->
+                <div class="wallets-section">
+                    <div class="section-header">
+                        <h3>👥 Gestion des Portefeuilles</h3>
+                        <div class="wallets-controls">
+                            <div class="search-filter">
+                                <input type="text" id="wallet-search" placeholder="Rechercher un utilisateur..." class="search-input">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="wallets-list">
+                        <!-- Les portefeuilles seront ajoutés dynamiquement -->
+                    </div>
+                </div>
+
+                <!-- Actions Administratives Financières -->
+                <div class="admin-financial-actions">
+                    <div class="section-header">
+                        <h3>⚙️ Actions Administratives</h3>
+                    </div>
+
+                    <div class="admin-actions-grid">
+                        <div class="action-card">
+                            <h4>💰 Gestion des Revenus</h4>
+                            <div class="action-buttons">
+                                <button class="action-btn success" onclick="addRevenue(prompt('Montant:'), 'streaming', prompt('Description:'))">➕ Ajouter Revenus</button>
+                                <button class="action-btn info" onclick="generateFinancialReport()">📊 Rapport</button>
+                            </div>
+                        </div>
+
+                        <div class="action-card">
+                            <h4>💸 Gestion des Dépenses</h4>
+                            <div class="action-buttons">
+                                <button class="action-btn warning" onclick="addExpense(prompt('Montant:'), 'server', prompt('Description:'))">➖ Ajouter Dépenses</button>
+                                <button class="action-btn secondary" onclick="createBudget(prompt('Catégorie:'), prompt('Limite:'))">🎯 Créer Budget</button>
+                            </div>
+                        </div>
+
+                        <div class="action-card">
+                            <h4>📊 Export & Sauvegarde</h4>
+                            <div class="action-buttons">
+                                <button class="action-btn primary" onclick="exportFinancialData()">💾 Exporter</button>
+                                <button class="action-btn danger" onclick="resetFinancialData()">🔄 Réinitialiser</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>

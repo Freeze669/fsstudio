@@ -822,53 +822,452 @@
 
         <!-- Onglet Finance -->
         <div class="tab-content" id="finance">
-            <!-- Section Gestion des Finances -->
-            <div class="admin-section">
-                <div class="section-header">
-                    <h2>💰 Gestion des Finances</h2>
-                    <div class="online-stats">
-                        <span class="stat-item">
-                            <span class="stat-label">Total Portefeuilles:</span>
-                            <span class="stat-value" id="totalWallets">0</span>
-                        </span>
-                        <span class="stat-item">
-                            <span class="stat-label">Total Fonds:</span>
-                            <span class="stat-value" id="totalFunds">0€</span>
-                        </span>
+            <div class="finance-dashboard">
+                <!-- Métriques financières principales -->
+                <div class="finance-metrics-grid">
+                    <div class="metric-card revenue">
+                        <div class="metric-icon">💰</div>
+                        <div class="metric-content">
+                            <div class="metric-value">$0.00</div>
+                            <div class="metric-label">Revenus totaux</div>
+                            <div class="metric-change">+0.00 (30j)</div>
+                        </div>
+                    </div>
+
+                    <div class="metric-card expenses">
+                        <div class="metric-icon">💸</div>
+                        <div class="metric-content">
+                            <div class="metric-value">$0.00</div>
+                            <div class="metric-label">Dépenses totales</div>
+                            <div class="metric-change">+0.00 (30j)</div>
+                        </div>
+                    </div>
+
+                    <div class="metric-card profit">
+                        <div class="metric-icon">📈</div>
+                        <div class="metric-content">
+                            <div class="metric-value">$0.00</div>
+                            <div class="metric-label">Bénéfice net</div>
+                            <div class="metric-change">+0.00 (30j)</div>
+                        </div>
+                    </div>
+
+                    <div class="metric-card roi">
+                        <div class="metric-icon">🎯</div>
+                        <div class="metric-content">
+                            <div class="metric-value">0.0%</div>
+                            <div class="metric-label">ROI</div>
+                            <div class="metric-change">+0.0% (30j)</div>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Statistiques globales -->
-                <div class="finance-stats">
-                    <div class="stat-circle" id="fundsDistribution">
-                        <div class="circle-content">
-                            <div class="circle-value" id="distributionPercent">0%</div>
-                            <div class="circle-label">Répartition</div>
+                <!-- Graphiques financiers -->
+                <div class="finance-charts">
+                    <div class="chart-container">
+                        <h3>📊 Revenus par Source</h3>
+                        <div class="chart-placeholder">
+                            <div class="chart-bar" data-value="$0.00" style="height: 20%"></div>
+                            <div class="chart-bar" data-value="$0.00" style="height: 40%"></div>
+                            <div class="chart-bar" data-value="$0.00" style="height: 60%"></div>
                         </div>
                     </div>
-                    <div class="stat-circle" id="averageWallet">
-                        <div class="circle-content">
-                            <div class="circle-value" id="averageAmount">0€</div>
-                            <div class="circle-label">Moyenne</div>
+
+                    <div class="chart-container">
+                        <h3>📈 Répartition des Dépenses</h3>
+                        <div class="pie-chart">
+                            <div class="pie-center">
+                                <div class="pie-value">$0.00</div>
+                                <div class="pie-label">Total</div>
+                            </div>
                         </div>
-                    </div>
-                    <div class="stat-circle" id="topEarner">
-                        <div class="circle-content">
-                            <div class="circle-value" id="topEarnerName">-</div>
-                            <div class="circle-label">Top</div>
+                        <div class="pie-legend">
+                            <div class="legend-item">
+                                <div class="legend-color server"></div>
+                                <div class="legend-label">Serveur</div>
+                                <div class="legend-value">$0.00 (0.0%)</div>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-color marketing"></div>
+                                <div class="legend-label">Marketing</div>
+                                <div class="legend-value">$0.00 (0.0%)</div>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-color staff"></div>
+                                <div class="legend-label">Staff</div>
+                                <div class="legend-value">$0.00 (0.0%)</div>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-color other"></div>
+                                <div class="legend-label">Autre</div>
+                                <div class="legend-value">$0.00 (0.0%)</div>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Liste des portefeuilles -->
-                <div class="finance-list" id="financeList">
-                    <div class="loading-message">Chargement des finances...</div>
+                <!-- Section Transactions -->
+                <div class="transactions-section">
+                    <div class="section-header">
+                        <h3>📋 Historique des Transactions</h3>
+                        <div class="transaction-filters">
+                            <select id="transaction-type-filter" class="filter-select">
+                                <option value="all">Toutes les transactions</option>
+                                <option value="revenue">Revenus</option>
+                                <option value="expense">Dépenses</option>
+                                <option value="transfer">Transferts</option>
+                            </select>
+                            <select id="transaction-sort" class="sort-select">
+                                <option value="date-desc">Plus récent</option>
+                                <option value="date-asc">Plus ancien</option>
+                                <option value="amount-desc">Montant ↓</option>
+                                <option value="amount-asc">Montant ↑</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="transactions-table">
+                        <div class="transaction-header">
+                            <div class="transaction-col">Date</div>
+                            <div class="transaction-col">Type</div>
+                            <div class="transaction-col">Description</div>
+                            <div class="transaction-col">Montant</div>
+                            <div class="transaction-col">Catégorie</div>
+                        </div>
+                        <div class="transaction-body">
+                            <div class="transaction-row empty">Aucune transaction trouvée</div>
+                        </div>
+                    </div>
                 </div>
 
-                <!-- Actions pour Directeur Général -->
-                <div class="admin-actions" id="financeActions" style="display: none;">
-                    <button class="action-btn" id="addFinanceBtn">➕ Ajouter des fonds</button>
-                    <button class="action-btn danger" id="resetAllWalletsBtn">🔄 Réinitialiser tous les portefeuilles</button>
+                <!-- Section Budgets -->
+                <div class="budget-section">
+                    <div class="section-header">
+                        <h3>🎯 Gestion des Budgets</h3>
+                        <button class="action-btn primary" onclick="createBudget('Nouveau Budget', 100)">➕ Nouveau Budget</button>
+                    </div>
+
+                    <div class="budgets-grid">
+                        <!-- Les budgets seront ajoutés dynamiquement -->
+                    </div>
+                </div>
+
+                <!-- Section Portefeuilles -->
+                <div class="wallets-section">
+                    <div class="section-header">
+                        <h3>👥 Gestion des Portefeuilles</h3>
+                        <div class="wallets-controls">
+                            <div class="search-filter">
+                                <input type="text" id="wallet-search" placeholder="Rechercher un utilisateur..." class="search-input">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="wallets-list">
+                        <!-- Les portefeuilles seront ajoutés dynamiquement -->
+                    </div>
+                </div>
+
+                <!-- Actions Administratives Financières -->
+                <div class="admin-financial-actions">
+                    <div class="section-header">
+                        <h3>⚙️ Actions Administratives</h3>
+                    </div>
+
+                    <div class="admin-actions-grid">
+                        <div class="action-card">
+                            <h4>💰 Gestion des Revenus</h4>
+                            <div class="action-buttons">
+                                <button class="action-btn success" onclick="addRevenue(prompt('Montant:'), 'streaming', prompt('Description:'))">➕ Ajouter Revenus</button>
+                                <button class="action-btn info" onclick="generateFinancialReport()">📊 Rapport</button>
+                            </div>
+                        </div>
+
+                        <div class="action-card">
+                            <h4>💸 Gestion des Dépenses</h4>
+                            <div class="action-buttons">
+                                <button class="action-btn warning" onclick="addExpense(prompt('Montant:'), 'server', prompt('Description:'))">➖ Ajouter Dépenses</button>
+                                <button class="action-btn secondary" onclick="createBudget(prompt('Catégorie:'), prompt('Limite:'))">🎯 Créer Budget</button>
+                            </div>
+                        </div>
+
+                        <div class="action-card">
+                            <h4>📊 Export & Sauvegarde</h4>
+                            <div class="action-buttons">
+                                <button class="action-btn primary" onclick="exportFinancialData()">💾 Exporter</button>
+                                <button class="action-btn danger" onclick="resetFinancialData()">🔄 Réinitialiser</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Onglet Diffusion -->
+            <div class="tab-content" id="broadcasting">
+        </div>
+    </div>
+
+    <!-- Modal d'édition des modérateurs -->
+    <div class="modal" id="editModeratorModal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>✏️ Modifier le Modérateur</h3>
+                <span class="modal-close" id="cancelEditModeratorBtn">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="editModeratorForm">
+                    <div class="form-group">
+                        <label>Nom du modérateur:</label>
+                        <input type="text" id="editModeratorName" placeholder="Nom du modérateur" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; font-size: 14px;">
+                    </div>
+                    <div class="form-group">
+                        <label>Label affiché (dans les parenthèses):</label>
+                        <input type="text" id="editModeratorDisplayLabel" placeholder="Ex: STAFF, MOD, ADMIN..." style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; font-size: 14px;">
+                    </div>
+                    <div class="form-group">
+                        <label>Code d'accès:</label>
+                        <input type="text" id="editModeratorCode" placeholder="Code d'accès" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; font-size: 14px;">
+                    </div>
+                    <div class="form-group">
+                        <label>Permissions:</label>
+                        <div style="display: flex; gap: 15px; margin-top: 5px;">
+                            <label style="display: flex; align-items: center; gap: 5px; color: rgba(255,255,255,0.8);">
+                                <input type="checkbox" id="editChatPermission"> 💬 Chat
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 5px; color: rgba(255,255,255,0.8);">
+                                <input type="checkbox" id="editBroadcastPermission"> 📡 Diffusion
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 5px; color: rgba(255,255,255,0.8);">
+                                <input type="checkbox" id="editFinancePermission"> 💰 Finance
+                            </label>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="cancel-btn" id="cancelEditModeratorBtn">Annuler</button>
+                <button class="save-btn" id="saveEditModeratorBtn">💾 Sauvegarder</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal d'ajout de fonds -->
+    <div class="modal" id="addFinanceModal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>💰 Ajouter des Fonds</h3>
+                <span class="modal-close" id="cancelAddFinanceBtn">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="addFinanceForm">
+                    <div class="form-group">
+                        <label>Sélectionner l'utilisateur:</label>
+                        <select id="financeUserSelect" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; font-size: 14px;">
+                            <option value="">Choisir un utilisateur...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Montant à ajouter (€):</label>
+                        <input type="number" id="financeAmount" placeholder="0.00" min="0" step="0.01" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; font-size: 14px;">
+                    </div>
+                    <div class="form-group">
+                        <label>Description:</label>
+                        <input type="text" id="financeDescription" placeholder="Ex: Salaire mensuel, Bonus..." style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; font-size: 14px;">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="cancel-btn" id="cancelAddFinanceBtn">Annuler</button>
+                <button class="save-btn" id="saveAddFinanceBtn">💰 Ajouter</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    
+    <!-- Configuration Firebase -->
+    <script src="firebase-config.js"></script>
+    
+    <!-- Mediasoup Client -->
+    <script src="mediasoup-client-admin.js"></script>
+    
+    <!-- Panneau de contrôle audio -->
+    <script src="audio-control-panel.js"></script>
+    
+    <!-- Script Admin -->
+    <script src="admin.js"></script>
+</body>
+</html>
+                            </select>
+                            <button class="action-btn secondary" id="exportTransactionsBtn">📄 Exporter</button>
+                        </div>
+                    </div>
+
+                    <div class="transactions-table" id="transactionsTable">
+                        <div class="transaction-header">
+                            <div class="transaction-col date">Date</div>
+                            <div class="transaction-col type">Type</div>
+                            <div class="transaction-col description">Description</div>
+                            <div class="transaction-col amount">Montant</div>
+                            <div class="transaction-col balance">Solde</div>
+                        </div>
+                        <div class="transaction-body" id="transactionBody">
+                            <div class="transaction-row empty">
+                                <div class="transaction-col" colspan="5">Aucune transaction récente</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Gestion des budgets et objectifs -->
+                <div class="budget-section">
+                    <div class="section-header">
+                        <h3>🎯 Budgets et Objectifs</h3>
+                        <button class="action-btn primary" id="addBudgetBtn">➕ Nouveau Budget</button>
+                    </div>
+
+                    <div class="budgets-grid" id="budgetsGrid">
+                        <div class="budget-card">
+                            <div class="budget-header">
+                                <h4>🎵 Production Musicale</h4>
+                                <span class="budget-status on-track">Sur objectif</span>
+                            </div>
+                            <div class="budget-progress">
+                                <div class="progress-bar">
+                                    <div class="progress-fill" style="width: 65%"></div>
+                                </div>
+                                <div class="progress-text">
+                                    <span class="progress-current">650.00€</span>
+                                    <span class="progress-total">1000.00€</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="budget-card">
+                            <div class="budget-header">
+                                <h4>📡 Infrastructure Serveur</h4>
+                                <span class="budget-status over">Dépassement</span>
+                            </div>
+                            <div class="budget-progress">
+                                <div class="progress-bar">
+                                    <div class="progress-fill over" style="width: 110%"></div>
+                                </div>
+                                <div class="progress-text">
+                                    <span class="progress-current">550.00€</span>
+                                    <span class="progress-total">500.00€</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="budget-card">
+                            <div class="budget-header">
+                                <h4>📢 Marketing & Promotion</h4>
+                                <span class="budget-status under">Sous objectif</span>
+                            </div>
+                            <div class="budget-progress">
+                                <div class="progress-bar">
+                                    <div class="progress-fill" style="width: 35%"></div>
+                                </div>
+                                <div class="progress-text">
+                                    <span class="progress-current">175.00€</span>
+                                    <span class="progress-total">500.00€</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Gestion des portefeuilles utilisateurs -->
+                <div class="wallets-section">
+                    <div class="section-header">
+                        <h3>👥 Portefeuilles Utilisateurs</h3>
+                        <div class="wallet-actions">
+                            <button class="action-btn info" id="refreshWalletsBtn">🔄 Actualiser</button>
+                            <button class="action-btn warning" id="bulkTransferBtn">💸 Transfert groupé</button>
+                        </div>
+                    </div>
+
+                    <div class="wallets-controls">
+                        <div class="search-filter">
+                            <input type="text" id="walletSearch" placeholder="Rechercher un utilisateur..." class="search-input">
+                            <select id="walletSort" class="sort-select">
+                                <option value="balance-desc">Solde ↓</option>
+                                <option value="balance-asc">Solde ↑</option>
+                                <option value="name-asc">Nom A-Z</option>
+                                <option value="name-desc">Nom Z-A</option>
+                                <option value="last-activity">Dernière activité</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="wallets-list" id="walletsList">
+                        <div class="wallet-item">
+                            <div class="wallet-user">
+                                <div class="user-avatar">👤</div>
+                                <div class="user-info">
+                                    <div class="user-name">Chargement...</div>
+                                    <div class="user-role">Utilisateur</div>
+                                </div>
+                            </div>
+                            <div class="wallet-balance">
+                                <div class="balance-amount">0.00€</div>
+                                <div class="balance-change">+0.00€</div>
+                            </div>
+                            <div class="wallet-actions">
+                                <button class="wallet-btn edit">✏️</button>
+                                <button class="wallet-btn transfer">💸</button>
+                                <button class="wallet-btn history">📊</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Actions administratives (Directeur Général seulement) -->
+                <div class="admin-financial-actions" id="adminFinancialActions" style="display: none;">
+                    <div class="section-header">
+                        <h3>⚙️ Actions Administratives</h3>
+                    </div>
+
+                    <div class="admin-actions-grid">
+                        <div class="action-card">
+                            <h4>💰 Gestion des Fonds</h4>
+                            <div class="action-buttons">
+                                <button class="action-btn success" id="addFundsBtn">➕ Ajouter des fonds</button>
+                                <button class="action-btn danger" id="removeFundsBtn">➖ Retirer des fonds</button>
+                                <button class="action-btn warning" id="transferFundsBtn">🔄 Transférer</button>
+                            </div>
+                        </div>
+
+                        <div class="action-card">
+                            <h4>📊 Rapports Financiers</h4>
+                            <div class="action-buttons">
+                                <button class="action-btn info" id="generateReportBtn">📄 Générer rapport</button>
+                                <button class="action-btn secondary" id="exportDataBtn">💾 Exporter données</button>
+                                <button class="action-btn primary" id="backupDataBtn">🔒 Sauvegarde</button>
+                            </div>
+                        </div>
+
+                        <div class="action-card">
+                            <h4>🎯 Objectifs & KPIs</h4>
+                            <div class="action-buttons">
+                                <button class="action-btn primary" id="setGoalsBtn">🎯 Définir objectifs</button>
+                                <button class="action-btn info" id="trackKPIsBtn">📈 Suivre KPIs</button>
+                                <button class="action-btn warning" id="alertsBtn">🚨 Alertes</button>
+                            </div>
+                        </div>
+
+                        <div class="action-card">
+                            <h4>🔧 Maintenance</h4>
+                            <div class="action-buttons">
+                                <button class="action-btn danger" id="resetAllBtn">🔄 Réinitialiser tout</button>
+                                <button class="action-btn warning" id="auditBtn">🔍 Audit</button>
+                                <button class="action-btn secondary" id="maintenanceBtn">⚙️ Maintenance</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

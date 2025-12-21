@@ -2803,3 +2803,502 @@ function formatTime(timeString) {
     return `${hours}h${minutes.padStart(2, '0')}`;
 }
 
+// ==========================================
+// GESTION FINANCIÈRE COMPLÈTE
+// ==========================================
+
+// Données financières globales
+let financialData = {
+    revenue: {
+        streaming: 0,
+        donations: 0,
+        ads: 0,
+        total: 0
+    },
+    expenses: {
+        server: 0,
+        marketing: 0,
+        staff: 0,
+        other: 0,
+        total: 0
+    },
+    transactions: [],
+    budgets: [],
+    wallets: []
+};
+
+// Initialisation des données financières
+function initializeFinancialData() {
+    loadFinancialData();
+    setupFinancialEventListeners();
+    updateFinancialDashboard();
+}
+
+// Chargement des données financières depuis Firebase
+function loadFinancialData() {
+    database.ref('finance').once('value', (snapshot) => {
+        const data = snapshot.val() || {};
+        financialData = {
+            revenue: data.revenue || { streaming: 0, donations: 0, ads: 0, total: 0 },
+            expenses: data.expenses || { server: 0, marketing: 0, staff: 0, other: 0, total: 0 },
+            transactions: data.transactions || [],
+            budgets: data.budgets || [],
+            wallets: data.wallets || []
+        };
+        updateFinancialDashboard();
+    });
+}
+
+// Sauvegarde des données financières
+function saveFinancialData() {
+    database.ref('finance').set(financialData);
+}
+
+// Mise à jour du tableau de bord financier
+function updateFinancialDashboard() {
+    updateFinancialMetrics();
+    updateCharts();
+    updateTransactionsTable();
+    updateBudgetsDisplay();
+    updateWalletsDisplay();
+}
+
+// Mise à jour des métriques financières
+function updateFinancialMetrics() {
+    const profit = financialData.revenue.total - financialData.expenses.total;
+    const roi = financialData.expenses.total > 0 ? ((profit / financialData.expenses.total) * 100) : 0;
+
+    // Mise à jour des cartes de métriques
+    document.querySelector('.metric-card.revenue .metric-value').textContent = `$${financialData.revenue.total.toFixed(2)}`;
+    document.querySelector('.metric-card.expenses .metric-value').textContent = `$${financialData.expenses.total.toFixed(2)}`;
+    document.querySelector('.metric-card.profit .metric-value').textContent = `$${profit.toFixed(2)}`;
+    document.querySelector('.metric-card.roi .metric-value').textContent = `${roi.toFixed(1)}%`;
+
+    // Calcul des changements (simulation basée sur les 30 derniers jours)
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const recentTransactions = financialData.transactions.filter(t =>
+        new Date(t.date) > thirtyDaysAgo
+    );
+
+    const recentRevenue = recentTransactions
+        .filter(t => t.type === 'revenue')
+        .reduce((sum, t) => sum + t.amount, 0);
+
+    const recentExpenses = recentTransactions
+        .filter(t => t.type === 'expense')
+        .reduce((sum, t) => sum + t.amount, 0);
+
+    // Affichage des changements
+    updateMetricChange('.metric-card.revenue', recentRevenue);
+    updateMetricChange('.metric-card.expenses', recentExpenses);
+    updateMetricChange('.metric-card.profit', recentRevenue - recentExpenses);
+}
+
+function updateMetricChange(selector, value) {
+    const changeElement = document.querySelector(`${selector} .metric-change`);
+    if (!changeElement) return;
+
+    const isPositive = value >= 0;
+    const sign = isPositive ? '+' : '';
+    const color = isPositive ? '#28a745' : '#dc3545';
+
+    changeElement.textContent = `${sign}$${value.toFixed(2)} (30j)`;
+    changeElement.style.color = color;
+}
+
+// Mise à jour des graphiques
+function updateCharts() {
+    updateRevenueChart();
+    updateExpenseChart();
+}
+
+function updateRevenueChart() {
+    const bars = document.querySelectorAll('.chart-bar');
+    const maxRevenue = Math.max(financialData.revenue.streaming, financialData.revenue.donations, financialData.revenue.ads);
+
+    if (maxRevenue === 0) return;
+
+    const streamingHeight = (financialData.revenue.streaming / maxRevenue) * 100;
+    const donationsHeight = (financialData.revenue.donations / maxRevenue) * 100;
+    const adsHeight = (financialData.revenue.ads / maxRevenue) * 100;
+
+    bars[0].style.height = `${streamingHeight}%`;
+    bars[0].setAttribute('data-value', `$${financialData.revenue.streaming.toFixed(2)}`);
+
+    bars[1].style.height = `${donationsHeight}%`;
+    bars[1].setAttribute('data-value', `$${financialData.revenue.donations.toFixed(2)}`);
+
+    bars[2].style.height = `${adsHeight}%`;
+    bars[2].setAttribute('data-value', `$${financialData.revenue.ads.toFixed(2)}`);
+}
+
+function updateExpenseChart() {
+    const total = financialData.expenses.total;
+    if (total === 0) return;
+
+    const serverPercent = (financialData.expenses.server / total) * 100;
+    const marketingPercent = (financialData.expenses.marketing / total) * 100;
+    const staffPercent = (financialData.expenses.staff / total) * 100;
+    const otherPercent = (financialData.expenses.other / total) * 100;
+
+    // Mise à jour du graphique circulaire (simulation avec CSS)
+    const pieCenter = document.querySelector('.pie-center .pie-value');
+    if (pieCenter) {
+        pieCenter.textContent = `$${total.toFixed(2)}`;
+    }
+
+    // Mise à jour de la légende
+    document.querySelector('.legend-item:nth-child(1) .legend-value').textContent = `$${financialData.expenses.server.toFixed(2)} (${serverPercent.toFixed(1)}%)`;
+    document.querySelector('.legend-item:nth-child(2) .legend-value').textContent = `$${financialData.expenses.marketing.toFixed(2)} (${marketingPercent.toFixed(1)}%)`;
+    document.querySelector('.legend-item:nth-child(3) .legend-value').textContent = `$${financialData.expenses.staff.toFixed(2)} (${staffPercent.toFixed(1)}%)`;
+    document.querySelector('.legend-item:nth-child(4) .legend-value').textContent = `$${financialData.expenses.other.toFixed(2)} (${otherPercent.toFixed(1)}%)`;
+}
+
+// Mise à jour du tableau des transactions
+function updateTransactionsTable() {
+    const tbody = document.querySelector('.transaction-body');
+    if (!tbody) return;
+
+    tbody.innerHTML = '';
+
+    if (financialData.transactions.length === 0) {
+        const emptyRow = document.createElement('div');
+        emptyRow.className = 'transaction-row empty';
+        emptyRow.textContent = 'Aucune transaction trouvée';
+        tbody.appendChild(emptyRow);
+        return;
+    }
+
+    // Tri par date décroissante
+    const sortedTransactions = [...financialData.transactions].sort((a, b) =>
+        new Date(b.date) - new Date(a.date)
+    );
+
+    sortedTransactions.forEach(transaction => {
+        const row = document.createElement('div');
+        row.className = `transaction-row ${transaction.type}`;
+
+        row.innerHTML = `
+            <div class="transaction-date">${formatDate(transaction.date)}</div>
+            <div class="transaction-type">${getTransactionTypeLabel(transaction.type)}</div>
+            <div class="transaction-description">${transaction.description}</div>
+            <div class="transaction-amount">$${transaction.amount.toFixed(2)}</div>
+            <div class="transaction-category">${transaction.category || '-'}</div>
+        `;
+
+        tbody.appendChild(row);
+    });
+}
+
+function formatDate(dateString) {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('fr-FR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+    });
+}
+
+function getTransactionTypeLabel(type) {
+    const labels = {
+        'revenue': 'Revenus',
+        'expense': 'Dépenses',
+        'transfer': 'Transfert'
+    };
+    return labels[type] || type;
+}
+
+// Mise à jour de l'affichage des budgets
+function updateBudgetsDisplay() {
+    const budgetsGrid = document.querySelector('.budgets-grid');
+    if (!budgetsGrid) return;
+
+    budgetsGrid.innerHTML = '';
+
+    if (financialData.budgets.length === 0) {
+        const emptyCard = document.createElement('div');
+        emptyCard.className = 'budget-card';
+        emptyCard.innerHTML = '<p style="text-align: center; color: rgba(255,255,255,0.5);">Aucun budget défini</p>';
+        budgetsGrid.appendChild(emptyCard);
+        return;
+    }
+
+    financialData.budgets.forEach(budget => {
+        const card = document.createElement('div');
+        card.className = 'budget-card';
+
+        const spent = budget.spent || 0;
+        const percentage = budget.limit > 0 ? (spent / budget.limit) * 100 : 0;
+        const status = percentage > 100 ? 'over' : percentage > 80 ? 'under' : 'on-track';
+        const statusLabel = status === 'over' ? 'Dépassé' : status === 'under' ? 'Attention' : 'Dans les clous';
+
+        card.innerHTML = `
+            <div class="budget-header">
+                <h4>${budget.category}</h4>
+                <span class="budget-status ${status}">${statusLabel}</span>
+            </div>
+            <div class="budget-progress">
+                <div class="progress-bar">
+                    <div class="progress-fill ${status === 'over' ? 'over' : ''}" style="width: ${Math.min(percentage, 100)}%"></div>
+                </div>
+                <div class="progress-text">
+                    <span>$${spent.toFixed(2)} dépensé</span>
+                    <span>$${budget.limit.toFixed(2)} limite</span>
+                </div>
+            </div>
+        `;
+
+        budgetsGrid.appendChild(card);
+    });
+}
+
+// Mise à jour de l'affichage des portefeuilles
+function updateWalletsDisplay() {
+    const walletsList = document.querySelector('.wallets-list');
+    if (!walletsList) return;
+
+    const walletsContainer = walletsList.querySelector('.wallets-list') || walletsList;
+    walletsContainer.innerHTML = '';
+
+    // Récupération des utilisateurs admin
+    const allUsers = { ...ADMIN_USERS, ...dynamicModerators };
+
+    Object.entries(allUsers).forEach(([code, user]) => {
+        const walletItem = document.createElement('div');
+        walletItem.className = 'wallet-item';
+
+        const balance = user.wallet || 0;
+        const earnings = user.earnings || [];
+        const recentChange = earnings.length > 0 ?
+            earnings[earnings.length - 1].amount : 0;
+
+        walletItem.innerHTML = `
+            <div class="wallet-user">
+                <div class="user-avatar">${user.name.charAt(0).toUpperCase()}</div>
+                <div class="user-info">
+                    <div class="user-name">${user.name}</div>
+                    <div class="user-role">${user.role}</div>
+                </div>
+            </div>
+            <div class="wallet-balance">
+                <div class="balance-amount">$${balance.toFixed(2)}</div>
+                <div class="balance-change">${recentChange >= 0 ? '+' : ''}$${recentChange.toFixed(2)}</div>
+            </div>
+            <div class="wallet-actions">
+                <button class="wallet-btn" onclick="adjustWallet('${code}', 10)">+10</button>
+                <button class="wallet-btn" onclick="adjustWallet('${code}', -10)">-10</button>
+                <button class="wallet-btn" onclick="viewWalletHistory('${code}')">📊</button>
+            </div>
+        `;
+
+        walletsContainer.appendChild(walletItem);
+    });
+}
+
+// Configuration des écouteurs d'événements financiers
+function setupFinancialEventListeners() {
+    // Filtres de transactions
+    const typeFilter = document.getElementById('transaction-type-filter');
+    const sortSelect = document.getElementById('transaction-sort');
+
+    if (typeFilter) {
+        typeFilter.addEventListener('change', filterTransactions);
+    }
+
+    if (sortSelect) {
+        sortSelect.addEventListener('change', sortTransactions);
+    }
+
+    // Recherche de portefeuilles
+    const searchInput = document.getElementById('wallet-search');
+    if (searchInput) {
+        searchInput.addEventListener('input', filterWallets);
+    }
+}
+
+// Fonctions d'ajout de transactions
+function addRevenue(amount, source, description) {
+    const transaction = {
+        id: Date.now(),
+        type: 'revenue',
+        amount: parseFloat(amount),
+        category: source,
+        description: description,
+        date: new Date().toISOString()
+    };
+
+    financialData.transactions.push(transaction);
+    financialData.revenue[source] += transaction.amount;
+    financialData.revenue.total += transaction.amount;
+
+    saveFinancialData();
+    updateFinancialDashboard();
+}
+
+function addExpense(amount, category, description) {
+    const transaction = {
+        id: Date.now(),
+        type: 'expense',
+        amount: parseFloat(amount),
+        category: category,
+        description: description,
+        date: new Date().toISOString()
+    };
+
+    financialData.transactions.push(transaction);
+    financialData.expenses[category] += transaction.amount;
+    financialData.expenses.total += transaction.amount;
+
+    saveFinancialData();
+    updateFinancialDashboard();
+}
+
+// Gestion des budgets
+function createBudget(category, limit) {
+    const budget = {
+        id: Date.now(),
+        category: category,
+        limit: parseFloat(limit),
+        spent: 0
+    };
+
+    financialData.budgets.push(budget);
+    saveFinancialData();
+    updateBudgetsDisplay();
+}
+
+function updateBudgetSpent(category, amount) {
+    const budget = financialData.budgets.find(b => b.category === category);
+    if (budget) {
+        budget.spent += amount;
+        saveFinancialData();
+        updateBudgetsDisplay();
+    }
+}
+
+// Gestion des portefeuilles
+function adjustWallet(userCode, amount) {
+    if (!hasPermission(currentUser, 'finance')) {
+        alert('❌ Permission insuffisante');
+        return;
+    }
+
+    const user = ADMIN_USERS[userCode] || dynamicModerators[userCode];
+    if (!user) return;
+
+    user.wallet = (user.wallet || 0) + parseFloat(amount);
+
+    // Enregistrement de l'ajustement
+    const earning = {
+        amount: parseFloat(amount),
+        type: amount > 0 ? 'bonus' : 'deduction',
+        date: new Date().toISOString(),
+        description: `Ajustement manuel par ${currentUser.name}`
+    };
+
+    user.earnings = user.earnings || [];
+    user.earnings.push(earning);
+
+    // Sauvegarde
+    if (ADMIN_USERS[userCode]) {
+        // Utilisateur statique
+    } else {
+        dynamicModerators[userCode] = user;
+        localStorage.setItem('dynamicModerators', JSON.stringify(dynamicModerators));
+        database.ref('admin/moderators/' + userCode).set(user);
+    }
+
+    updateWalletsDisplay();
+}
+
+function viewWalletHistory(userCode) {
+    const user = ADMIN_USERS[userCode] || dynamicModerators[userCode];
+    if (!user) return;
+
+    const earnings = user.earnings || [];
+    let history = `Historique du portefeuille de ${user.name}:\n\n`;
+
+    if (earnings.length === 0) {
+        history += 'Aucune transaction trouvée.';
+    } else {
+        earnings.forEach(earning => {
+            const date = new Date(earning.date).toLocaleDateString('fr-FR');
+            history += `${date}: ${earning.amount >= 0 ? '+' : ''}$${earning.amount} (${earning.type}) - ${earning.description}\n`;
+        });
+    }
+
+    alert(history);
+}
+
+// Fonctions de filtrage
+function filterTransactions() {
+    const typeFilter = document.getElementById('transaction-type-filter').value;
+    updateTransactionsTable(); // Re-filtrage sera implémenté avec la logique de filtrage
+}
+
+function sortTransactions() {
+    updateTransactionsTable(); // Re-tri sera implémenté
+}
+
+function filterWallets() {
+    const searchTerm = document.getElementById('wallet-search').value.toLowerCase();
+    updateWalletsDisplay(); // Filtrage sera implémenté
+}
+
+// Actions administratives financières
+function generateFinancialReport() {
+    const report = {
+        period: '30 derniers jours',
+        revenue: financialData.revenue,
+        expenses: financialData.expenses,
+        profit: financialData.revenue.total - financialData.expenses.total,
+        transactions: financialData.transactions.length,
+        generatedAt: new Date().toISOString()
+    };
+
+    console.log('Rapport financier:', report);
+    alert('📊 Rapport financier généré. Consultez la console pour les détails.');
+}
+
+function exportFinancialData() {
+    const dataStr = JSON.stringify(financialData, null, 2);
+    const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+
+    const exportFileDefaultName = `financial-data-${new Date().toISOString().split('T')[0]}.json`;
+
+    const linkElement = document.createElement('a');
+    linkElement.setAttribute('href', dataUri);
+    linkElement.setAttribute('download', exportFileDefaultName);
+    linkElement.click();
+}
+
+function resetFinancialData() {
+    if (!confirm('⚠️ Êtes-vous sûr de vouloir réinitialiser toutes les données financières ? Cette action est irréversible.')) {
+        return;
+    }
+
+    financialData = {
+        revenue: { streaming: 0, donations: 0, ads: 0, total: 0 },
+        expenses: { server: 0, marketing: 0, staff: 0, other: 0, total: 0 },
+        transactions: [],
+        budgets: [],
+        wallets: []
+    };
+
+    saveFinancialData();
+    updateFinancialDashboard();
+    alert('✅ Données financières réinitialisées');
+}
+
+// Initialisation lors du chargement de la page admin
+document.addEventListener('DOMContentLoaded', function() {
+    // ... autres initialisations ...
+
+    // Initialisation des données financières
+    if (document.querySelector('.finance-dashboard')) {
+        initializeFinancialData();
+    }
+});
+
