@@ -1,0 +1,40 @@
+{
+  "rules": {
+    "publicChat": {
+      ".read": true,
+      ".write": true
+    },
+    "radio": {
+      ".read": true,
+      ".write": true,
+      "audioChunks": {
+        ".read": true,
+        ".write": true
+      },
+      "status": {
+        ".read": true,
+        ".write": true
+      },
+      "listeners": {
+        ".read": true,
+        ".write": true
+      }
+    },
+    "broadcast": {
+      ".read": true,
+      ".write": true,
+      "info": {
+        ".read": true,
+        ".write": true,
+        "schedule": {
+          ".read": true,
+          ".write": true
+        },
+        "contact": {
+          ".read": true,
+          ".write": true
+        }
+      }
+    }
+  }
+}

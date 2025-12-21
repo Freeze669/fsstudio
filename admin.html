@@ -36,355 +36,550 @@
         </header>
 
         <div class="admin-content">
-            <!-- Section Chat Management -->
-            <div class="admin-section">
-                <div class="section-header">
-                    <h2>💬 Gestion du Chat</h2>
-                    <div class="online-stats">
-                        <span class="stat-item">
-                            <span class="stat-label">En ligne:</span>
-                            <span class="stat-value" id="adminOnlineCount">0</span>
-                        </span>
+            <!-- Navigation par onglets -->
+            <div class="tab-navigation">
+                <button class="tab-btn active" data-tab="site-info">📊 Informations du Site</button>
+                <button class="tab-btn" data-tab="broadcasting">📡 Diffusion</button>
+                <button class="tab-btn" data-tab="chat">💬 Chat</button>
+            </div>
+
+            <!-- Onglet Informations du Site -->
+            <div class="tab-content active" id="site-info">
+                <!-- Section Statistiques étendues -->
+                <div class="admin-section">
+                    <div class="section-header">
+                        <h2>📊 Statistiques du Site</h2>
+                        <div class="real-time-indicator">
+                            <span class="pulse-dot"></span>
+                            <span>Temps réel</span>
+                        </div>
+                    </div>
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-icon">💬</div>
+                            <div class="stat-info">
+                                <div class="stat-number" id="totalMessages">0</div>
+                                <div class="stat-label">Messages totaux</div>
+                                <div class="stat-change" id="messagesChange">+0 aujourd'hui</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">👥</div>
+                            <div class="stat-info">
+                                <div class="stat-number" id="totalUsers">0</div>
+                                <div class="stat-label">Utilisateurs uniques</div>
+                                <div class="stat-change" id="usersChange">+0 aujourd'hui</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">🎙️</div>
+                            <div class="stat-info">
+                                <div class="stat-number" id="listenersCount">0</div>
+                                <div class="stat-label">Auditeurs actifs</div>
+                                <div class="stat-percentage" id="listenersPercentage">0%</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">🟢</div>
+                            <div class="stat-info">
+                                <div class="stat-number" id="onlineUsers">0</div>
+                                <div class="stat-label">Utilisateurs en ligne</div>
+                                <div class="stat-percentage" id="onlinePercentage">0%</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">⏱️</div>
+                            <div class="stat-info">
+                                <div class="stat-number" id="uptime">00:00:00</div>
+                                <div class="stat-label">Temps de fonctionnement</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">📈</div>
+                            <div class="stat-info">
+                                <div class="stat-number" id="engagementRate">0%</div>
+                                <div class="stat-label">Taux d'engagement</div>
+                                <div class="stat-change" id="engagementChange">+0%</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Graphiques et métriques avancées -->
+                    <div class="advanced-metrics">
+                        <div class="metric-row">
+                            <div class="metric-item">
+                                <h4>Activité par heure</h4>
+                                <div class="activity-chart" id="activityChart">
+                                    <div class="chart-placeholder">Chargement des données...</div>
+                                </div>
+                            </div>
+                            <div class="metric-item">
+                                <h4>Top messages</h4>
+                                <div class="top-messages" id="topMessages">
+                                    <div class="message-item">
+                                        <span class="message-text">Aucun message récent</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Zone de messages avec modération -->
-                <div class="chat-admin-container">
-                    <div class="chat-messages-admin" id="chatMessagesAdmin">
-                        <div class="loading-message">Chargement des messages...</div>
+                <!-- Section État du Serveur -->
+                <div class="admin-section">
+                    <div class="section-header">
+                        <h2>🖥️ État du Serveur</h2>
                     </div>
-                </div>
-
-                <!-- Actions rapides -->
-                <div class="admin-actions">
-                    <button class="action-btn danger" id="clearAllBtn">🗑️ Supprimer tous les messages</button>
-                    <button class="action-btn" id="refreshBtn">🔄 Actualiser</button>
+                    <div class="server-status">
+                        <div class="status-item">
+                            <span class="status-label">WebSocket:</span>
+                            <span class="status-value" id="websocketStatus">🔄 Connexion...</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">Firebase:</span>
+                            <span class="status-value" id="firebaseStatus">🔄 Connexion...</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">Streaming:</span>
+                            <span class="status-value" id="streamingStatus">⏸️ Arrêté</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">Dernière activité:</span>
+                            <span class="status-value" id="lastActivity">-</span>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <!-- Configuration URL Stream -->
-            <div class="admin-section">
-                <div class="section-header">
-                    <h2>📡 Configuration Stream Audio</h2>
-                </div>
-                <div class="send-message-form">
-                    <div class="form-group">
-                        <label>URL du Stream Audio (ex: https://stream.example.com/radio.mp3):</label>
-                        <input type="text" id="streamUrlInput" placeholder="https://..." style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; font-size: 14px;">
+            <!-- Onglet Diffusion -->
+            <div class="tab-content" id="broadcasting">
+                <!-- Configuration URL Stream -->
+                <div class="admin-section">
+                    <div class="section-header">
+                        <h2>📡 Configuration Stream Audio</h2>
                     </div>
-                    <div class="form-actions">
-                        <button class="send-btn" id="saveStreamUrlBtn">💾 Enregistrer l'URL</button>
-                    </div>
-                    <p style="margin-top: 10px; font-size: 12px; color: rgba(255,255,255,0.6);">
-                        ⚠️ Si une URL est configurée, elle sera utilisée au lieu du streaming vocal direct. Laissez vide pour utiliser le streaming vocal.
-                    </p>
-                </div>
-                
-                <!-- Option simple : Fichier MP3 local -->
-                <div class="send-message-form" style="margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 20px;">
-                    <div class="form-group">
-                        <label>🎵 OU : Diffuser un fichier MP3 directement (plus simple !)</label>
-                        <input type="file" id="mp3FileInput" accept="audio/mp3,audio/*" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; font-size: 14px;">
-                        <p style="margin-top: 5px; font-size: 11px; color: rgba(255,255,255,0.5);">
-                            Sélectionnez un fichier MP3 de votre ordinateur. Il sera diffusé automatiquement sur le site !
+                    <div class="send-message-form">
+                        <div class="form-group">
+                            <label>URL du Stream Audio (ex: https://stream.example.com/radio.mp3):</label>
+                            <input type="text" id="streamUrlInput" placeholder="https://..." style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; font-size: 14px;">
+                        </div>
+                        <div class="form-actions">
+                            <button class="send-btn" id="saveStreamUrlBtn">💾 Enregistrer l'URL</button>
+                        </div>
+                        <p style="margin-top: 10px; font-size: 12px; color: rgba(255,255,255,0.6);">
+                            ⚠️ Si une URL est configurée, elle sera utilisée au lieu du streaming vocal direct. Laissez vide pour utiliser le streaming vocal.
                         </p>
                     </div>
-                    <div class="form-actions">
-                        <button class="send-btn" id="startMp3StreamBtn">▶️ Démarrer la diffusion MP3</button>
-                        <button class="send-btn" id="stopMp3StreamBtn" style="display: none; background: #f04747;">⏹️ Arrêter la diffusion</button>
+                    
+                    <!-- Option simple : Fichier MP3 local -->
+                    <div class="send-message-form" style="margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 20px;">
+                        <div class="form-group">
+                            <label>🎵 OU : Diffuser un fichier MP3 directement (plus simple !)</label>
+                            <input type="file" id="mp3FileInput" accept="audio/mp3,audio/*" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; font-size: 14px;">
+                            <p style="margin-top: 5px; font-size: 11px; color: rgba(255,255,255,0.5);">
+                                Sélectionnez un fichier MP3 de votre ordinateur. Il sera diffusé automatiquement sur le site !
+                            </p>
+                        </div>
+                        <div class="form-actions">
+                            <button class="send-btn" id="startMp3StreamBtn">▶️ Démarrer la diffusion MP3</button>
+                            <button class="send-btn" id="stopMp3StreamBtn" style="display: none; background: #f04747;">⏹️ Arrêter la diffusion</button>
+                        </div>
+                        <p id="mp3StreamStatus" style="margin-top: 10px; font-size: 12px; color: rgba(255,255,255,0.6);"></p>
                     </div>
-                    <p id="mp3StreamStatus" style="margin-top: 10px; font-size: 12px; color: rgba(255,255,255,0.6);"></p>
+                </div>
+
+                <!-- Section Radio / Streaming -->
+                <div class="admin-section">
+                    <div class="section-header">
+                        <h2>🎙️ Radio / Streaming</h2>
+                        <div class="radio-status" id="radioStatus">
+                            <span class="status-indicator" id="radioStatusIndicator"></span>
+                            <span id="radioStatusText">Hors ligne</span>
+                        </div>
+                    </div>
+
+                    <!-- Info importante -->
+                    <div class="radio-info-box">
+                        <h4>📢 Diffusion vocale en direct</h4>
+                        <p>Ce système diffuse votre voix directement sur le site, sans serveur externe nécessaire.</p>
+                        <ul>
+                            <li>✅ Aucune configuration requise</li>
+                            <li>✅ Diffusion en temps réel</li>
+                            <li>✅ Accessible à tous les visiteurs</li>
+                            <li>✅ Qualité audio optimisée</li>
+                        </ul>
+                    </div>
+
+                    <!-- Contrôle vocal en direct -->
+                    <div class="voice-control">
+                        <div class="voice-header">
+                            <h3>🎤 Diffusion vocale en direct</h3>
+                        </div>
+                        <div class="voice-controls">
+                            <button class="voice-btn" id="startVoiceBtn">
+                                <span class="voice-icon">🎤</span>
+                                <span>Démarrer la diffusion</span>
+                            </button>
+                            <button class="voice-btn stop" id="stopVoiceBtn" style="display: none;">
+                                <span class="voice-icon">⏹️</span>
+                                <span>Arrêter la diffusion</span>
+                            </button>
+                        </div>
+                        <div class="voice-info" id="voiceInfo" style="display: none;">
+                            <div class="voice-meter">
+                                <div class="meter-label">Niveau audio:</div>
+                                <div class="meter-bar">
+                                    <div class="meter-fill" id="audioLevel"></div>
+                                </div>
+                            </div>
+                            <div class="audio-quality-info">
+                                <div class="quality-badge">🎚️ Normalisation active</div>
+                                <div class="quality-badge">🔇 Suppression de bruit</div>
+                                <div class="quality-badge">🎛️ Compression audio</div>
+                            </div>
+                            <p class="voice-status-text" id="voiceStatusText">En attente de permission microphone...</p>
+                            <div class="stream-stats" id="streamStats" style="display: none;">
+                                <div class="stat-row">
+                                    <span>Chunks envoyés:</span>
+                                    <span id="chunksSent">0</span>
+                                </div>
+                                <div class="stat-row">
+                                    <span>Dernier envoi:</span>
+                                    <span id="lastSent">-</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Instructions -->
+                    <div class="radio-instructions">
+                        <h4>📋 Comment utiliser:</h4>
+                        <ol>
+                            <li>Cliquez sur "Démarrer la diffusion" ci-dessous</li>
+                            <li>Autorisez l'accès au microphone dans votre navigateur</li>
+                            <li>Parlez normalement - votre voix sera diffusée en direct</li>
+                            <li>Les visiteurs du site entendront votre voix en temps réel</li>
+                            <li>Cliquez sur "Arrêter" pour mettre fin à la diffusion</li>
+                        </ol>
+                        <p class="info-note">💡 <strong>Astuce:</strong> Assurez-vous d'avoir un bon micro et un environnement calme pour une meilleure qualité audio.</p>
+                    </div>
+                </div>
+
+                <!-- Section Contrôle Audio en Temps Réel -->
+                <div class="admin-section" id="audioControlSection">
+                    <div class="section-header">
+                        <h2>🎛️ Contrôle Audio en Temps Réel</h2>
+                        <div class="audio-control-actions">
+                            <button class="action-btn" id="resetAudioParamsBtn">🔄 Réinitialiser</button>
+                            <button class="action-btn" id="saveAudioParamsBtn">💾 Sauvegarder</button>
+                        </div>
+                    </div>
+
+                    <div class="audio-control-panel">
+                        <!-- Filtres -->
+                        <div class="audio-control-group">
+                            <h3>🔊 Filtres</h3>
+                            <div class="control-row">
+                                <label>High-Pass (Hz): <span id="audio-highPassFreq-display">50 Hz</span></label>
+                                <input type="range" id="audio-highPassFreq" min="20" max="200" step="1" value="50">
+                            </div>
+                            <div class="control-row">
+                                <label>Low-Pass (Hz): <span id="audio-lowPassFreq-display">15000 Hz</span></label>
+                                <input type="range" id="audio-lowPassFreq" min="5000" max="20000" step="100" value="15000">
+                            </div>
+                        </div>
+
+                        <!-- Pré-emphasis -->
+                        <div class="audio-control-group">
+                            <h3>📈 Pré-emphasis FM</h3>
+                            <div class="control-row">
+                                <label>Gain (dB): <span id="audio-preEmphasisGain-display">+3.0 dB</span></label>
+                                <input type="range" id="audio-preEmphasisGain" min="0" max="10" step="0.1" value="3">
+                            </div>
+                            <div class="control-row">
+                                <label>Fréquence (Hz): <span id="audio-preEmphasisFreq-display">3000 Hz</span></label>
+                                <input type="range" id="audio-preEmphasisFreq" min="1000" max="8000" step="100" value="3000">
+                            </div>
+                        </div>
+
+                        <!-- Égaliseur -->
+                        <div class="audio-control-group">
+                            <h3>🎚️ Égaliseur</h3>
+                            <div class="eq-band">
+                                <h4>Basse (200Hz)</h4>
+                                <div class="control-row">
+                                    <label>Fréquence (Hz): <span id="audio-eqLowFreq-display">200 Hz</span></label>
+                                    <input type="range" id="audio-eqLowFreq" min="50" max="500" step="10" value="200">
+                                </div>
+                                <div class="control-row">
+                                    <label>Gain (dB): <span id="audio-eqLowGain-display">+1.5 dB</span></label>
+                                    <input type="range" id="audio-eqLowGain" min="-10" max="10" step="0.1" value="1.5">
+                                </div>
+                                <div class="control-row">
+                                    <label>Q: <span id="audio-eqLowQ-display">1.00</span></label>
+                                    <input type="range" id="audio-eqLowQ" min="0.1" max="5" step="0.1" value="1.0">
+                                </div>
+                            </div>
+                            <div class="eq-band">
+                                <h4>Médium (2kHz)</h4>
+                                <div class="control-row">
+                                    <label>Fréquence (Hz): <span id="audio-eqMidFreq-display">2000 Hz</span></label>
+                                    <input type="range" id="audio-eqMidFreq" min="500" max="5000" step="50" value="2000">
+                                </div>
+                                <div class="control-row">
+                                    <label>Gain (dB): <span id="audio-eqMidGain-display">+2.5 dB</span></label>
+                                    <input type="range" id="audio-eqMidGain" min="-10" max="10" step="0.1" value="2.5">
+                                </div>
+                                <div class="control-row">
+                                    <label>Q: <span id="audio-eqMidQ-display">1.20</span></label>
+                                    <input type="range" id="audio-eqMidQ" min="0.1" max="5" step="0.1" value="1.2">
+                                </div>
+                            </div>
+                            <div class="eq-band">
+                                <h4>Haute (6kHz)</h4>
+                                <div class="control-row">
+                                    <label>Fréquence (Hz): <span id="audio-eqHighFreq-display">6000 Hz</span></label>
+                                    <input type="range" id="audio-eqHighFreq" min="2000" max="12000" step="100" value="6000">
+                                </div>
+                                <div class="control-row">
+                                    <label>Gain (dB): <span id="audio-eqHighGain-display">+2.0 dB</span></label>
+                                    <input type="range" id="audio-eqHighGain" min="-10" max="10" step="0.1" value="2">
+                                </div>
+                                <div class="control-row">
+                                    <label>Q: <span id="audio-eqHighQ-display">1.00</span></label>
+                                    <input type="range" id="audio-eqHighQ" min="0.1" max="5" step="0.1" value="1.0">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Compresseur -->
+                        <div class="audio-control-group">
+                            <h3>🎚️ Compresseur</h3>
+                            <div class="control-row">
+                                <label>Seuil (dB): <span id="audio-compressorThreshold-display">-18.0 dB</span></label>
+                                <input type="range" id="audio-compressorThreshold" min="-60" max="0" step="1" value="-18">
+                            </div>
+                            <div class="control-row">
+                                <label>Knee (dB): <span id="audio-compressorKnee-display">15.0 dB</span></label>
+                                <input type="range" id="audio-compressorKnee" min="0" max="40" step="1" value="15">
+                            </div>
+                            <div class="control-row">
+                                <label>Ratio: <span id="audio-compressorRatio-display">3.0:1</span></label>
+                                <input type="range" id="audio-compressorRatio" min="1" max="20" step="0.1" value="3">
+                            </div>
+                            <div class="control-row">
+                                <label>Attack (ms): <span id="audio-compressorAttack-display">3.0 ms</span></label>
+                                <input type="range" id="audio-compressorAttack" min="0.001" max="0.1" step="0.001" value="0.003">
+                            </div>
+                            <div class="control-row">
+                                <label>Release (ms): <span id="audio-compressorRelease-display">150.0 ms</span></label>
+                                <input type="range" id="audio-compressorRelease" min="0.01" max="1" step="0.01" value="0.15">
+                            </div>
+                        </div>
+
+                        <!-- AGC -->
+                        <div class="audio-control-group">
+                            <h3>🔊 AGC (Auto Gain Control)</h3>
+                            <div class="control-row">
+                                <label>Gain: <span id="audio-agcGain-display">1.00</span></label>
+                                <input type="range" id="audio-agcGain" min="0.1" max="2" step="0.01" value="1.0">
+                            </div>
+                        </div>
+
+                        <!-- Limiter -->
+                        <div class="audio-control-group">
+                            <h3>🛡️ Limiter</h3>
+                            <div class="control-row">
+                                <label>Seuil (dB): <span id="audio-limiterThreshold-display">-0.3 dB</span></label>
+                                <input type="range" id="audio-limiterThreshold" min="-3" max="0" step="0.1" value="-0.3">
+                            </div>
+                            <div class="control-row">
+                                <label>Knee (dB): <span id="audio-limiterKnee-display">0.0 dB</span></label>
+                                <input type="range" id="audio-limiterKnee" min="0" max="10" step="0.1" value="0">
+                            </div>
+                            <div class="control-row">
+                                <label>Ratio: <span id="audio-limiterRatio-display">20.0:1</span></label>
+                                <input type="range" id="audio-limiterRatio" min="5" max="30" step="0.1" value="20">
+                            </div>
+                            <div class="control-row">
+                                <label>Attack (ms): <span id="audio-limiterAttack-display">1.0 ms</span></label>
+                                <input type="range" id="audio-limiterAttack" min="0.001" max="0.01" step="0.001" value="0.001">
+                            </div>
+                            <div class="control-row">
+                                <label>Release (ms): <span id="audio-limiterRelease-display">50.0 ms</span></label>
+                                <input type="range" id="audio-limiterRelease" min="0.01" max="0.2" step="0.01" value="0.05">
+                            </div>
+                        </div>
+
+                        <!-- De-emphasis -->
+                        <div class="audio-control-group">
+                            <h3>📉 De-emphasis</h3>
+                            <div class="control-row">
+                                <label>Gain (dB): <span id="audio-deEmphasisGain-display">-1.0 dB</span></label>
+                                <input type="range" id="audio-deEmphasisGain" min="-5" max="0" step="0.1" value="-1">
+                            </div>
+                            <div class="control-row">
+                                <label>Fréquence (Hz): <span id="audio-deEmphasisFreq-display">3000 Hz</span></label>
+                                <input type="range" id="audio-deEmphasisFreq" min="1000" max="8000" step="100" value="3000">
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <!-- Section Envoyer un message -->
+            <!-- Section Programmation et Contact -->
             <div class="admin-section">
                 <div class="section-header">
-                    <h2>📢 Envoyer un message</h2>
-                </div>
-                <div class="send-message-form">
-                    <div class="form-group">
-                        <label>Nom d'affichage:</label>
-                        <input type="text" id="adminUsername" value="Admin FS Studio" maxlength="20">
-                    </div>
-                    <div class="form-group">
-                        <label>Message:</label>
-                        <textarea id="adminMessage" placeholder="Tapez votre message..." maxlength="500" rows="3"></textarea>
-                    </div>
-                    <div class="form-actions">
-                        <button class="send-btn" id="adminSendBtn">📤 Envoyer</button>
-                        <span class="char-count"><span id="charCount">0</span>/500</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Section Radio / Streaming -->
-            <div class="admin-section">
-                <div class="section-header">
-                    <h2>🎙️ Radio / Streaming</h2>
-                    <div class="radio-status" id="radioStatus">
-                        <span class="status-indicator" id="radioStatusIndicator"></span>
-                        <span id="radioStatusText">Hors ligne</span>
-                    </div>
+                    <h2>📅 Programmation & Contact</h2>
                 </div>
 
-                <!-- Info importante -->
-                <div class="radio-info-box">
-                    <h4>📢 Diffusion vocale en direct</h4>
-                    <p>Ce système diffuse votre voix directement sur le site, sans serveur externe nécessaire.</p>
-                    <ul>
-                        <li>✅ Aucune configuration requise</li>
-                        <li>✅ Diffusion en temps réel</li>
-                        <li>✅ Accessible à tous les visiteurs</li>
-                        <li>✅ Qualité audio optimisée</li>
-                    </ul>
-                </div>
-
-                <!-- Contrôle vocal en direct -->
-                <div class="voice-control">
-                    <div class="voice-header">
-                        <h3>🎤 Diffusion vocale en direct</h3>
-                    </div>
-                    <div class="voice-controls">
-                        <button class="voice-btn" id="startVoiceBtn">
-                            <span class="voice-icon">🎤</span>
-                            <span>Démarrer la diffusion</span>
-                        </button>
-                        <button class="voice-btn stop" id="stopVoiceBtn" style="display: none;">
-                            <span class="voice-icon">⏹️</span>
-                            <span>Arrêter la diffusion</span>
-                        </button>
-                    </div>
-                    <div class="voice-info" id="voiceInfo" style="display: none;">
-                        <div class="voice-meter">
-                            <div class="meter-label">Niveau audio:</div>
-                            <div class="meter-bar">
-                                <div class="meter-fill" id="audioLevel"></div>
-                            </div>
+                <!-- Horaires de diffusion -->
+                <div class="schedule-section">
+                    <h3>Horaires de Diffusion</h3>
+                    <div class="schedule-editor">
+                        <div class="form-group">
+                            <label>Jour:</label>
+                            <select id="scheduleDay">
+                                <option value="Tous les jours">Tous les jours</option>
+                                <option value="Lundi">Lundi</option>
+                                <option value="Mardi">Mardi</option>
+                                <option value="Mercredi">Mercredi</option>
+                                <option value="Jeudi">Jeudi</option>
+                                <option value="Vendredi">Vendredi</option>
+                                <option value="Samedi">Samedi</option>
+                                <option value="Dimanche">Dimanche</option>
+                            </select>
                         </div>
-                        <div class="audio-quality-info">
-                            <div class="quality-badge">🎚️ Normalisation active</div>
-                            <div class="quality-badge">🔇 Suppression de bruit</div>
-                            <div class="quality-badge">🎛️ Compression audio</div>
+                        <div class="form-group">
+                            <label>Heure de début:</label>
+                            <input type="time" id="scheduleStart" value="14:00">
                         </div>
-                        <p class="voice-status-text" id="voiceStatusText">En attente de permission microphone...</p>
-                        <div class="stream-stats" id="streamStats" style="display: none;">
-                            <div class="stat-row">
-                                <span>Chunks envoyés:</span>
-                                <span id="chunksSent">0</span>
-                            </div>
-                            <div class="stat-row">
-                                <span>Dernier envoi:</span>
-                                <span id="lastSent">-</span>
-                            </div>
+                        <div class="form-group">
+                            <label>Heure de fin:</label>
+                            <input type="time" id="scheduleEnd" value="16:00">
+                        </div>
+                        <div class="form-actions">
+                            <button class="save-btn" id="saveScheduleBtn">💾 Sauvegarder Horaires</button>
+                        </div>
+                    </div>
+                    <div class="schedule-display">
+                        <div class="schedule-item">
+                            <span class="schedule-day" id="currentScheduleDay">Tous les jours</span>
+                            <span class="schedule-time" id="currentScheduleTime">14h00 - 16h00</span>
+                            <span class="schedule-status">🟢 Actif</span>
                         </div>
                     </div>
                 </div>
 
-                <!-- Instructions -->
-                <div class="radio-instructions">
-                    <h4>📋 Comment utiliser:</h4>
-                    <ol>
-                        <li>Cliquez sur "Démarrer la diffusion" ci-dessous</li>
-                        <li>Autorisez l'accès au microphone dans votre navigateur</li>
-                        <li>Parlez normalement - votre voix sera diffusée en direct</li>
-                        <li>Les visiteurs du site entendront votre voix en temps réel</li>
-                        <li>Cliquez sur "Arrêter" pour mettre fin à la diffusion</li>
-                    </ol>
-                    <p class="info-note">💡 <strong>Astuce:</strong> Assurez-vous d'avoir un bon micro et un environnement calme pour une meilleure qualité audio.</p>
+                <!-- Informations de contact -->
+                <div class="contact-section">
+                    <h3>Informations de Contact</h3>
+                    <div class="contact-form">
+                        <div class="form-group">
+                            <label>Email:</label>
+                            <input type="email" id="contactEmail" value="contact@fsstudio.com">
+                        </div>
+                        <div class="form-group">
+                            <label>Site web:</label>
+                            <input type="url" id="contactWebsite" value="www.fsstudio.com">
+                        </div>
+                        <div class="form-group">
+                            <label>Téléphone:</label>
+                            <input type="tel" id="contactPhone" value="+33 1 23 45 67 89">
+                        </div>
+                        <div class="form-group">
+                            <label>Adresse:</label>
+                            <textarea id="contactAddress" rows="2">123 Rue de la Radio, 75001 Paris, France</textarea>
+                        </div>
+                        <div class="form-actions">
+                            <button class="save-btn" id="saveContactBtn">💾 Sauvegarder Contact</button>
+                        </div>
+                    </div>
                 </div>
-            </div>
 
-            <!-- Section Contrôle Audio en Temps Réel -->
-            <div class="admin-section" id="audioControlSection" style="display: none;">
-                <div class="section-header">
-                    <h2>🎛️ Contrôle Audio en Temps Réel</h2>
-                    <div class="audio-control-actions">
-                        <button class="action-btn" id="resetAudioParamsBtn">🔄 Réinitialiser</button>
-                        <button class="action-btn" id="saveAudioParamsBtn">💾 Sauvegarder</button>
-                    </div>
-                </div>
-
-                <div class="audio-control-panel">
-                    <!-- Filtres -->
-                    <div class="audio-control-group">
-                        <h3>🔊 Filtres</h3>
-                        <div class="control-row">
-                            <label>High-Pass (Hz): <span id="audio-highPassFreq-display">50 Hz</span></label>
-                            <input type="range" id="audio-highPassFreq" min="20" max="200" step="1" value="50">
-                        </div>
-                        <div class="control-row">
-                            <label>Low-Pass (Hz): <span id="audio-lowPassFreq-display">15000 Hz</span></label>
-                            <input type="range" id="audio-lowPassFreq" min="5000" max="20000" step="100" value="15000">
-                        </div>
-                    </div>
-
-                    <!-- Pré-emphasis -->
-                    <div class="audio-control-group">
-                        <h3>📈 Pré-emphasis FM</h3>
-                        <div class="control-row">
-                            <label>Gain (dB): <span id="audio-preEmphasisGain-display">+3.0 dB</span></label>
-                            <input type="range" id="audio-preEmphasisGain" min="0" max="10" step="0.1" value="3">
-                        </div>
-                        <div class="control-row">
-                            <label>Fréquence (Hz): <span id="audio-preEmphasisFreq-display">3000 Hz</span></label>
-                            <input type="range" id="audio-preEmphasisFreq" min="1000" max="8000" step="100" value="3000">
-                        </div>
-                    </div>
-
-                    <!-- Égaliseur -->
-                    <div class="audio-control-group">
-                        <h3>🎚️ Égaliseur</h3>
-                        <div class="eq-band">
-                            <h4>Basse (200Hz)</h4>
-                            <div class="control-row">
-                                <label>Fréquence (Hz): <span id="audio-eqLowFreq-display">200 Hz</span></label>
-                                <input type="range" id="audio-eqLowFreq" min="50" max="500" step="10" value="200">
-                            </div>
-                            <div class="control-row">
-                                <label>Gain (dB): <span id="audio-eqLowGain-display">+1.5 dB</span></label>
-                                <input type="range" id="audio-eqLowGain" min="-10" max="10" step="0.1" value="1.5">
-                            </div>
-                            <div class="control-row">
-                                <label>Q: <span id="audio-eqLowQ-display">1.00</span></label>
-                                <input type="range" id="audio-eqLowQ" min="0.1" max="5" step="0.1" value="1.0">
+                <!-- Statistiques de diffusion -->
+                <div class="broadcast-stats">
+                    <h3>Statistiques de Diffusion</h3>
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-icon">⏰</div>
+                            <div class="stat-info">
+                                <div class="stat-number" id="broadcastHours">2h</div>
+                                <div class="stat-label">Durée quotidienne</div>
                             </div>
                         </div>
-                        <div class="eq-band">
-                            <h4>Médium (2kHz)</h4>
-                            <div class="control-row">
-                                <label>Fréquence (Hz): <span id="audio-eqMidFreq-display">2000 Hz</span></label>
-                                <input type="range" id="audio-eqMidFreq" min="500" max="5000" step="50" value="2000">
-                            </div>
-                            <div class="control-row">
-                                <label>Gain (dB): <span id="audio-eqMidGain-display">+2.5 dB</span></label>
-                                <input type="range" id="audio-eqMidGain" min="-10" max="10" step="0.1" value="2.5">
-                            </div>
-                            <div class="control-row">
-                                <label>Q: <span id="audio-eqMidQ-display">1.20</span></label>
-                                <input type="range" id="audio-eqMidQ" min="0.1" max="5" step="0.1" value="1.2">
+                        <div class="stat-card">
+                            <div class="stat-icon">📊</div>
+                            <div class="stat-info">
+                                <div class="stat-number" id="broadcastDays">7/7</div>
+                                <div class="stat-label">Jours par semaine</div>
                             </div>
                         </div>
-                        <div class="eq-band">
-                            <h4>Haute (6kHz)</h4>
-                            <div class="control-row">
-                                <label>Fréquence (Hz): <span id="audio-eqHighFreq-display">6000 Hz</span></label>
-                                <input type="range" id="audio-eqHighFreq" min="2000" max="12000" step="100" value="6000">
+                        <div class="stat-card">
+                            <div class="stat-icon">🎯</div>
+                            <div class="stat-info">
+                                <div class="stat-number" id="broadcastReach">0</div>
+                                <div class="stat-label">Audience cumulée</div>
                             </div>
-                            <div class="control-row">
-                                <label>Gain (dB): <span id="audio-eqHighGain-display">+2.0 dB</span></label>
-                                <input type="range" id="audio-eqHighGain" min="-10" max="10" step="0.1" value="2">
-                            </div>
-                            <div class="control-row">
-                                <label>Q: <span id="audio-eqHighQ-display">1.00</span></label>
-                                <input type="range" id="audio-eqHighQ" min="0.1" max="5" step="0.1" value="1.0">
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Compresseur -->
-                    <div class="audio-control-group">
-                        <h3>🎚️ Compresseur</h3>
-                        <div class="control-row">
-                            <label>Seuil (dB): <span id="audio-compressorThreshold-display">-18.0 dB</span></label>
-                            <input type="range" id="audio-compressorThreshold" min="-60" max="0" step="1" value="-18">
-                        </div>
-                        <div class="control-row">
-                            <label>Knee (dB): <span id="audio-compressorKnee-display">15.0 dB</span></label>
-                            <input type="range" id="audio-compressorKnee" min="0" max="40" step="1" value="15">
-                        </div>
-                        <div class="control-row">
-                            <label>Ratio: <span id="audio-compressorRatio-display">3.0:1</span></label>
-                            <input type="range" id="audio-compressorRatio" min="1" max="20" step="0.1" value="3">
-                        </div>
-                        <div class="control-row">
-                            <label>Attack (ms): <span id="audio-compressorAttack-display">3.0 ms</span></label>
-                            <input type="range" id="audio-compressorAttack" min="0.001" max="0.1" step="0.001" value="0.003">
-                        </div>
-                        <div class="control-row">
-                            <label>Release (ms): <span id="audio-compressorRelease-display">150.0 ms</span></label>
-                            <input type="range" id="audio-compressorRelease" min="0.01" max="1" step="0.01" value="0.15">
-                        </div>
-                    </div>
-
-                    <!-- AGC -->
-                    <div class="audio-control-group">
-                        <h3>🔊 AGC (Auto Gain Control)</h3>
-                        <div class="control-row">
-                            <label>Gain: <span id="audio-agcGain-display">1.00</span></label>
-                            <input type="range" id="audio-agcGain" min="0.1" max="2" step="0.01" value="1.0">
-                        </div>
-                    </div>
-
-                    <!-- Limiter -->
-                    <div class="audio-control-group">
-                        <h3>🛡️ Limiter</h3>
-                        <div class="control-row">
-                            <label>Seuil (dB): <span id="audio-limiterThreshold-display">-0.3 dB</span></label>
-                            <input type="range" id="audio-limiterThreshold" min="-3" max="0" step="0.1" value="-0.3">
-                        </div>
-                        <div class="control-row">
-                            <label>Knee (dB): <span id="audio-limiterKnee-display">0.0 dB</span></label>
-                            <input type="range" id="audio-limiterKnee" min="0" max="10" step="0.1" value="0">
-                        </div>
-                        <div class="control-row">
-                            <label>Ratio: <span id="audio-limiterRatio-display">20.0:1</span></label>
-                            <input type="range" id="audio-limiterRatio" min="5" max="30" step="0.1" value="20">
-                        </div>
-                        <div class="control-row">
-                            <label>Attack (ms): <span id="audio-limiterAttack-display">1.0 ms</span></label>
-                            <input type="range" id="audio-limiterAttack" min="0.001" max="0.01" step="0.001" value="0.001">
-                        </div>
-                        <div class="control-row">
-                            <label>Release (ms): <span id="audio-limiterRelease-display">50.0 ms</span></label>
-                            <input type="range" id="audio-limiterRelease" min="0.01" max="0.2" step="0.01" value="0.05">
-                        </div>
-                    </div>
-
-                    <!-- De-emphasis -->
-                    <div class="audio-control-group">
-                        <h3>📉 De-emphasis</h3>
-                        <div class="control-row">
-                            <label>Gain (dB): <span id="audio-deEmphasisGain-display">-1.0 dB</span></label>
-                            <input type="range" id="audio-deEmphasisGain" min="-5" max="0" step="0.1" value="-1">
-                        </div>
-                        <div class="control-row">
-                            <label>Fréquence (Hz): <span id="audio-deEmphasisFreq-display">3000 Hz</span></label>
-                            <input type="range" id="audio-deEmphasisFreq" min="1000" max="8000" step="100" value="3000">
                         </div>
                     </div>
                 </div>
             </div>
+        </div>
 
-            <!-- Section Statistiques -->
-            <div class="admin-section">
-                <div class="section-header">
-                    <h2>📊 Statistiques</h2>
+        <!-- Onglet Chat -->
+            <div class="tab-content" id="chat">
+                <!-- Section Chat Management -->
+                <div class="admin-section">
+                    <div class="section-header">
+                        <h2>💬 Gestion du Chat</h2>
+                        <div class="online-stats">
+                            <span class="stat-item">
+                                <span class="stat-label">En ligne:</span>
+                                <span class="stat-value" id="adminOnlineCount">0</span>
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Zone de messages avec modération -->
+                    <div class="chat-admin-container">
+                        <div class="chat-messages-admin" id="chatMessagesAdmin">
+                            <div class="loading-message">Chargement des messages...</div>
+                        </div>
+                    </div>
+
+                    <!-- Actions rapides -->
+                    <div class="admin-actions">
+                        <button class="action-btn danger" id="clearAllBtn">🗑️ Supprimer tous les messages</button>
+                        <button class="action-btn" id="refreshBtn">🔄 Actualiser</button>
+                    </div>
                 </div>
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-icon">💬</div>
-                        <div class="stat-info">
-                            <div class="stat-number" id="totalMessages">0</div>
-                            <div class="stat-label">Messages totaux</div>
-                        </div>
+
+                <!-- Section Envoyer un message -->
+                <div class="admin-section">
+                    <div class="section-header">
+                        <h2>📢 Envoyer un message</h2>
                     </div>
-                    <div class="stat-card">
-                        <div class="stat-icon">👥</div>
-                        <div class="stat-info">
-                            <div class="stat-number" id="totalUsers">0</div>
-                            <div class="stat-label">Utilisateurs uniques</div>
+                    <div class="send-message-form">
+                        <div class="form-group">
+                            <label>Nom d'affichage:</label>
+                            <input type="text" id="adminUsername" value="Admin FS Studio" maxlength="20">
                         </div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon">🎙️</div>
-                        <div class="stat-info">
-                            <div class="stat-number" id="listenersCount">0</div>
-                            <div class="stat-label">Auditeurs</div>
+                        <div class="form-group">
+                            <label>Message:</label>
+                            <textarea id="adminMessage" placeholder="Tapez votre message..." maxlength="500" rows="3"></textarea>
+                        </div>
+                        <div class="form-actions">
+                            <button class="send-btn" id="adminSendBtn">📤 Envoyer</button>
+                            <span class="char-count"><span id="charCount">0</span>/500</span>
                         </div>
                     </div>
                 </div>
             </div>
+        </div>
+
+            <!-- Onglet Diffusion -->
+            <div class="tab-content" id="broadcasting">
         </div>
     </div>
 
@@ -394,6 +589,9 @@
     
     <!-- Configuration Firebase -->
     <script src="firebase-config.js"></script>
+    
+    <!-- Mediasoup Client -->
+    <script src="mediasoup-client-admin.js"></script>
     
     <!-- Panneau de contrôle audio -->
     <script src="audio-control-panel.js"></script>

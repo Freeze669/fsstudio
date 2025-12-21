@@ -20,11 +20,83 @@ const charCount = document.getElementById('charCount');
 const totalMessages = document.getElementById('totalMessages');
 const totalUsers = document.getElementById('totalUsers');
 
+// Variables pour les statistiques
+let startTime = Date.now();
+let lastMessageCount = 0;
+let lastUserCount = 0;
+let lastEngagement = 0;
+
+// Fonction pour changer d'onglet
+function switchTab(tabId) {
+    // Masquer tous les contenus
+    tabContents.forEach(content => {
+        content.classList.remove('active');
+    });
+    
+    // Désactiver tous les boutons
+    tabBtns.forEach(btn => {
+        btn.classList.remove('active');
+    });
+    
+    // Activer l'onglet sélectionné
+    const selectedTab = document.getElementById(tabId);
+    const selectedBtn = document.querySelector(`[data-tab="${tabId}"]`);
+    
+    if (selectedTab) {
+        selectedTab.classList.add('active');
+    }
+    if (selectedBtn) {
+        selectedBtn.classList.add('active');
+    }
+    
+    // Sauvegarder l'onglet actif
+    localStorage.setItem('adminActiveTab', tabId);
+}
+
+// Fonction pour mettre à jour l'uptime
+function updateUptime() {
+    const now = Date.now();
+    const diff = now - startTime;
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+    uptime.textContent = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+}
+
+// Fonction pour calculer les pourcentages
+function calculatePercentages() {
+    const total = parseInt(totalUsers.textContent) || 1;
+    const online = parseInt(onlineUsers.textContent) || 0;
+    const listeners = parseInt(listenersCount.textContent) || 0;
+    
+    const onlinePct = total > 0 ? Math.round((online / total) * 100) : 0;
+    const listenersPct = total > 0 ? Math.round((listeners / total) * 100) : 0;
+    
+    onlinePercentage.textContent = `${onlinePct}%`;
+    listenersPercentage.textContent = `${listenersPct}%`;
+}
+
+// Fonction pour mettre à jour les changements
+function updateChanges() {
+    const currentMessages = parseInt(totalMessages.textContent) || 0;
+    const currentUsers = parseInt(totalUsers.textContent) || 0;
+    
+    const messageChange = currentMessages - lastMessageCount;
+    const userChange = currentUsers - lastUserCount;
+    
+    messagesChange.textContent = messageChange >= 0 ? `+${messageChange} aujourd'hui` : `${messageChange} aujourd'hui`;
+    usersChange.textContent = userChange >= 0 ? `+${userChange} aujourd'hui` : `${userChange} aujourd'hui`;
+    
+    lastMessageCount = currentMessages;
+    lastUserCount = currentUsers;
+}
+
 // Configuration Firebase
 const FIREBASE_MESSAGES_PATH = 'publicChat/messages';
 const FIREBASE_USERS_PATH = 'publicChat/users';
 const FIREBASE_RADIO_PATH = 'radio';
 const FIREBASE_RADIO_STATUS_PATH = 'radio/status';
+const FIREBASE_BROADCAST_INFO_PATH = 'broadcast/info';
 
 // Configuration WebSocket pour streaming audio
 // URL du serveur Railway (toujours en WSS car Railway utilise HTTPS)
@@ -44,6 +116,7 @@ function connectWebSocket() {
             console.log('✅ Connecté au serveur WebSocket');
             // S'identifier comme diffuseur
             audioWebSocket.send(JSON.stringify({ type: 'broadcast' }));
+            if (websocketStatus) websocketStatus.textContent = '🟢 Connecté';
         };
         
         audioWebSocket.onmessage = (event) => {
@@ -59,10 +132,12 @@ function connectWebSocket() {
         
         audioWebSocket.onerror = (error) => {
             console.error('❌ Erreur WebSocket:', error);
+            if (websocketStatus) websocketStatus.textContent = '🔴 Erreur';
         };
         
         audioWebSocket.onclose = () => {
             console.log('⚠️ Connexion WebSocket fermée');
+            if (websocketStatus) websocketStatus.textContent = '🔴 Déconnecté';
             // Tentative de reconnexion après 3 secondes
             if (isStreaming) {
                 setTimeout(() => {
@@ -85,6 +160,15 @@ let loadedMessageIds = new Set();
 let startVoiceBtn, stopVoiceBtn;
 let voiceInfo, audioLevel, voiceStatusText, radioStatusIndicator, radioStatusText, listenersCount;
 let streamStats, chunksSent, lastSent;
+
+// Variables pour les onglets et stats
+let tabBtns, tabContents;
+let onlineUsers, uptime, engagementRate, websocketStatus, firebaseStatus, streamingStatus, lastActivity;
+let messagesChange, usersChange, engagementChange, listenersPercentage, onlinePercentage;
+
+// Éléments pour la diffusion
+let scheduleDay, scheduleStart, scheduleEnd, saveScheduleBtn, currentScheduleDay, currentScheduleTime;
+let contactEmail, contactWebsite, contactPhone, contactAddress, saveContactBtn;
 
 let mediaStream = null;
 let audioContext = null;
@@ -138,6 +222,57 @@ function showAdmin() {
     chunksSent = document.getElementById('chunksSent');
     lastSent = document.getElementById('lastSent');
     
+    // Initialiser les nouveaux éléments DOM
+    onlineUsers = document.getElementById('onlineUsers');
+    uptime = document.getElementById('uptime');
+    engagementRate = document.getElementById('engagementRate');
+    websocketStatus = document.getElementById('websocketStatus');
+    firebaseStatus = document.getElementById('firebaseStatus');
+    streamingStatus = document.getElementById('streamingStatus');
+    lastActivity = document.getElementById('lastActivity');
+    messagesChange = document.getElementById('messagesChange');
+    usersChange = document.getElementById('usersChange');
+    engagementChange = document.getElementById('engagementChange');
+    listenersPercentage = document.getElementById('listenersPercentage');
+    onlinePercentage = document.getElementById('onlinePercentage');
+    
+    // Éléments pour la diffusion
+    scheduleDay = document.getElementById('scheduleDay');
+    scheduleStart = document.getElementById('scheduleStart');
+    scheduleEnd = document.getElementById('scheduleEnd');
+    saveScheduleBtn = document.getElementById('saveScheduleBtn');
+    currentScheduleDay = document.getElementById('currentScheduleDay');
+    currentScheduleTime = document.getElementById('currentScheduleTime');
+    
+    contactEmail = document.getElementById('contactEmail');
+    contactWebsite = document.getElementById('contactWebsite');
+    contactPhone = document.getElementById('contactPhone');
+    contactAddress = document.getElementById('contactAddress');
+    saveContactBtn = document.getElementById('saveContactBtn');
+    
+    // Onglets
+    tabBtns = document.querySelectorAll('.tab-btn');
+    tabContents = document.querySelectorAll('.tab-content');
+    
+    // Écouteurs pour les onglets
+    tabBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const tabId = btn.getAttribute('data-tab');
+            switchTab(tabId);
+        });
+    });
+    
+    // Initialiser les onglets
+    const savedTab = localStorage.getItem('adminActiveTab') || 'site-info';
+    switchTab(savedTab);
+    
+    // Écouteurs pour les boutons de sauvegarde
+    saveScheduleBtn.addEventListener('click', saveBroadcastSchedule);
+    saveContactBtn.addEventListener('click', saveContactInfo);
+    
+    // Charger les données de diffusion
+    loadBroadcastInfo();
+    
     connectToFirebase();
     initRadio();
     initAudioControlPanel();
@@ -146,7 +281,7 @@ function showAdmin() {
 // Initialiser le panneau de contrôle audio
 function initAudioControlPanel() {
     // Attendre que MediasoupBroadcaster soit disponible
-    if (typeof MediasoupBroadcaster !== 'undefined') {
+    if (typeof MediasoupBroadcaster !== 'undefined' && typeof AudioControlPanel !== 'undefined') {
         const serverUrl = 'https://fsstudio-production.up.railway.app';
         const broadcaster = new MediasoupBroadcaster(serverUrl);
         window.audioControlPanel = new AudioControlPanel(broadcaster);
@@ -161,7 +296,7 @@ function initAudioControlPanel() {
         setupAudioControls();
     } else {
         // Réessayer après un court délai
-        setTimeout(initAudioControlPanel, 500);
+        setTimeout(initAudioControlPanel, 1000);
     }
 }
 
@@ -397,6 +532,8 @@ function connectToFirebase() {
     try {
         console.log('🔄 Connexion admin à Firebase...');
         
+        firebaseStatus.textContent = '🟢 Connecté';
+        
         // Écouter les utilisateurs en ligne
         usersRef = database.ref(FIREBASE_USERS_PATH);
         usersRef.on('value', (snapshot) => {
@@ -408,6 +545,7 @@ function connectToFirebase() {
                     return (now - lastSeen) < 120000; // 2 minutes
                 });
                 adminOnlineCount.textContent = onlineUsers.length;
+                onlineUsers.textContent = onlineUsers.length;
                 totalUsers.textContent = Object.keys(users).length;
             } else {
                 adminOnlineCount.textContent = '0';
@@ -469,6 +607,7 @@ function listenToNewMessages() {
             const messageId = snapshot.key;
             addMessageToAdmin(messageId, message.author, message.content, message.timestamp);
             updateStats();
+            lastActivity.textContent = new Date().toLocaleTimeString();
         }
     });
     
@@ -488,11 +627,13 @@ function listenToNewMessages() {
 function updateStats() {
     messagesRef.once('value', (snapshot) => {
         const messages = snapshot.val();
-        if (messages) {
-            totalMessages.textContent = Object.keys(messages).length;
-        } else {
-            totalMessages.textContent = '0';
-        }
+        const messageCount = messages ? Object.keys(messages).length : 0;
+        totalMessages.textContent = messageCount;
+        
+        // Calculer le taux d'engagement (messages par utilisateur)
+        const userCount = parseInt(totalUsers.textContent) || 1;
+        const engagement = messageCount / userCount;
+        engagementRate.textContent = engagement.toFixed(2);
     });
 }
 
@@ -1066,6 +1207,7 @@ function initRadioEvents() {
             voiceInfo.style.display = 'block';
             streamStats.style.display = 'block';
             isStreaming = true;
+            streamingStatus.textContent = '▶️ En cours';
             chunksSentCount = 0;
             
             // Démarrer l'animation du niveau audio
@@ -1089,6 +1231,7 @@ function initRadioEvents() {
         
         // Arrêter le streaming immédiatement
         isStreaming = false;
+        streamingStatus.textContent = '⏸️ Arrêté';
         
         // Envoyer le statut d'arrêt via WebSocket
         if (audioWebSocket && audioWebSocket.readyState === WebSocket.OPEN) {
@@ -1202,6 +1345,7 @@ function initRadioEvents() {
         voiceInfo.style.display = 'none';
         if (streamStats) streamStats.style.display = 'none';
         isStreaming = false; // IMPORTANT: Mettre à false AVANT de masquer les contrôles
+        streamingStatus.textContent = '⏸️ Arrêté';
         
         if (audioLevel) {
             audioLevel.style.width = '0%';
@@ -1505,4 +1649,93 @@ function stopMp3Stream() {
 
 // Initialisation
 checkAuth();
+
+// Fonctions pour la gestion des informations de diffusion
+function saveBroadcastSchedule() {
+    if (!database) {
+        alert('❌ Base de données non disponible. Veuillez rafraîchir la page.');
+        return;
+    }
+    
+    const scheduleData = {
+        day: scheduleDay.value,
+        start: scheduleStart.value,
+        end: scheduleEnd.value,
+        updatedAt: new Date().toISOString()
+    };
+    
+    database.ref(FIREBASE_BROADCAST_INFO_PATH + '/schedule').set(scheduleData)
+        .then(() => {
+            alert('✅ Horaires de diffusion sauvegardés !');
+            loadBroadcastInfo(); // Recharger pour mettre à jour l'affichage
+        })
+        .catch((error) => {
+            console.error('❌ Erreur sauvegarde horaires:', error);
+            alert('❌ Erreur lors de la sauvegarde: ' + error.message);
+        });
+}
+
+function saveContactInfo() {
+    if (!database) {
+        alert('❌ Base de données non disponible. Veuillez rafraîchir la page.');
+        return;
+    }
+    
+    const contactData = {
+        email: contactEmail.value,
+        website: contactWebsite.value,
+        phone: contactPhone.value,
+        address: contactAddress.value,
+        updatedAt: new Date().toISOString()
+    };
+    
+    database.ref(FIREBASE_BROADCAST_INFO_PATH + '/contact').set(contactData)
+        .then(() => {
+            alert('✅ Informations de contact sauvegardées !');
+            loadBroadcastInfo(); // Recharger pour mettre à jour l'affichage
+        })
+        .catch((error) => {
+            console.error('❌ Erreur sauvegarde contact:', error);
+            alert('❌ Erreur lors de la sauvegarde: ' + error.message);
+        });
+}
+
+function loadBroadcastInfo() {
+    // Charger les horaires
+    database.ref(FIREBASE_BROADCAST_INFO_PATH + '/schedule').once('value')
+        .then((snapshot) => {
+            const schedule = snapshot.val();
+            if (schedule) {
+                scheduleDay.value = schedule.day || 'Tous les jours';
+                scheduleStart.value = schedule.start || '14:00';
+                scheduleEnd.value = schedule.end || '16:00';
+                currentScheduleDay.textContent = schedule.day || 'Tous les jours';
+                currentScheduleTime.textContent = formatTime(schedule.start) + ' - ' + formatTime(schedule.end);
+            }
+        })
+        .catch((error) => {
+            console.error('❌ Erreur chargement horaires:', error);
+        });
+    
+    // Charger les contacts
+    database.ref(FIREBASE_BROADCAST_INFO_PATH + '/contact').once('value')
+        .then((snapshot) => {
+            const contact = snapshot.val();
+            if (contact) {
+                contactEmail.value = contact.email || 'contact@fsstudio.com';
+                contactWebsite.value = contact.website || 'www.fsstudio.com';
+                contactPhone.value = contact.phone || '+33 1 23 45 67 89';
+                contactAddress.value = contact.address || '123 Rue de la Radio, 75001 Paris, France';
+            }
+        })
+        .catch((error) => {
+            console.error('❌ Erreur chargement contact:', error);
+        });
+}
+
+function formatTime(timeString) {
+    if (!timeString) return '14h00';
+    const [hours, minutes] = timeString.split(':');
+    return `${hours}h${minutes.padStart(2, '0')}`;
+}
 

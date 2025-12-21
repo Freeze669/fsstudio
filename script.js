@@ -5,6 +5,7 @@ const radioConfig = {
 
 // Chemins Firebase pour la radio
 const FIREBASE_RADIO_STATUS_PATH = 'radio/status';
+const FIREBASE_BROADCAST_INFO_PATH = 'broadcast/info';
 
 // Configuration WebSocket pour streaming audio
 // URL du serveur Railway (toujours en WSS car Railway utilise HTTPS)
@@ -19,6 +20,11 @@ const currentTimeEl = document.getElementById('currentTime');
 const vinylRecord = document.querySelector('.vinyl-record');
 const playIcon = document.querySelector('.play-icon');
 const pauseIcon = document.querySelector('.pause-icon');
+
+// Éléments pour les informations de diffusion
+const scheduleDayEl = document.querySelector('.schedule-item .day');
+const scheduleTimeEl = document.querySelector('.schedule-item .time');
+const contactEmailEl = document.querySelector('.contact-value'); // Assuming first one is email
 
 // État du lecteur
 let isPlaying = false;
@@ -1338,6 +1344,9 @@ setInterval(updateTime, 1000); // Mettre à jour l'heure chaque seconde
 // Activer l'audio automatiquement au chargement de la page
 // Cela permet au navigateur de détecter que le site veut jouer de l'audio
 document.addEventListener('DOMContentLoaded', () => {
+    // Charger les informations de diffusion
+    loadBroadcastInfo();
+    
     // Créer un contexte audio dès le chargement pour "réserver" les permissions
     try {
         if (!audioContextListener || audioContextListener.state === 'closed') {
@@ -1697,5 +1706,40 @@ if (typeof firebase !== 'undefined' && firebase.apps.length > 0) {
             updateStatus(false, 'Firebase non configuré');
         }
     }, 1000);
+}
+
+// Fonction pour charger les informations de diffusion
+function loadBroadcastInfo() {
+    if (typeof database === 'undefined') return;
+    
+    // Charger les horaires et écouter les changements
+    database.ref(FIREBASE_BROADCAST_INFO_PATH + '/schedule').on('value', (snapshot) => {
+        const schedule = snapshot.val();
+        if (schedule && scheduleDayEl && scheduleTimeEl) {
+            scheduleDayEl.textContent = schedule.day || 'Tous les jours';
+            scheduleTimeEl.textContent = formatTime(schedule.start) + ' - ' + formatTime(schedule.end);
+        }
+    });
+    
+    // Charger les contacts et écouter les changements
+    database.ref(FIREBASE_BROADCAST_INFO_PATH + '/contact').on('value', (snapshot) => {
+        const contact = snapshot.val();
+        if (contact) {
+            // Mettre à jour les éléments de contact
+            const contactItems = document.querySelectorAll('.contact-value');
+            if (contactItems.length >= 4) {
+                contactItems[0].textContent = contact.email || 'contact@fsstudio.com';
+                contactItems[1].textContent = contact.website || 'www.fsstudio.com';
+                contactItems[2].textContent = contact.phone || '+33 1 23 45 67 89';
+                contactItems[3].textContent = contact.address || '123 Rue de la Radio, 75001 Paris, France';
+            }
+        }
+    });
+}
+
+function formatTime(timeString) {
+    if (!timeString) return '14h00';
+    const [hours, minutes] = timeString.split(':');
+    return `${hours}h${minutes.padStart(2, '0')}`;
 }
 

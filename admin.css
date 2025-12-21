@@ -164,6 +164,52 @@ body {
     margin: 0 auto;
 }
 
+/* Navigation par onglets */
+.tab-navigation {
+    display: flex;
+    background: rgba(30, 30, 30, 0.95);
+    backdrop-filter: blur(20px);
+    border-radius: 16px;
+    padding: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    margin-bottom: 20px;
+}
+
+.tab-btn {
+    flex: 1;
+    padding: 12px 20px;
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    border-radius: 12px;
+    transition: all 0.3s;
+    text-align: center;
+}
+
+.tab-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.tab-btn.active {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.tab-content {
+    display: none;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.tab-content.active {
+    display: flex;
+}
+
 .admin-section {
     background: rgba(30, 30, 30, 0.95);
     backdrop-filter: blur(20px);
@@ -449,6 +495,131 @@ body {
     color: rgba(255, 255, 255, 0.6);
     text-transform: uppercase;
     letter-spacing: 0.5px;
+}
+
+.stat-change {
+    font-size: 11px;
+    color: #43b581;
+    margin-top: 2px;
+}
+
+.stat-percentage {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.8);
+    background: rgba(67, 181, 129, 0.2);
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.stat-info {
+    flex: 1;
+    position: relative;
+}
+
+.real-time-indicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.pulse-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #43b581;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+/* Métriques avancées */
+.advanced-metrics {
+    margin-top: 24px;
+    padding-top: 24px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.metric-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+.metric-item {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.metric-item h4 {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 16px;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.activity-chart {
+    height: 100px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 14px;
+}
+
+.top-messages {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.message-item {
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.message-item:last-child {
+    border-bottom: none;
+}
+
+/* État du serveur */
+.server-status {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+}
+
+.status-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.status-label {
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.status-value {
+    font-size: 14px;
+    font-weight: 600;
 }
 
 /* Section Radio */
@@ -848,5 +1019,156 @@ body {
 .audio-control-actions .action-btn {
     padding: 10px 20px;
     font-size: 13px;
+}
+
+/* Programmation et Contact */
+.schedule-section, .contact-section, .broadcast-stats {
+    margin-bottom: 24px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.schedule-section:last-child, .contact-section:last-child, .broadcast-stats:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+.schedule-section h3, .contact-section h3, .broadcast-stats h3 {
+    font-size: 16px;
+    font-weight: 600;
+    color: #43b581;
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.schedule-editor {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.schedule-editor .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+
+.schedule-editor label {
+    font-size: 13px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.schedule-editor input, .schedule-editor select {
+    padding: 8px 12px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
+    color: white;
+    font-size: 13px;
+}
+
+.schedule-editor input:focus, .schedule-editor select:focus {
+    outline: none;
+    border-color: #43b581;
+    background: rgba(0, 0, 0, 0.4);
+}
+
+.schedule-editor .form-actions {
+    margin-top: 16px;
+    text-align: center;
+}
+
+.save-btn {
+    padding: 10px 20px;
+    background: rgba(67, 181, 129, 0.2);
+    border: 1px solid rgba(67, 181, 129, 0.4);
+    border-radius: 8px;
+    color: #43b581;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.save-btn:hover {
+    background: rgba(67, 181, 129, 0.3);
+    transform: translateY(-2px);
+}
+
+.save-btn:active {
+    transform: translateY(0);
+}
+
+.schedule-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+}
+
+.schedule-day {
+    font-weight: 600;
+    color: white;
+}
+
+.schedule-time {
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 14px;
+}
+
+.schedule-status {
+    font-size: 12px;
+    color: #43b581;
+}
+
+.schedule-note {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.6);
+    font-style: italic;
+    margin: 0;
+}
+
+.contact-form {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+.contact-form .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.contact-form label {
+    font-size: 13px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.contact-form input, .contact-form textarea {
+    padding: 8px 12px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
+    color: white;
+    font-size: 13px;
+}
+
+.contact-form input:focus, .contact-form textarea:focus {
+    outline: none;
+    border-color: #43b581;
+    background: rgba(0, 0, 0, 0.4);
+}
+
+.contact-form textarea {
+    resize: vertical;
+    min-height: 60px;
 }
 
