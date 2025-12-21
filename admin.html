@@ -14,13 +14,35 @@
     <div class="login-screen" id="loginScreen">
         <div class="login-container">
             <div class="login-header">
-                <h1>🔐 Administration</h1>
-                <p>Accès réservé aux administrateurs</p>
+                <h1>🔐 Administration FS STUDIO</h1>
+                <p>Accès réservé aux administrateurs autorisés</p>
             </div>
             <div class="login-form">
-                <input type="password" id="adminCode" placeholder="Code d'accès" autocomplete="off">
-                <button id="loginBtn">Se connecter</button>
+                <div class="form-group">
+                    <label for="adminCode">Code d'accès administrateur:</label>
+                    <input type="password" id="adminCode" placeholder="Entrez votre code d'accès" autocomplete="off" required>
+                </div>
+                <button id="loginBtn" class="login-button">🔓 Se connecter</button>
                 <p class="error-message" id="errorMessage" style="display: none;"></p>
+
+                <!-- Informations sur les codes d'accès -->
+                <div class="login-info">
+                    <h4>🔑 Codes d'accès disponibles:</h4>
+                    <div class="code-examples">
+                        <div class="code-item">
+                            <strong>DIRECTEUR2024</strong> - Directeur Général (Contrôle total)
+                        </div>
+                        <div class="code-item">
+                            <strong>STUDIO2024</strong> - Directeur de Niveau 1 (Contrôle étendu)
+                        </div>
+                        <div class="code-item">
+                            <em>Ou codes de modérateurs créés par le Directeur Général</em>
+                        </div>
+                    </div>
+                    <p class="login-note">
+                        💡 <strong>Note:</strong> Si vous n'avez pas de code d'accès, contactez le Directeur Général pour en obtenir un.
+                    </p>
+                </div>
             </div>
         </div>
     </div>
@@ -240,101 +262,101 @@
                         <!-- Les modérateurs seront affichés ici -->
                     </div>
                 </div>
-            </div>
 
-            <!-- Section Programmation et Contact -->
-            <div class="admin-section">
-                <div class="section-header">
-                    <h2>📅 Programmation & Contact</h2>
-                </div>
-
-                <!-- Horaires de diffusion -->
-                <div class="schedule-section">
-                    <h3>Horaires de Diffusion</h3>
-                    <div class="schedule-editor">
-                        <div class="form-group">
-                            <label>Jour:</label>
-                            <select id="scheduleDay">
-                                <option value="Tous les jours">Tous les jours</option>
-                                <option value="Lundi">Lundi</option>
-                                <option value="Mardi">Mardi</option>
-                                <option value="Mercredi">Mercredi</option>
-                                <option value="Jeudi">Jeudi</option>
-                                <option value="Vendredi">Vendredi</option>
-                                <option value="Samedi">Samedi</option>
-                                <option value="Dimanche">Dimanche</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label>Heure de début:</label>
-                            <input type="time" id="scheduleStart" value="14:00">
-                        </div>
-                        <div class="form-group">
-                            <label>Heure de fin:</label>
-                            <input type="time" id="scheduleEnd" value="16:00">
-                        </div>
-                        <div class="form-actions">
-                            <button class="save-btn" id="saveScheduleBtn">💾 Sauvegarder Horaires</button>
-                        </div>
+                <!-- Section Programmation et Contact -->
+                <div class="admin-section">
+                    <div class="section-header">
+                        <h2>📅 Programmation & Contact</h2>
                     </div>
-                    <div class="schedule-display">
-                        <div class="schedule-item">
-                            <span class="schedule-day" id="currentScheduleDay">Tous les jours</span>
-                            <span class="schedule-time" id="currentScheduleTime">14h00 - 16h00</span>
-                            <span class="schedule-status">🟢 Actif</span>
-                        </div>
-                    </div>
-                </div>
 
-                <!-- Informations de contact -->
-                <div class="contact-section">
-                    <h3>Informations de Contact</h3>
-                    <div class="contact-form">
-                        <div class="form-group">
-                            <label>Email:</label>
-                            <input type="email" id="contactEmail" value="contact@fsstudio.com">
-                        </div>
-                        <div class="form-group">
-                            <label>Site web:</label>
-                            <input type="url" id="contactWebsite" value="www.fsstudio.com">
-                        </div>
-                        <div class="form-group">
-                            <label>Téléphone:</label>
-                            <input type="tel" id="contactPhone" value="+33 1 23 45 67 89">
-                        </div>
-                        <div class="form-group">
-                            <label>Adresse:</label>
-                            <textarea id="contactAddress" rows="2">123 Rue de la Radio, 75001 Paris, France</textarea>
-                        </div>
-                        <div class="form-actions">
-                            <button class="save-btn" id="saveContactBtn">💾 Sauvegarder Contact</button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Statistiques de diffusion -->
-                <div class="broadcast-stats">
-                    <h3>Statistiques de Diffusion</h3>
-                    <div class="stats-grid">
-                        <div class="stat-card">
-                            <div class="stat-icon">⏰</div>
-                            <div class="stat-info">
-                                <div class="stat-number" id="broadcastHours">2h</div>
-                                <div class="stat-label">Durée quotidienne</div>
+                    <!-- Horaires de diffusion -->
+                    <div class="schedule-section">
+                        <h3>Horaires de Diffusion</h3>
+                        <div class="schedule-editor">
+                            <div class="form-group">
+                                <label>Jour:</label>
+                                <select id="scheduleDay">
+                                    <option value="Tous les jours">Tous les jours</option>
+                                    <option value="Lundi">Lundi</option>
+                                    <option value="Mardi">Mardi</option>
+                                    <option value="Mercredi">Mercredi</option>
+                                    <option value="Jeudi">Jeudi</option>
+                                    <option value="Vendredi">Vendredi</option>
+                                    <option value="Samedi">Samedi</option>
+                                    <option value="Dimanche">Dimanche</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Heure de début:</label>
+                                <input type="time" id="scheduleStart" value="14:00">
+                            </div>
+                            <div class="form-group">
+                                <label>Heure de fin:</label>
+                                <input type="time" id="scheduleEnd" value="16:00">
+                            </div>
+                            <div class="form-actions">
+                                <button class="save-btn" id="saveScheduleBtn">💾 Sauvegarder Horaires</button>
                             </div>
                         </div>
-                        <div class="stat-card">
-                            <div class="stat-icon">📊</div>
-                            <div class="stat-info">
-                                <div class="stat-number" id="broadcastDays">7/7</div>
-                                <div class="stat-label">Jours par semaine</div>
+                        <div class="schedule-display">
+                            <div class="schedule-item">
+                                <span class="schedule-day" id="currentScheduleDay">Tous les jours</span>
+                                <span class="schedule-time" id="currentScheduleTime">14h00 - 16h00</span>
+                                <span class="schedule-status">🟢 Actif</span>
                             </div>
                         </div>
-                        <div class="stat-card">
-                            <div class="stat-icon">🎯</div>
-                            <div class="stat-info">
-                                <div class="stat-number" id="broadcastReach">0</div>
-                                <div class="stat-label">Audience cumulée</div>
+                    </div>
+
+                    <!-- Informations de contact -->
+                    <div class="contact-section">
+                        <h3>Informations de Contact</h3>
+                        <div class="contact-form">
+                            <div class="form-group">
+                                <label>Email:</label>
+                                <input type="email" id="contactEmail" value="contact@fsstudio.com">
+                            </div>
+                            <div class="form-group">
+                                <label>Site web:</label>
+                                <input type="url" id="contactWebsite" value="www.fsstudio.com">
+                            </div>
+                            <div class="form-group">
+                                <label>Téléphone:</label>
+                                <input type="tel" id="contactPhone" value="+33 1 23 45 67 89">
+                            </div>
+                            <div class="form-group">
+                                <label>Adresse:</label>
+                                <textarea id="contactAddress" rows="2">123 Rue de la Radio, 75001 Paris, France</textarea>
+                            </div>
+                            <div class="form-actions">
+                                <button class="save-btn" id="saveContactBtn">💾 Sauvegarder Contact</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Statistiques de diffusion -->
+                    <div class="broadcast-stats">
+                        <h3>Statistiques de Diffusion</h3>
+                        <div class="stats-grid">
+                            <div class="stat-card">
+                                <div class="stat-icon">⏰</div>
+                                <div class="stat-info">
+                                    <div class="stat-number" id="broadcastHours">2h</div>
+                                    <div class="stat-label">Durée quotidienne</div>
+                                </div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-icon">📊</div>
+                                <div class="stat-info">
+                                    <div class="stat-number" id="broadcastDays">7/7</div>
+                                    <div class="stat-label">Jours par semaine</div>
+                                </div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-icon">🎯</div>
+                                <div class="stat-info">
+                                    <div class="stat-number" id="broadcastReach">0</div>
+                                    <div class="stat-label">Audience cumulée</div>
+                                </div>
                             </div>
                         </div>
                     </div>

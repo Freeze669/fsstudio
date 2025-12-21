@@ -1323,17 +1323,17 @@ loginBtn.addEventListener('click', () => {
 function performLogin(code) {
     console.log('🔐 Tentative de connexion avec le code:', code);
     console.log('📋 Modérateurs disponibles:', Object.keys(dynamicModerators));
-    
+
     // Vérifier d'abord les utilisateurs statiques
     let user = ADMIN_USERS[code];
     console.log('👑 Vérification utilisateurs statiques:', user ? 'Trouvé (' + user.name + ')' : 'Non trouvé');
-    
+
     // Si pas trouvé, vérifier les modérateurs dynamiques
     if (!user) {
         user = dynamicModerators[code];
         console.log('👥 Vérification modérateurs dynamiques:', user ? 'Trouvé (' + user.name + ')' : 'Non trouvé');
     }
-    
+
     if (user) {
         localStorage.setItem('adminAuth', code);
         adminCodeInput.value = '';
@@ -1343,9 +1343,10 @@ function performLogin(code) {
         showAdmin();
     } else {
         console.log('❌ Code incorrect:', code);
-        errorMessage.textContent = 'Code incorrect';
+        errorMessage.textContent = '❌ Code d\'accès incorrect. Vérifiez les codes disponibles ci-dessus.';
         errorMessage.style.display = 'block';
         adminCodeInput.value = '';
+        adminCodeInput.focus();
     }
 }
 
