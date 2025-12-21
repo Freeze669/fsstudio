@@ -1720,26 +1720,35 @@ function connectToFirebase() {
         loadMessages();
         listenToNewMessages();
         
-        // Charger les modérateurs dynamiques depuis Firebase
-        database.ref('admin/moderators').once('value', (snapshot) => {
-            const firebaseModerators = snapshot.val() || {};
-            // Fusionner avec les modérateurs locaux
-            dynamicModerators = { ...dynamicModerators, ...firebaseModerators };
-            localStorage.setItem('dynamicModerators', JSON.stringify(dynamicModerators));
-        });
-        
-        // Charger les finances des utilisateurs statiques depuis Firebase
+        // Charger les finances des utilisateurs statiques depuis Firebase avec mise à jour en temps réel
         Object.keys(ADMIN_USERS).forEach(code => {
-            database.ref('admin/finances/' + code).once('value', (snapshot) => {
+            database.ref('admin/finances/' + code).on('value', (snapshot) => {
                 const financeData = snapshot.val();
                 if (financeData) {
                     ADMIN_USERS[code].wallet = financeData.wallet || 0;
                     ADMIN_USERS[code].earnings = financeData.earnings || [];
+                } else {
+                    ADMIN_USERS[code].wallet = 0;
+                    ADMIN_USERS[code].earnings = [];
+                }
+                // Mettre à jour l'affichage des portefeuilles en temps réel
+                if (document.querySelector('.wallets-list')) {
+                    updateWalletsDisplay();
                 }
             });
         });
         
-        console.log('✅ Admin connecté à Firebase');
+        // Écouter les changements des modérateurs dynamiques
+        database.ref('admin/moderators').on('value', (snapshot) => {
+            const firebaseModerators = snapshot.val() || {};
+            // Fusionner avec les modérateurs locaux
+            dynamicModerators = { ...dynamicModerators, ...firebaseModerators };
+            localStorage.setItem('dynamicModerators', JSON.stringify(dynamicModerators));
+            // Mettre à jour l'affichage si l'onglet finance est actif
+            if (document.querySelector('.wallets-list')) {
+                updateWalletsDisplay();
+            }
+        });
         
     } catch (error) {
         console.error('❌ Erreur Firebase:', error);
@@ -3017,9 +3026,9 @@ function initializeFinancialData() {
     updateFinancialDashboard();
 }
 
-// Chargement des données financières depuis Firebase
+// Chargement des données financières depuis Firebase avec mise à jour en temps réel
 function loadFinancialData() {
-    database.ref('finance').once('value', (snapshot) => {
+    database.ref('finance').on('value', (snapshot) => {
         const data = snapshot.val() || {};
         financialData = {
             revenue: data.revenue || { streaming: 0, donations: 0, ads: 0, total: 0 },
@@ -3029,6 +3038,10 @@ function loadFinancialData() {
             wallets: data.wallets || []
         };
         updateFinancialDashboard();
+        // Mettre à jour l'affichage des portefeuilles si l'onglet est actif
+        if (document.querySelector('.wallets-list')) {
+            updateWalletsDisplay();
+        }
     });
 }
 
@@ -3092,16 +3105,25 @@ function updateFinancialMetrics() {
     const profit = financialData.revenue.total - financialData.expenses.total;
     const roi = financialData.expenses.total > 0 ? ((profit / financialData.expenses.total) * 100) : 0;
 
+    // Calcul du total des portefeuilles
+    const allUsers = { ...ADMIN_USERS, ...dynamicModerators };
+    const totalWallets = Object.values(allUsers).reduce((sum, user) => sum + (user.wallet || 0), 0);
+    const totalUsers = Object.keys(allUsers).length;
+
     // Mise à jour des cartes de métriques
     const revenueCard = document.querySelector('.metric-card.revenue .metric-value');
     const expensesCard = document.querySelector('.metric-card.expenses .metric-value');
     const profitCard = document.querySelector('.metric-card.profit .metric-value');
     const roiCard = document.querySelector('.metric-card.roi .metric-value');
+    const walletsCard = document.querySelector('.metric-card.wallets .metric-value');
+    const walletsChange = document.querySelector('.metric-card.wallets .metric-change');
     
     if (revenueCard) revenueCard.textContent = `$${financialData.revenue.total.toFixed(2)}`;
     if (expensesCard) expensesCard.textContent = `$${financialData.expenses.total.toFixed(2)}`;
     if (profitCard) profitCard.textContent = `$${profit.toFixed(2)}`;
     if (roiCard) roiCard.textContent = `${roi.toFixed(1)}%`;
+    if (walletsCard) walletsCard.textContent = `$${totalWallets.toFixed(2)}`;
+    if (walletsChange) walletsChange.textContent = `${totalUsers} utilisateurs`;
 
     // Calcul des changements (simulation basée sur les 30 derniers jours)
     const thirtyDaysAgo = new Date();

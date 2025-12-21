@@ -2615,6 +2615,10 @@ body.admin-active {
     border-left: 4px solid #ffc107;
 }
 
+.metric-card.wallets {
+    border-left: 4px solid #9c88ff;
+}
+
 .metric-icon {
     font-size: 32px;
     opacity: 0.8;
