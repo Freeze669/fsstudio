@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="admin.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet>
 </head>
 <body>
     <!-- Écran de connexion -->
@@ -197,7 +197,7 @@
                         <h2>👑 Gestion des Modérateurs</h2>
                         <p style="font-size: 12px; color: rgba(255,255,255,0.6); margin: 0;">Créer et gérer les comptes modérateurs</p>
                     </div>
-                    
+
                     <!-- Création de modérateur -->
                     <div class="send-message-form">
                         <div class="form-group">
@@ -234,10 +234,109 @@
                             ⚠️ Le code généré sera le mot de passe du modérateur. Notez-le bien !
                         </p>
                     </div>
-                    
+
                     <!-- Liste des modérateurs -->
                     <div class="moderator-list" id="moderatorList" style="margin-top: 20px;">
                         <!-- Les modérateurs seront affichés ici -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Section Programmation et Contact -->
+            <div class="admin-section">
+                <div class="section-header">
+                    <h2>📅 Programmation & Contact</h2>
+                </div>
+
+                <!-- Horaires de diffusion -->
+                <div class="schedule-section">
+                    <h3>Horaires de Diffusion</h3>
+                    <div class="schedule-editor">
+                        <div class="form-group">
+                            <label>Jour:</label>
+                            <select id="scheduleDay">
+                                <option value="Tous les jours">Tous les jours</option>
+                                <option value="Lundi">Lundi</option>
+                                <option value="Mardi">Mardi</option>
+                                <option value="Mercredi">Mercredi</option>
+                                <option value="Jeudi">Jeudi</option>
+                                <option value="Vendredi">Vendredi</option>
+                                <option value="Samedi">Samedi</option>
+                                <option value="Dimanche">Dimanche</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Heure de début:</label>
+                            <input type="time" id="scheduleStart" value="14:00">
+                        </div>
+                        <div class="form-group">
+                            <label>Heure de fin:</label>
+                            <input type="time" id="scheduleEnd" value="16:00">
+                        </div>
+                        <div class="form-actions">
+                            <button class="save-btn" id="saveScheduleBtn">💾 Sauvegarder Horaires</button>
+                        </div>
+                    </div>
+                    <div class="schedule-display">
+                        <div class="schedule-item">
+                            <span class="schedule-day" id="currentScheduleDay">Tous les jours</span>
+                            <span class="schedule-time" id="currentScheduleTime">14h00 - 16h00</span>
+                            <span class="schedule-status">🟢 Actif</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Informations de contact -->
+                <div class="contact-section">
+                    <h3>Informations de Contact</h3>
+                    <div class="contact-form">
+                        <div class="form-group">
+                            <label>Email:</label>
+                            <input type="email" id="contactEmail" value="contact@fsstudio.com">
+                        </div>
+                        <div class="form-group">
+                            <label>Site web:</label>
+                            <input type="url" id="contactWebsite" value="www.fsstudio.com">
+                        </div>
+                        <div class="form-group">
+                            <label>Téléphone:</label>
+                            <input type="tel" id="contactPhone" value="+33 1 23 45 67 89">
+                        </div>
+                        <div class="form-group">
+                            <label>Adresse:</label>
+                            <textarea id="contactAddress" rows="2">123 Rue de la Radio, 75001 Paris, France</textarea>
+                        </div>
+                        <div class="form-actions">
+                            <button class="save-btn" id="saveContactBtn">💾 Sauvegarder Contact</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Statistiques de diffusion -->
+                <div class="broadcast-stats">
+                    <h3>Statistiques de Diffusion</h3>
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-icon">⏰</div>
+                            <div class="stat-info">
+                                <div class="stat-number" id="broadcastHours">2h</div>
+                                <div class="stat-label">Durée quotidienne</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">📊</div>
+                            <div class="stat-info">
+                                <div class="stat-number" id="broadcastDays">7/7</div>
+                                <div class="stat-label">Jours par semaine</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">🎯</div>
+                            <div class="stat-info">
+                                <div class="stat-number" id="broadcastReach">0</div>
+                                <div class="stat-label">Audience cumulée</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -261,7 +360,7 @@
                             ⚠️ Si une URL est configurée, elle sera utilisée au lieu du streaming vocal direct. Laissez vide pour utiliser le streaming vocal.
                         </p>
                     </div>
-                    
+
                     <!-- Option simple : Fichier MP3 local -->
                     <div class="send-message-form" style="margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 20px;">
                         <div class="form-group">
@@ -669,106 +768,6 @@
                 </div>
             </div>
 
-            <!-- Section Programmation et Contact -->
-            <div class="admin-section">
-                <div class="section-header">
-                    <h2>📅 Programmation & Contact</h2>
-                </div>
-
-                <!-- Horaires de diffusion -->
-                <div class="schedule-section">
-                    <h3>Horaires de Diffusion</h3>
-                    <div class="schedule-editor">
-                        <div class="form-group">
-                            <label>Jour:</label>
-                            <select id="scheduleDay">
-                                <option value="Tous les jours">Tous les jours</option>
-                                <option value="Lundi">Lundi</option>
-                                <option value="Mardi">Mardi</option>
-                                <option value="Mercredi">Mercredi</option>
-                                <option value="Jeudi">Jeudi</option>
-                                <option value="Vendredi">Vendredi</option>
-                                <option value="Samedi">Samedi</option>
-                                <option value="Dimanche">Dimanche</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label>Heure de début:</label>
-                            <input type="time" id="scheduleStart" value="14:00">
-                        </div>
-                        <div class="form-group">
-                            <label>Heure de fin:</label>
-                            <input type="time" id="scheduleEnd" value="16:00">
-                        </div>
-                        <div class="form-actions">
-                            <button class="save-btn" id="saveScheduleBtn">💾 Sauvegarder Horaires</button>
-                        </div>
-                    </div>
-                    <div class="schedule-display">
-                        <div class="schedule-item">
-                            <span class="schedule-day" id="currentScheduleDay">Tous les jours</span>
-                            <span class="schedule-time" id="currentScheduleTime">14h00 - 16h00</span>
-                            <span class="schedule-status">🟢 Actif</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Informations de contact -->
-                <div class="contact-section">
-                    <h3>Informations de Contact</h3>
-                    <div class="contact-form">
-                        <div class="form-group">
-                            <label>Email:</label>
-                            <input type="email" id="contactEmail" value="contact@fsstudio.com">
-                        </div>
-                        <div class="form-group">
-                            <label>Site web:</label>
-                            <input type="url" id="contactWebsite" value="www.fsstudio.com">
-                        </div>
-                        <div class="form-group">
-                            <label>Téléphone:</label>
-                            <input type="tel" id="contactPhone" value="+33 1 23 45 67 89">
-                        </div>
-                        <div class="form-group">
-                            <label>Adresse:</label>
-                            <textarea id="contactAddress" rows="2">123 Rue de la Radio, 75001 Paris, France</textarea>
-                        </div>
-                        <div class="form-actions">
-                            <button class="save-btn" id="saveContactBtn">💾 Sauvegarder Contact</button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Statistiques de diffusion -->
-                <div class="broadcast-stats">
-                    <h3>Statistiques de Diffusion</h3>
-                    <div class="stats-grid">
-                        <div class="stat-card">
-                            <div class="stat-icon">⏰</div>
-                            <div class="stat-info">
-                                <div class="stat-number" id="broadcastHours">2h</div>
-                                <div class="stat-label">Durée quotidienne</div>
-                            </div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-icon">📊</div>
-                            <div class="stat-info">
-                                <div class="stat-number" id="broadcastDays">7/7</div>
-                                <div class="stat-label">Jours par semaine</div>
-                            </div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-icon">🎯</div>
-                            <div class="stat-info">
-                                <div class="stat-number" id="broadcastReach">0</div>
-                                <div class="stat-label">Audience cumulée</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
         <!-- Onglet Chat -->
             <div class="tab-content" id="chat">
                 <!-- Section Chat Management -->
@@ -1002,280 +1001,6 @@
                 </div>
             </div>
         </div>
-
-        <!-- Onglet Diffusion -->
-            <div class="tab-content" id="broadcasting">
-        </div>
-    </div>
-
-    <!-- Modal d'édition des modérateurs -->
-    <div class="modal" id="editModeratorModal" style="display: none;">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>✏️ Modifier le Modérateur</h3>
-                <span class="modal-close" id="cancelEditModeratorBtn">&times;</span>
-            </div>
-            <div class="modal-body">
-                <form id="editModeratorForm">
-                    <div class="form-group">
-                        <label>Nom du modérateur:</label>
-                        <input type="text" id="editModeratorName" placeholder="Nom du modérateur" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; font-size: 14px;">
-                    </div>
-                    <div class="form-group">
-                        <label>Label affiché (dans les parenthèses):</label>
-                        <input type="text" id="editModeratorDisplayLabel" placeholder="Ex: STAFF, MOD, ADMIN..." style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; font-size: 14px;">
-                    </div>
-                    <div class="form-group">
-                        <label>Code d'accès:</label>
-                        <input type="text" id="editModeratorCode" placeholder="Code d'accès" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; font-size: 14px;">
-                    </div>
-                    <div class="form-group">
-                        <label>Permissions:</label>
-                        <div style="display: flex; gap: 15px; margin-top: 5px;">
-                            <label style="display: flex; align-items: center; gap: 5px; color: rgba(255,255,255,0.8);">
-                                <input type="checkbox" id="editChatPermission"> 💬 Chat
-                            </label>
-                            <label style="display: flex; align-items: center; gap: 5px; color: rgba(255,255,255,0.8);">
-                                <input type="checkbox" id="editBroadcastPermission"> 📡 Diffusion
-                            </label>
-                            <label style="display: flex; align-items: center; gap: 5px; color: rgba(255,255,255,0.8);">
-                                <input type="checkbox" id="editFinancePermission"> 💰 Finance
-                            </label>
-                        </div>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button class="cancel-btn" id="cancelEditModeratorBtn">Annuler</button>
-                <button class="save-btn" id="saveEditModeratorBtn">💾 Sauvegarder</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal d'ajout de fonds -->
-    <div class="modal" id="addFinanceModal" style="display: none;">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>💰 Ajouter des Fonds</h3>
-                <span class="modal-close" id="cancelAddFinanceBtn">&times;</span>
-            </div>
-            <div class="modal-body">
-                <form id="addFinanceForm">
-                    <div class="form-group">
-                        <label>Sélectionner l'utilisateur:</label>
-                        <select id="financeUserSelect" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; font-size: 14px;">
-                            <option value="">Choisir un utilisateur...</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Montant à ajouter (€):</label>
-                        <input type="number" id="financeAmount" placeholder="0.00" min="0" step="0.01" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; font-size: 14px;">
-                    </div>
-                    <div class="form-group">
-                        <label>Description:</label>
-                        <input type="text" id="financeDescription" placeholder="Ex: Salaire mensuel, Bonus..." style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; font-size: 14px;">
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button class="cancel-btn" id="cancelAddFinanceBtn">Annuler</button>
-                <button class="save-btn" id="saveAddFinanceBtn">💰 Ajouter</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-    
-    <!-- Configuration Firebase -->
-    <script src="firebase-config.js"></script>
-    
-    <!-- Mediasoup Client -->
-    <script src="mediasoup-client-admin.js"></script>
-    
-    <!-- Panneau de contrôle audio -->
-    <script src="audio-control-panel.js"></script>
-    
-    <!-- Script Admin -->
-    <script src="admin.js"></script>
-</body>
-</html>
-                            </select>
-                            <button class="action-btn secondary" id="exportTransactionsBtn">📄 Exporter</button>
-                        </div>
-                    </div>
-
-                    <div class="transactions-table" id="transactionsTable">
-                        <div class="transaction-header">
-                            <div class="transaction-col date">Date</div>
-                            <div class="transaction-col type">Type</div>
-                            <div class="transaction-col description">Description</div>
-                            <div class="transaction-col amount">Montant</div>
-                            <div class="transaction-col balance">Solde</div>
-                        </div>
-                        <div class="transaction-body" id="transactionBody">
-                            <div class="transaction-row empty">
-                                <div class="transaction-col" colspan="5">Aucune transaction récente</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Gestion des budgets et objectifs -->
-                <div class="budget-section">
-                    <div class="section-header">
-                        <h3>🎯 Budgets et Objectifs</h3>
-                        <button class="action-btn primary" id="addBudgetBtn">➕ Nouveau Budget</button>
-                    </div>
-
-                    <div class="budgets-grid" id="budgetsGrid">
-                        <div class="budget-card">
-                            <div class="budget-header">
-                                <h4>🎵 Production Musicale</h4>
-                                <span class="budget-status on-track">Sur objectif</span>
-                            </div>
-                            <div class="budget-progress">
-                                <div class="progress-bar">
-                                    <div class="progress-fill" style="width: 65%"></div>
-                                </div>
-                                <div class="progress-text">
-                                    <span class="progress-current">650.00€</span>
-                                    <span class="progress-total">1000.00€</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="budget-card">
-                            <div class="budget-header">
-                                <h4>📡 Infrastructure Serveur</h4>
-                                <span class="budget-status over">Dépassement</span>
-                            </div>
-                            <div class="budget-progress">
-                                <div class="progress-bar">
-                                    <div class="progress-fill over" style="width: 110%"></div>
-                                </div>
-                                <div class="progress-text">
-                                    <span class="progress-current">550.00€</span>
-                                    <span class="progress-total">500.00€</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="budget-card">
-                            <div class="budget-header">
-                                <h4>📢 Marketing & Promotion</h4>
-                                <span class="budget-status under">Sous objectif</span>
-                            </div>
-                            <div class="budget-progress">
-                                <div class="progress-bar">
-                                    <div class="progress-fill" style="width: 35%"></div>
-                                </div>
-                                <div class="progress-text">
-                                    <span class="progress-current">175.00€</span>
-                                    <span class="progress-total">500.00€</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Gestion des portefeuilles utilisateurs -->
-                <div class="wallets-section">
-                    <div class="section-header">
-                        <h3>👥 Portefeuilles Utilisateurs</h3>
-                        <div class="wallet-actions">
-                            <button class="action-btn info" id="refreshWalletsBtn">🔄 Actualiser</button>
-                            <button class="action-btn warning" id="bulkTransferBtn">💸 Transfert groupé</button>
-                        </div>
-                    </div>
-
-                    <div class="wallets-controls">
-                        <div class="search-filter">
-                            <input type="text" id="walletSearch" placeholder="Rechercher un utilisateur..." class="search-input">
-                            <select id="walletSort" class="sort-select">
-                                <option value="balance-desc">Solde ↓</option>
-                                <option value="balance-asc">Solde ↑</option>
-                                <option value="name-asc">Nom A-Z</option>
-                                <option value="name-desc">Nom Z-A</option>
-                                <option value="last-activity">Dernière activité</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="wallets-list" id="walletsList">
-                        <div class="wallet-item">
-                            <div class="wallet-user">
-                                <div class="user-avatar">👤</div>
-                                <div class="user-info">
-                                    <div class="user-name">Chargement...</div>
-                                    <div class="user-role">Utilisateur</div>
-                                </div>
-                            </div>
-                            <div class="wallet-balance">
-                                <div class="balance-amount">0.00€</div>
-                                <div class="balance-change">+0.00€</div>
-                            </div>
-                            <div class="wallet-actions">
-                                <button class="wallet-btn edit">✏️</button>
-                                <button class="wallet-btn transfer">💸</button>
-                                <button class="wallet-btn history">📊</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Actions administratives (Directeur Général seulement) -->
-                <div class="admin-financial-actions" id="adminFinancialActions" style="display: none;">
-                    <div class="section-header">
-                        <h3>⚙️ Actions Administratives</h3>
-                    </div>
-
-                    <div class="admin-actions-grid">
-                        <div class="action-card">
-                            <h4>💰 Gestion des Fonds</h4>
-                            <div class="action-buttons">
-                                <button class="action-btn success" id="addFundsBtn">➕ Ajouter des fonds</button>
-                                <button class="action-btn danger" id="removeFundsBtn">➖ Retirer des fonds</button>
-                                <button class="action-btn warning" id="transferFundsBtn">🔄 Transférer</button>
-                            </div>
-                        </div>
-
-                        <div class="action-card">
-                            <h4>📊 Rapports Financiers</h4>
-                            <div class="action-buttons">
-                                <button class="action-btn info" id="generateReportBtn">📄 Générer rapport</button>
-                                <button class="action-btn secondary" id="exportDataBtn">💾 Exporter données</button>
-                                <button class="action-btn primary" id="backupDataBtn">🔒 Sauvegarde</button>
-                            </div>
-                        </div>
-
-                        <div class="action-card">
-                            <h4>🎯 Objectifs & KPIs</h4>
-                            <div class="action-buttons">
-                                <button class="action-btn primary" id="setGoalsBtn">🎯 Définir objectifs</button>
-                                <button class="action-btn info" id="trackKPIsBtn">📈 Suivre KPIs</button>
-                                <button class="action-btn warning" id="alertsBtn">🚨 Alertes</button>
-                            </div>
-                        </div>
-
-                        <div class="action-card">
-                            <h4>🔧 Maintenance</h4>
-                            <div class="action-buttons">
-                                <button class="action-btn danger" id="resetAllBtn">🔄 Réinitialiser tout</button>
-                                <button class="action-btn warning" id="auditBtn">🔍 Audit</button>
-                                <button class="action-btn secondary" id="maintenanceBtn">⚙️ Maintenance</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Onglet Diffusion -->
-            <div class="tab-content" id="broadcasting">
-        </div>
-    </div>
 
     <!-- Modal d'édition des modérateurs -->
     <div class="modal" id="editModeratorModal" style="display: none;">
