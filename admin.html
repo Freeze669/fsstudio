@@ -30,7 +30,7 @@
         <header class="admin-header">
             <div class="admin-title">
                 <h1>⚙️ Administration FS STUDIO</h1>
-                <span class="admin-badge">ADMIN</span>
+                <span class="admin-badge" id="userInfo">ADMIN</span>
             </div>
             <button class="logout-btn" id="logoutBtn">Déconnexion</button>
         </header>
@@ -147,6 +147,31 @@
                             <span class="status-label">Dernière activité:</span>
                             <span class="status-value" id="lastActivity">-</span>
                         </div>
+                    </div>
+                </div>
+
+                <!-- Section Gestion des Modérateurs (Founder seulement) -->
+                <div class="admin-section" id="createModeratorSection" style="display: none;">
+                    <div class="section-header">
+                        <h2>👑 Gestion des Modérateurs</h2>
+                        <p style="font-size: 12px; color: rgba(255,255,255,0.6); margin: 0;">Créer de nouveaux comptes modérateurs</p>
+                    </div>
+                    <div class="send-message-form">
+                        <div class="form-group">
+                            <label>Nom du modérateur:</label>
+                            <input type="text" id="moderatorName" placeholder="Ex: Modérateur Chat" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; font-size: 14px;">
+                        </div>
+                        <div class="form-group">
+                            <label>Code d'accès (auto-généré):</label>
+                            <input type="text" id="moderatorCode" placeholder="Généré automatiquement" readonly style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.5); color: rgba(255,255,255,0.7); font-size: 14px;">
+                        </div>
+                        <div class="form-actions">
+                            <button class="send-btn" id="generateCodeBtn">🎲 Générer Code</button>
+                            <button class="send-btn" id="createModeratorBtn">✅ Créer Modérateur</button>
+                        </div>
+                        <p style="margin-top: 10px; font-size: 12px; color: rgba(255,255,255,0.6);">
+                            ⚠️ Le code généré sera le mot de passe du modérateur. Notez-le bien !
+                        </p>
                     </div>
                 </div>
             </div>

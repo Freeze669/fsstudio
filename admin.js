@@ -1,6 +1,54 @@
-// Configuration Admin
-const ADMIN_CODE = 'FS2024ADMIN'; // Changez ce code pour la production !
-const ADMIN_USERNAME = 'Admin FS Studio';
+// Configuration Admin - Système hiérarchique
+const ADMIN_USERS = {
+    // Founder - Contrôle total
+    'FOUNDER2024': { role: 'founder', name: 'Founder FS Studio', permissions: ['all'] },
+    
+    // Management Team - Studio
+    'STUDIO2024': { role: 'management', name: 'Management FS Studio', permissions: ['chat', 'broadcast', 'stats'] },
+    
+    // Moderators (peuvent être ajoutés dynamiquement par le founder)
+};
+
+// Stockage des modérateurs créés dynamiquement
+let dynamicModerators = JSON.parse(localStorage.getItem('dynamicModerators') || '{}');
+
+// Fonction pour vérifier les permissions
+function hasPermission(user, permission) {
+    if (!user || !user.permissions) return false;
+    return user.permissions.includes('all') || user.permissions.includes(permission);
+}
+
+// Fonction pour créer un modérateur (seulement pour founder)
+function createModerator(code, name) {
+    if (!isAuthenticated || !currentUser || currentUser.role !== 'founder') {
+        alert('❌ Seuls les fondateurs peuvent créer des modérateurs');
+        return false;
+    }
+    
+    if (ADMIN_USERS[code] || dynamicModerators[code]) {
+        alert('❌ Ce code existe déjà');
+        return false;
+    }
+    
+    dynamicModerators[code] = {
+        role: 'moderator',
+        name: name,
+        permissions: ['chat'],
+        createdBy: currentUser.name,
+        createdAt: new Date().toISOString()
+    };
+    
+    localStorage.setItem('dynamicModerators', JSON.stringify(dynamicModerators));
+    
+    // Sauvegarder dans Firebase pour synchronisation
+    database.ref('admin/moderators/' + code).set(dynamicModerators[code]);
+    
+    alert(`✅ Modérateur "${name}" créé avec le code: ${code}`);
+    return true;
+}
+
+// Variables globales
+let currentUser = null;
 
 // Éléments DOM
 const loginScreen = document.getElementById('loginScreen');
@@ -188,12 +236,23 @@ let scriptProcessor = null;
 // Vérifier si déjà connecté
 function checkAuth() {
     const savedAuth = localStorage.getItem('adminAuth');
-    if (savedAuth === ADMIN_CODE) {
-        isAuthenticated = true;
-        showAdmin();
-    } else {
-        showLogin();
+    if (savedAuth) {
+        // Vérifier d'abord les utilisateurs statiques
+        let user = ADMIN_USERS[savedAuth];
+        
+        // Si pas trouvé, vérifier les modérateurs dynamiques
+        if (!user) {
+            user = dynamicModerators[savedAuth];
+        }
+        
+        if (user) {
+            currentUser = user;
+            isAuthenticated = true;
+            showAdmin();
+            return;
+        }
     }
+    showLogin();
 }
 
 // Afficher l'écran de connexion
@@ -208,6 +267,29 @@ function showAdmin() {
     loginScreen.style.display = 'none';
     adminContainer.style.display = 'block';
     isAuthenticated = true;
+    
+    // Afficher le nom et rôle de l'utilisateur
+    const userInfo = document.getElementById('userInfo');
+    if (userInfo && currentUser) {
+        userInfo.textContent = `${currentUser.name} (${currentUser.role})`;
+    }
+    
+    // Masquer les onglets selon les permissions
+    if (!hasPermission(currentUser, 'broadcast')) {
+        const broadcastTab = document.querySelector('[data-tab="broadcasting"]');
+        if (broadcastTab) broadcastTab.style.display = 'none';
+    }
+    
+    if (!hasPermission(currentUser, 'chat')) {
+        const chatTab = document.querySelector('[data-tab="chat"]');
+        if (chatTab) chatTab.style.display = 'none';
+    }
+    
+    // Masquer la section de création de modérateurs si pas founder
+    const createModeratorSection = document.getElementById('createModeratorSection');
+    if (createModeratorSection) {
+        createModeratorSection.style.display = currentUser && currentUser.role === 'founder' ? 'block' : 'none';
+    }
     
     // Initialiser les éléments DOM radio
     startVoiceBtn = document.getElementById('startVoiceBtn');
@@ -270,12 +352,54 @@ function showAdmin() {
     saveScheduleBtn.addEventListener('click', saveBroadcastSchedule);
     saveContactBtn.addEventListener('click', saveContactInfo);
     
+    // Écouteurs pour la gestion des modérateurs
+    const generateCodeBtn = document.getElementById('generateCodeBtn');
+    const createModeratorBtn = document.getElementById('createModeratorBtn');
+    const moderatorName = document.getElementById('moderatorName');
+    const moderatorCode = document.getElementById('moderatorCode');
+    
+    if (generateCodeBtn) {
+        generateCodeBtn.addEventListener('click', () => {
+            const code = 'MOD' + Math.random().toString(36).substr(2, 6).toUpperCase();
+            moderatorCode.value = code;
+        });
+    }
+    
+    if (createModeratorBtn) {
+        createModeratorBtn.addEventListener('click', () => {
+            const name = moderatorName.value.trim();
+            const code = moderatorCode.value.trim();
+            
+            if (!name) {
+                alert('Veuillez entrer un nom pour le modérateur');
+                return;
+            }
+            
+            if (!code) {
+                alert('Veuillez générer un code d\'accès');
+                return;
+            }
+            
+            if (createModerator(code, name)) {
+                moderatorName.value = '';
+                moderatorCode.value = '';
+            }
+        });
+    }
+    
     // Charger les données de diffusion
     loadBroadcastInfo();
     
     connectToFirebase();
     initRadio();
     initAudioControlPanel();
+    
+    // Mettre à jour les statistiques en temps réel toutes les 30 secondes
+    setInterval(() => {
+        if (isAuthenticated) {
+            updateStats();
+        }
+    }, 30000);
 }
 
 // Initialiser le panneau de contrôle audio
@@ -360,10 +484,20 @@ function setupAudioControls() {
 // Connexion
 loginBtn.addEventListener('click', () => {
     const code = adminCodeInput.value.trim();
-    if (code === ADMIN_CODE) {
-        localStorage.setItem('adminAuth', ADMIN_CODE);
+    
+    // Vérifier d'abord les utilisateurs statiques
+    let user = ADMIN_USERS[code];
+    
+    // Si pas trouvé, vérifier les modérateurs dynamiques
+    if (!user) {
+        user = dynamicModerators[code];
+    }
+    
+    if (user) {
+        localStorage.setItem('adminAuth', code);
         adminCodeInput.value = '';
         errorMessage.style.display = 'none';
+        currentUser = user;
         showAdmin();
     } else {
         errorMessage.textContent = 'Code incorrect';
@@ -557,6 +691,14 @@ function connectToFirebase() {
         loadMessages();
         listenToNewMessages();
         
+        // Charger les modérateurs dynamiques depuis Firebase
+        database.ref('admin/moderators').once('value', (snapshot) => {
+            const firebaseModerators = snapshot.val() || {};
+            // Fusionner avec les modérateurs locaux
+            dynamicModerators = { ...dynamicModerators, ...firebaseModerators };
+            localStorage.setItem('dynamicModerators', JSON.stringify(dynamicModerators));
+        });
+        
         console.log('✅ Admin connecté à Firebase');
         
     } catch (error) {
@@ -634,6 +776,38 @@ function updateStats() {
         const userCount = parseInt(totalUsers.textContent) || 1;
         const engagement = messageCount / userCount;
         engagementRate.textContent = engagement.toFixed(2);
+        
+        // Mettre à jour l'uptime
+        const uptimeMs = Date.now() - startTime;
+        const uptimeHours = Math.floor(uptimeMs / (1000 * 60 * 60));
+        const uptimeMinutes = Math.floor((uptimeMs % (1000 * 60 * 60)) / (1000 * 60));
+        uptime.textContent = `${uptimeHours}h ${uptimeMinutes}m`;
+        
+        // Calculer les changements depuis la dernière mise à jour
+        const messageChange = messageCount - lastMessageCount;
+        const userChange = parseInt(totalUsers.textContent) - lastUserCount;
+        const engagementChange = engagement - lastEngagement;
+        
+        // Mettre à jour les indicateurs de changement
+        if (messagesChange) {
+            messagesChange.textContent = messageChange >= 0 ? `+${messageChange}` : messageChange.toString();
+            messagesChange.className = `change ${messageChange >= 0 ? 'positive' : 'negative'}`;
+        }
+        
+        if (usersChange) {
+            usersChange.textContent = userChange >= 0 ? `+${userChange}` : userChange.toString();
+            usersChange.className = `change ${userChange >= 0 ? 'positive' : 'negative'}`;
+        }
+        
+        if (engagementChange) {
+            engagementChange.textContent = engagementChange >= 0 ? `+${engagementChange.toFixed(2)}` : engagementChange.toFixed(2);
+            engagementChange.className = `change ${engagementChange >= 0 ? 'positive' : 'negative'}`;
+        }
+        
+        // Sauvegarder les valeurs actuelles
+        lastMessageCount = messageCount;
+        lastUserCount = parseInt(totalUsers.textContent);
+        lastEngagement = engagement;
     });
 }
 

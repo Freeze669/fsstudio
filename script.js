@@ -24,7 +24,7 @@ const pauseIcon = document.querySelector('.pause-icon');
 // Éléments pour les informations de diffusion
 const scheduleDayEl = document.querySelector('.schedule-item .day');
 const scheduleTimeEl = document.querySelector('.schedule-item .time');
-const contactEmailEl = document.querySelector('.contact-value'); // Assuming first one is email
+const contactValueEls = document.querySelectorAll('.contact-value');
 
 // État du lecteur
 let isPlaying = false;
@@ -1697,10 +1697,12 @@ window.addEventListener('beforeunload', () => {
 // Initialisation du chat (attendre que Firebase soit prêt)
 if (typeof firebase !== 'undefined' && firebase.apps.length > 0) {
     initChat();
+    loadBroadcastInfo();
 } else {
     setTimeout(() => {
         if (typeof firebase !== 'undefined' && firebase.apps.length > 0) {
             initChat();
+            loadBroadcastInfo();
         } else {
             console.error('Firebase non initialisé');
             updateStatus(false, 'Firebase non configuré');
@@ -1724,15 +1726,11 @@ function loadBroadcastInfo() {
     // Charger les contacts et écouter les changements
     database.ref(FIREBASE_BROADCAST_INFO_PATH + '/contact').on('value', (snapshot) => {
         const contact = snapshot.val();
-        if (contact) {
-            // Mettre à jour les éléments de contact
-            const contactItems = document.querySelectorAll('.contact-value');
-            if (contactItems.length >= 4) {
-                contactItems[0].textContent = contact.email || 'contact@fsstudio.com';
-                contactItems[1].textContent = contact.website || 'www.fsstudio.com';
-                contactItems[2].textContent = contact.phone || '+33 1 23 45 67 89';
-                contactItems[3].textContent = contact.address || '123 Rue de la Radio, 75001 Paris, France';
-            }
+        if (contact && contactValueEls.length >= 4) {
+            contactValueEls[0].textContent = contact.email || 'contact@fsstudio.com';
+            contactValueEls[1].textContent = contact.website || 'www.fsstudio.com';
+            contactValueEls[2].textContent = contact.phone || '+33 1 23 45 67 89';
+            contactValueEls[3].textContent = contact.address || '123 Rue de la Radio, 75001 Paris, France';
         }
     });
 }
