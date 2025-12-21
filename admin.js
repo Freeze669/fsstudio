@@ -634,12 +634,15 @@ function checkAuth() {
 
 // Fonction séparée pour vérifier l'authentification (connexion automatique)
 function performAuthCheck() {
-    console.log('🔐 Démarrage de la connexion automatique...');
-
-    // Connexion automatique immédiate
-    setTimeout(() => {
-        performAutoLogin();
-    }, 1500); // Petit délai pour l'effet visuel de chargement
+    // Vérifier si déjà authentifié
+    const savedAuth = localStorage.getItem('adminAuth');
+    if (savedAuth && ADMIN_USERS[savedAuth]) {
+        currentUser = ADMIN_USERS[savedAuth];
+        console.log('✅ Session restaurée pour:', currentUser.name);
+        showAdmin();
+    } else {
+        showLogin();
+    }
 }
 
 // Afficher l'écran de connexion
@@ -1272,6 +1275,70 @@ function updateProfileInfo(profile) {
     }
 }
 
+// Fonction pour effectuer la connexion
+function performLogin(code) {
+    const loginError = document.getElementById('loginError');
+    const errorText = loginError ? loginError.querySelector('.error-text') : null;
+    
+    // Masquer l'erreur précédente
+    if (loginError) {
+        loginError.style.display = 'none';
+    }
+    
+    // Vérifier si le code est vide
+    if (!code || code.trim() === '') {
+        if (loginError && errorText) {
+            errorText.textContent = 'Veuillez entrer un code d\'accès';
+            loginError.style.display = 'flex';
+        }
+        adminCodeInput.focus();
+        return;
+    }
+    
+    // Vérifier dans les utilisateurs statiques
+    let user = ADMIN_USERS[code];
+    
+    // Si pas trouvé, vérifier dans les modérateurs dynamiques
+    if (!user) {
+        user = dynamicModerators[code];
+    }
+    
+    if (user) {
+        // Connexion réussie
+        localStorage.setItem('adminAuth', code);
+        currentUser = user;
+        console.log('✅ Connexion réussie pour:', user.name, '- Rôle:', user.role);
+        
+        // Masquer l'erreur si elle était affichée
+        if (loginError) {
+            loginError.style.display = 'none';
+        }
+        
+        // Réinitialiser le champ
+        adminCodeInput.value = '';
+        
+        showAdmin();
+    } else {
+        // Code incorrect
+        if (loginError && errorText) {
+            errorText.textContent = 'Code d\'accès incorrect. Veuillez réessayer.';
+            loginError.style.display = 'flex';
+        }
+        
+        // Effet de secousse sur le champ
+        adminCodeInput.style.animation = 'none';
+        setTimeout(() => {
+            adminCodeInput.style.animation = 'errorShake 0.5s ease-out';
+        }, 10);
+        
+        // Réinitialiser le champ après l'animation
+        setTimeout(() => {
+            adminCodeInput.value = '';
+            adminCodeInput.focus();
+        }, 500);
+    }
+}
+
 // Connexion
 loginBtn.addEventListener('click', () => {
     const code = adminCodeInput.value.trim();
@@ -1323,6 +1390,14 @@ logoutBtn.addEventListener('click', () => {
 adminCodeInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
         loginBtn.click();
+    }
+});
+
+// Masquer l'erreur quand l'utilisateur commence à taper
+adminCodeInput.addEventListener('input', () => {
+    const loginError = document.getElementById('loginError');
+    if (loginError && loginError.style.display !== 'none') {
+        loginError.style.display = 'none';
     }
 });
 

@@ -12,37 +12,36 @@
 <body>
     <!-- Écran de connexion -->
     <div class="login-screen" id="loginScreen">
+        <div class="login-background">
+            <div class="login-pattern"></div>
+        </div>
         <div class="login-container">
+            <div class="login-logo">
+                <div class="logo-icon">🔐</div>
+                <div class="logo-glow"></div>
+            </div>
             <div class="login-header">
-                <h1>🔐 Administration FS STUDIO</h1>
-                <p>Accès réservé aux administrateurs autorisés</p>
+                <h1>Administration FS STUDIO</h1>
+                <p>Accès sécurisé au panneau d'administration</p>
             </div>
             <div class="login-form">
-                <div class="form-group">
-                    <label for="adminCode">Code d'accès administrateur:</label>
-                    <input type="password" id="adminCode" placeholder="Entrez votre code d'accès" autocomplete="off" required>
+                <div class="input-wrapper">
+                    <div class="input-icon">🔑</div>
+                    <input type="password" id="adminCodeInput" placeholder="Entrez votre code d'accès" maxlength="20" autocomplete="off">
+                    <div class="input-line"></div>
                 </div>
-                <button id="loginBtn" class="login-button">🔓 Se connecter</button>
-                <p class="error-message" id="errorMessage" style="display: none;"></p>
-
-                <!-- Informations sur les codes d'accès -->
-                <div class="login-info">
-                    <h4>🔑 Codes d'accès disponibles:</h4>
-                    <div class="code-examples">
-                        <div class="code-item">
-                            <strong>DIRECTEUR2024</strong> - Directeur Général (Contrôle total)
-                        </div>
-                        <div class="code-item">
-                            <strong>STUDIO2024</strong> - Directeur de Niveau 1 (Contrôle étendu)
-                        </div>
-                        <div class="code-item">
-                            <em>Ou codes de modérateurs créés par le Directeur Général</em>
-                        </div>
-                    </div>
-                    <p class="login-note">
-                        💡 <strong>Note:</strong> Si vous n'avez pas de code d'accès, contactez le Directeur Général pour en obtenir un.
-                    </p>
-                </div>
+                <button id="loginBtn" class="login-button">
+                    <span class="btn-text">Se connecter</span>
+                    <span class="btn-icon">→</span>
+                    <div class="btn-shine"></div>
+                </button>
+            </div>
+            <div class="login-error" id="loginError" style="display: none;">
+                <div class="error-icon">⚠️</div>
+                <div class="error-text"></div>
+            </div>
+            <div class="login-footer">
+                <p>Système sécurisé • Accès restreint</p>
             </div>
         </div>
     </div>
