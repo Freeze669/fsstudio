@@ -19,7 +19,7 @@ function hasPermission(user, permission) {
 }
 
 // Fonction pour créer un modérateur (seulement pour le Directeur Général)
-function createModerator(code, name) {
+function createModerator(code, name, displayLabel) {
     if (!isAuthenticated || !currentUser || currentUser.role !== 'directeur_general') {
         alert('❌ Seuls les Directeurs Généraux peuvent créer des modérateurs');
         return false;
@@ -31,8 +31,9 @@ function createModerator(code, name) {
     }
     
     dynamicModerators[code] = {
-        role: 'directeur_de_2',
+        role: 'STAFF',
         name: name,
+        displayLabel: displayLabel || 'STAFF', // Utiliser le label fourni ou défaut
         permissions: ['chat'],
         createdBy: currentUser.name,
         createdAt: new Date().toISOString()
@@ -48,7 +49,7 @@ function createModerator(code, name) {
 }
 
 // Fonction pour modifier un modérateur
-function updateModerator(oldCode, newCode, newName, newPermissions) {
+function updateModerator(oldCode, newCode, newName, newPermissions, newDisplayLabel) {
     if (!isAuthenticated || !currentUser || currentUser.role !== 'directeur_general') {
         alert('❌ Seuls les Directeurs Généraux peuvent modifier les modérateurs');
         return false;
@@ -73,6 +74,7 @@ function updateModerator(oldCode, newCode, newName, newPermissions) {
     dynamicModerators[newCode] = {
         role: 'directeur_de_2',
         name: newName,
+        displayLabel: newDisplayLabel || 'STAFF', // Utiliser le nouveau label ou défaut
         permissions: newPermissions,
         createdBy: currentUser.name,
         updatedAt: new Date().toISOString()
@@ -125,7 +127,7 @@ function displayModerators() {
         moderatorDiv.className = 'moderator-item';
         moderatorDiv.innerHTML = `
             <div class="moderator-info">
-                <strong>${moderator.name}</strong> (${code})
+                <strong>${moderator.name}</strong> (${moderator.displayLabel || moderator.role || 'STAFF'})
                 <br><small>Créé par: ${moderator.createdBy} • ${new Date(moderator.createdAt).toLocaleDateString()}</small>
                 <br><small>Permissions: ${moderator.permissions.join(', ')}</small>
             </div>
@@ -160,11 +162,13 @@ function editModerator(code) {
     // Remplir le formulaire d'édition
     const editName = document.getElementById('editModeratorName');
     const editCode = document.getElementById('editModeratorCode');
+    const editDisplayLabel = document.getElementById('editModeratorDisplayLabel');
     const editChat = document.getElementById('editChatPermission');
     const editBroadcast = document.getElementById('editBroadcastPermission');
     
     if (editName) editName.value = moderator.name;
     if (editCode) editCode.value = code;
+    if (editDisplayLabel) editDisplayLabel.value = moderator.displayLabel || 'STAFF';
     if (editChat) editChat.checked = moderator.permissions.includes('chat');
     if (editBroadcast) editBroadcast.checked = moderator.permissions.includes('broadcast');
     
@@ -373,8 +377,16 @@ function checkAuth() {
             const firebaseModerators = snapshot.val() || {};
             console.log('📋 Modérateurs trouvés dans Firebase:', Object.keys(firebaseModerators));
             
-            // Fusionner avec les modérateurs locaux
+            // Fusionner avec les modérateurs locaux et s'assurer que tous ont un displayLabel
             dynamicModerators = { ...dynamicModerators, ...firebaseModerators };
+            
+            // S'assurer que tous les modérateurs ont un displayLabel
+            Object.keys(dynamicModerators).forEach(code => {
+                if (!dynamicModerators[code].displayLabel) {
+                    dynamicModerators[code].displayLabel = dynamicModerators[code].role || 'STAFF';
+                }
+            });
+            
             localStorage.setItem('dynamicModerators', JSON.stringify(dynamicModerators));
             console.log('✅ Modérateurs chargés et fusionnés:', Object.keys(dynamicModerators).length, 'modérateurs');
             
@@ -542,10 +554,16 @@ function showAdmin() {
     if (createModeratorBtn) {
         createModeratorBtn.addEventListener('click', () => {
             const name = moderatorName.value.trim();
+            const displayLabel = document.getElementById('moderatorDisplayLabel').value.trim();
             const code = moderatorCode.value.trim();
             
             if (!name) {
                 alert('Veuillez entrer un nom pour le modérateur');
+                return;
+            }
+            
+            if (!displayLabel) {
+                alert('Veuillez entrer un label affiché pour le modérateur');
                 return;
             }
             
@@ -554,8 +572,9 @@ function showAdmin() {
                 return;
             }
             
-            if (createModerator(code, name)) {
+            if (createModerator(code, name, displayLabel)) {
                 moderatorName.value = '';
+                document.getElementById('moderatorDisplayLabel').value = 'STAFF';
                 moderatorCode.value = '';
                 displayModerators(); // Rafraîchir la liste
             }
@@ -572,6 +591,7 @@ function showAdmin() {
             const originalCode = document.getElementById('editModeratorForm').dataset.originalCode;
             const newName = document.getElementById('editModeratorName').value.trim();
             const newCode = document.getElementById('editModeratorCode').value.trim();
+            const newDisplayLabel = document.getElementById('editModeratorDisplayLabel').value.trim();
             const chatPermission = document.getElementById('editChatPermission').checked;
             const broadcastPermission = document.getElementById('editBroadcastPermission').checked;
             
@@ -589,7 +609,7 @@ function showAdmin() {
                 return;
             }
             
-            if (updateModerator(originalCode, newCode, newName, newPermissions)) {
+            if (updateModerator(originalCode, newCode, newName, newPermissions, newDisplayLabel)) {
                 if (editModal) editModal.style.display = 'none';
                 displayModerators(); // Rafraîchir la liste
             }
