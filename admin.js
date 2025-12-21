@@ -584,6 +584,13 @@ function showAdmin() {
             updateStats();
         }
     }, 30000);
+    
+    // Mettre à jour l'uptime en temps réel toutes les secondes
+    setInterval(() => {
+        if (isAuthenticated && uptime) {
+            updateUptime();
+        }
+    }, 1000);
 }
 
 // Initialiser le panneau de contrôle audio
@@ -869,6 +876,9 @@ function connectToFirebase() {
                 adminOnlineCount.textContent = '0';
                 totalUsers.textContent = '0';
             }
+            // Mettre à jour les statistiques en temps réel
+            updateStats();
+            calculatePercentages();
         });
         
         // Charger et écouter les messages
@@ -1018,6 +1028,9 @@ function updateStats() {
     if (lastActivity) {
         lastActivity.textContent = new Date().toLocaleTimeString();
     }
+    
+    // Calculer les pourcentages
+    calculatePercentages();
 }
 
 // Gérer les clics sur les boutons de suppression
@@ -1798,6 +1811,8 @@ function countListeners() {
         } else {
             listenersCount.textContent = '0';
         }
+        // Mettre à jour les pourcentages en temps réel
+        calculatePercentages();
     });
 }
 
