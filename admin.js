@@ -442,6 +442,12 @@ function switchTab(tabId) {
     // Charger le contenu spécifique à l'onglet
     if (tabId === 'finance') {
         if (hasPermission(currentUser, 'finance')) {
+            // S'assurer que les données financières sont chargées
+            if (!financialData.transactions) {
+                initializeFinancialData();
+            } else {
+                updateFinancialDashboard();
+            }
             loadFinances();
         }
     } else if (tabId === 'member-wallet-view') {
@@ -1121,22 +1127,6 @@ function showAdmin() {
             });
         }
     }, 60000);
-    
-    // Générer automatiquement des revenus basés sur les auditeurs toutes les minutes
-    setInterval(() => {
-        if (isAuthenticated && currentUser && hasPermission(currentUser, 'finance')) {
-            database.ref('radio/listeners').once('value', (snapshot) => {
-                const listeners = snapshot.val();
-                const listenerCount = listeners ? Object.keys(listeners).length : 0;
-                if (listenerCount > 0) {
-                    // Générer 0.01$ par auditeur par minute
-                    const revenueAmount = listenerCount * 0.01;
-                    addRevenue(revenueAmount, 'streaming', `Revenus automatiques: ${listenerCount} auditeurs`);
-                    console.log(`💰 Revenus générés: $${revenueAmount.toFixed(2)} (${listenerCount} auditeurs)`);
-                }
-            });
-        }
-    }, 60000); // Toutes les minutes
 }
 
 // Initialiser le panneau de contrôle audio
@@ -3476,6 +3466,32 @@ function adjustWallet(userCode, amount) {
 
     user.earnings = user.earnings || [];
     user.earnings.push(earning);
+
+    // Ajouter une transaction financière
+    const transaction = {
+        id: Date.now(),
+        type: amount > 0 ? 'expense' : 'revenue',
+        amount: Math.abs(parseFloat(amount)),
+        category: 'wallets',
+        description: `${amount > 0 ? 'Ajustement portefeuille +' : 'Ajustement portefeuille -'}${Math.abs(amount)} pour ${user.name}`,
+        date: new Date().toISOString()
+    };
+
+    financialData.transactions.push(transaction);
+    
+    // Mettre à jour les totaux
+    if (amount > 0) {
+        financialData.expenses.other += Math.abs(amount);
+        financialData.expenses.total += Math.abs(amount);
+    } else {
+        financialData.revenue.total += Math.abs(amount);
+        // Peut-être ajouter une catégorie spéciale pour les ajustements
+        if (!financialData.revenue.adjustments) financialData.revenue.adjustments = 0;
+        financialData.revenue.adjustments += Math.abs(amount);
+    }
+
+    saveFinancialData();
+    updateFinancialDashboard();
 
     // Sauvegarde
     if (ADMIN_USERS[userCode]) {
