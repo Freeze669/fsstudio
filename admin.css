@@ -3062,6 +3062,36 @@ body.admin-active {
     color: white;
 }
 
+.custom-amount-input {
+    width: 80px;
+    padding: 6px 8px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    font-size: 12px;
+    text-align: center;
+}
+
+.custom-amount-input::placeholder {
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.custom-amount-input:focus {
+    outline: none;
+    border-color: #4CAF50;
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.wallet-btn.custom {
+    background: #4CAF50;
+    color: white;
+}
+
+.wallet-btn.custom:hover {
+    background: #45a049;
+}
+
 .admin-financial-actions {
     margin-top: 40px;
 }

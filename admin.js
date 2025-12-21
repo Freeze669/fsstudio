@@ -1121,6 +1121,22 @@ function showAdmin() {
             });
         }
     }, 60000);
+    
+    // Générer automatiquement des revenus basés sur les auditeurs toutes les minutes
+    setInterval(() => {
+        if (isAuthenticated && currentUser && hasPermission(currentUser, 'finance')) {
+            database.ref('radio/listeners').once('value', (snapshot) => {
+                const listeners = snapshot.val();
+                const listenerCount = listeners ? Object.keys(listeners).length : 0;
+                if (listenerCount > 0) {
+                    // Générer 0.01$ par auditeur par minute
+                    const revenueAmount = listenerCount * 0.01;
+                    addRevenue(revenueAmount, 'streaming', `Revenus automatiques: ${listenerCount} auditeurs`);
+                    console.log(`💰 Revenus générés: $${revenueAmount.toFixed(2)} (${listenerCount} auditeurs)`);
+                }
+            });
+        }
+    }, 60000); // Toutes les minutes
 }
 
 // Initialiser le panneau de contrôle audio
@@ -3312,6 +3328,8 @@ function updateWalletsDisplay() {
             <div class="wallet-actions">
                 <button class="wallet-btn" onclick="adjustWallet('${code}', 10)">+10</button>
                 <button class="wallet-btn" onclick="adjustWallet('${code}', -10)">-10</button>
+                <input type="number" class="custom-amount-input" id="custom-${code}" placeholder="Montant" step="0.01">
+                <button class="wallet-btn custom" onclick="applyCustomAmount('${code}')">Appliquer</button>
                 <button class="wallet-btn" onclick="viewWalletHistory('${code}')">📊</button>
             </div>
         `;
@@ -3343,18 +3361,28 @@ function setupFinancialEventListeners() {
 
 // Fonctions d'ajout de transactions
 function addRevenue(amount, source, description) {
+    const amountValue = parseFloat(amount);
+    if (isNaN(amountValue) || amountValue <= 0) {
+        alert('❌ Montant invalide');
+        return;
+    }
+
     const transaction = {
         id: Date.now(),
         type: 'revenue',
-        amount: parseFloat(amount),
+        amount: amountValue,
         category: source,
         description: description,
         date: new Date().toISOString()
     };
 
+    financialData.transactions = financialData.transactions || [];
+    financialData.revenue = financialData.revenue || { streaming: 0, donations: 0, ads: 0, total: 0 };
+    if (typeof financialData.revenue[source] === 'undefined') financialData.revenue[source] = 0;
+
     financialData.transactions.push(transaction);
     financialData.revenue[source] += transaction.amount;
-    financialData.revenue.total += transaction.amount;
+    financialData.revenue.total = (financialData.revenue.total || 0) + transaction.amount;
 
     saveFinancialData();
     updateFinancialDashboard();
@@ -3451,7 +3479,11 @@ function adjustWallet(userCode, amount) {
 
     // Sauvegarde
     if (ADMIN_USERS[userCode]) {
-        // Utilisateur statique
+        // Utilisateur statique - sauvegarder dans admin/finances
+        database.ref('admin/finances/' + userCode).set({
+            wallet: user.wallet,
+            earnings: user.earnings
+        });
     } else {
         dynamicModerators[userCode] = user;
         localStorage.setItem('dynamicModerators', JSON.stringify(dynamicModerators));
@@ -3459,6 +3491,17 @@ function adjustWallet(userCode, amount) {
     }
 
     updateWalletsDisplay();
+}
+
+function applyCustomAmount(userCode) {
+    const input = document.getElementById(`custom-${userCode}`);
+    const amount = parseFloat(input.value);
+    if (isNaN(amount) || amount === 0) {
+        alert('Veuillez entrer un montant valide');
+        return;
+    }
+    adjustWallet(userCode, amount);
+    input.value = ''; // Clear the input after applying
 }
 
 // Fonction pour afficher la vue membre simple (wallet uniquement)
