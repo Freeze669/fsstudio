@@ -288,19 +288,143 @@
 
             <!-- Onglet Diffusion -->
             <div class="tab-content" id="broadcasting">
-                <!-- Contenu de diffusion (identique à admin.html) -->
+                <!-- Configuration URL Stream -->
                 <div class="admin-section">
                     <div class="section-header">
                         <h2>📡 Configuration Stream Audio</h2>
                     </div>
                     <div class="send-message-form">
                         <div class="form-group">
-                            <label>URL du Stream Audio:</label>
+                            <label>URL du Stream Audio (ex: https://stream.example.com/radio.mp3):</label>
                             <input type="text" id="streamUrlInput" placeholder="https://..." style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; font-size: 14px;">
                         </div>
                         <div class="form-actions">
                             <button class="send-btn" id="saveStreamUrlBtn">💾 Enregistrer l'URL</button>
                         </div>
+                        <p style="margin-top: 10px; font-size: 12px; color: rgba(255,255,255,0.6);">
+                            ⚠️ Si une URL est configurée, elle sera utilisée au lieu du streaming vocal direct. Laissez vide pour utiliser le streaming vocal.
+                        </p>
+                    </div>
+
+                    <!-- Option simple : Fichier MP3 local -->
+                    <div class="send-message-form" style="margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 20px;">
+                        <div class="form-group">
+                            <label>🎵 OU : Diffuser un fichier MP3 directement (plus simple !)</label>
+                            <input type="file" id="mp3FileInput" accept="audio/mp3,audio/*" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; font-size: 14px;">
+                            <p style="margin-top: 5px; font-size: 11px; color: rgba(255,255,255,0.5);">
+                                Sélectionnez un fichier MP3 de votre ordinateur. Il sera diffusé automatiquement sur le site !
+                            </p>
+                        </div>
+                        <div class="form-actions">
+                            <button class="send-btn" id="startMp3StreamBtn">▶️ Démarrer la diffusion MP3</button>
+                            <button class="send-btn" id="stopMp3StreamBtn" style="display: none; background: #f04747;">⏹️ Arrêter la diffusion</button>
+                        </div>
+                        <p id="mp3StreamStatus" style="margin-top: 10px; font-size: 12px; color: rgba(255,255,255,0.6);"></p>
+                    </div>
+                </div>
+
+                <!-- Section Profils Audio -->
+                <div class="admin-section">
+                    <div class="section-header">
+                        <h2>🎵 Profils Audio - Qualité Optimisée</h2>
+                    </div>
+                    <div class="audio-profiles">
+                        <div class="profile-selector">
+                            <label>Profil Audio:</label>
+                            <select id="audioProfileSelect" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; font-size: 14px;">
+                                <option value="broadcast">📡 Broadcast (48kHz Stéréo) - Qualité radio professionnelle</option>
+                                <option value="music">🎵 Musique (44.1kHz Stéréo) - Qualité CD pour musique</option>
+                                <option value="voice">🎙️ Voix (16kHz Mono) - Optimisé pour la parole</option>
+                            </select>
+                        </div>
+                        <div class="profile-info" id="profileInfo" style="margin-top: 15px; padding: 15px; background: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);">
+                            <h4 style="margin: 0 0 10px 0; color: #43b581;">📡 Broadcast (48kHz Stéréo)</h4>
+                            <p style="margin: 0; font-size: 13px; color: rgba(255,255,255,0.8);">
+                                Profil optimisé pour la diffusion radio professionnelle avec latence minimale et qualité broadcast.
+                            </p>
+                        </div>
+                        <div class="audio-quality-indicator" style="margin-top: 15px; text-align: center;">
+                            <div class="quality-meter">
+                                <span class="quality-label">Qualité Audio: </span>
+                                <span class="quality-value" id="qualityValue">EXCELLENTE</span>
+                            </div>
+                            <div class="quality-bar" style="margin-top: 10px; height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden;">
+                                <div class="quality-fill" id="qualityFill" style="height: 100%; background: linear-gradient(90deg, #f04747, #faa61a, #43b581); width: 95%; border-radius: 4px;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section Contrôles Audio Avancés -->
+                <div class="admin-section">
+                    <div class="section-header">
+                        <h2>🎚️ Contrôles Audio Avancés</h2>
+                    </div>
+                    <div class="audio-controls-grid">
+                        <div class="control-group">
+                            <label>🎛️ Égaliseur</label>
+                            <div class="eq-controls">
+                                <div class="eq-slider">
+                                    <label>Basses (250Hz)</label>
+                                    <input type="range" id="eqLowGain" min="-10" max="10" step="0.1" value="2.0">
+                                    <span id="eqLowGainValue">2.0 dB</span>
+                                </div>
+                                <div class="eq-slider">
+                                    <label>Médiums (3kHz)</label>
+                                    <input type="range" id="eqMidGain" min="-10" max="10" step="0.1" value="3.0">
+                                    <span id="eqMidGainValue">3.0 dB</span>
+                                </div>
+                                <div class="eq-slider">
+                                    <label>Aigus (8kHz)</label>
+                                    <input type="range" id="eqHighGain" min="-10" max="10" step="0.1" value="2.5">
+                                    <span id="eqHighGainValue">2.5 dB</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="control-group">
+                            <label>🎚️ Compression</label>
+                            <div class="compressor-controls">
+                                <div class="compressor-slider">
+                                    <label>Seuil</label>
+                                    <input type="range" id="compressorThreshold" min="-40" max="0" step="1" value="-20">
+                                    <span id="compressorThresholdValue">-20 dB</span>
+                                </div>
+                                <div class="compressor-slider">
+                                    <label>Ratio</label>
+                                    <input type="range" id="compressorRatio" min="1" max="20" step="0.5" value="4">
+                                    <span id="compressorRatioValue">4:1</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="control-group">
+                            <label>🎚️ Effets Spéciaux</label>
+                            <div class="effects-controls">
+                                <div class="effect-toggle">
+                                    <label>
+                                        <input type="checkbox" id="stereoEnhancement" checked>
+                                        Amélioration Stéréo
+                                    </label>
+                                </div>
+                                <div class="effect-slider">
+                                    <label>Réverbération</label>
+                                    <input type="range" id="reverbMix" min="0" max="0.3" step="0.01" value="0.1">
+                                    <span id="reverbMixValue">10%</span>
+                                </div>
+                                <div class="effect-slider">
+                                    <label>Porte de Bruit</label>
+                                    <input type="range" id="noiseGateThreshold" min="-60" max="-20" step="1" value="-45">
+                                    <span id="noiseGateThresholdValue">-45 dB</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="audio-actions" style="margin-top: 20px; display: flex; gap: 10px;">
+                        <button class="action-btn primary" id="applyAudioSettings">✅ Appliquer les réglages</button>
+                        <button class="action-btn info" id="resetAudioSettings">🔄 Réinitialiser</button>
+                        <button class="action-btn warning" id="testAudioSettings">🎧 Tester l'audio</button>
                     </div>
                 </div>
 
@@ -314,27 +438,230 @@
                         </div>
                     </div>
 
-                    <div class="voice-controls">
-                        <button class="voice-btn" id="startVoiceBtn">🎤 Démarrer la diffusion vocale</button>
-                        <button class="voice-btn" id="stopVoiceBtn" style="display: none;">⏹️ Arrêter la diffusion</button>
+                    <!-- Info importante -->
+                    <div class="radio-info-box">
+                        <h4>📢 Diffusion vocale en direct</h4>
+                        <p>Ce système diffuse votre voix directement sur le site, sans serveur externe nécessaire.</p>
+                        <ul>
+                            <li>✅ Aucune configuration requise</li>
+                            <li>✅ Diffusion en temps réel</li>
+                            <li>✅ Accessible à tous les visiteurs</li>
+                            <li>✅ Qualité audio optimisée</li>
+                        </ul>
                     </div>
 
-                    <div class="voice-info" id="voiceInfo" style="display: none;">
-                        <div class="info-item">
-                            <span class="info-label">Statut:</span>
-                            <span class="info-value" id="voiceStatusText">Initialisation...</span>
+                    <!-- Contrôle vocal en direct -->
+                    <div class="voice-control">
+                        <div class="voice-header">
+                            <h3>🎤 Diffusion vocale en direct</h3>
                         </div>
-                        <div class="info-item">
-                            <span class="info-label">Niveau audio:</span>
-                            <span class="info-value">
-                                <div class="audio-level-bar">
-                                    <div class="audio-level-fill" id="audioLevel"></div>
+                        <div class="voice-controls">
+                            <button class="voice-btn" id="startVoiceBtn">
+                                <span class="voice-icon">🎤</span>
+                                <span>Démarrer la diffusion</span>
+                            </button>
+                            <button class="voice-btn stop" id="stopVoiceBtn" style="display: none;">
+                                <span class="voice-icon">⏹️</span>
+                                <span>Arrêter la diffusion</span>
+                            </button>
+                        </div>
+                        <div class="voice-info" id="voiceInfo" style="display: none;">
+                            <div class="voice-meter">
+                                <div class="meter-label">Niveau audio:</div>
+                                <div class="meter-bar">
+                                    <div class="meter-fill" id="audioLevel"></div>
                                 </div>
-                            </span>
+                            </div>
+                            <div class="audio-quality-info">
+                                <div class="quality-badge">🎚️ Normalisation active</div>
+                                <div class="quality-badge">🔇 Suppression de bruit</div>
+                                <div class="quality-badge">🎛️ Compression audio</div>
+                            </div>
+                            <p class="voice-status-text" id="voiceStatusText">En attente de permission microphone...</p>
+                            <div class="stream-stats" id="streamStats" style="display: none;">
+                                <div class="stat-row">
+                                    <span>Chunks envoyés:</span>
+                                    <span id="chunksSent">0</span>
+                                </div>
+                                <div class="stat-row">
+                                    <span>Dernier envoi:</span>
+                                    <span id="lastSent">-</span>
+                                </div>
+                            </div>
                         </div>
-                        <div class="info-item">
-                            <span class="info-label">Auditeurs:</span>
-                            <span class="info-value" id="listenersCount">0</span>
+                    </div>
+
+                    <!-- Instructions -->
+                    <div class="radio-instructions">
+                        <h4>📋 Comment utiliser:</h4>
+                        <ol>
+                            <li>Cliquez sur "Démarrer la diffusion" ci-dessous</li>
+                            <li>Autorisez l'accès au microphone dans votre navigateur</li>
+                            <li>Parlez normalement - votre voix sera diffusée en direct</li>
+                            <li>Les visiteurs du site entendront votre voix en temps réel</li>
+                            <li>Cliquez sur "Arrêter" pour mettre fin à la diffusion</li>
+                        </ol>
+                        <p class="info-note">💡 <strong>Astuce:</strong> Assurez-vous d'avoir un bon micro et un environnement calme pour une meilleure qualité audio.</p>
+                    </div>
+                </div>
+
+                <!-- Section Contrôle Audio en Temps Réel -->
+                <div class="admin-section" id="audioControlSection">
+                    <div class="section-header">
+                        <h2>🎛️ Contrôle Audio en Temps Réel</h2>
+                        <div class="audio-control-actions">
+                            <button class="action-btn" id="resetAudioParamsBtn">🔄 Réinitialiser</button>
+                            <button class="action-btn" id="saveAudioParamsBtn">💾 Sauvegarder</button>
+                        </div>
+                    </div>
+
+                    <div class="audio-control-panel">
+                        <!-- Filtres -->
+                        <div class="audio-control-group">
+                            <h3>🔊 Filtres</h3>
+                            <div class="control-row">
+                                <label>High-Pass (Hz): <span id="audio-highPassFreq-display">50 Hz</span></label>
+                                <input type="range" id="audio-highPassFreq" min="20" max="200" step="1" value="50">
+                            </div>
+                            <div class="control-row">
+                                <label>Low-Pass (Hz): <span id="audio-lowPassFreq-display">15000 Hz</span></label>
+                                <input type="range" id="audio-lowPassFreq" min="5000" max="20000" step="100" value="15000">
+                            </div>
+                        </div>
+
+                        <!-- Pré-emphasis -->
+                        <div class="audio-control-group">
+                            <h3>📈 Pré-emphasis FM</h3>
+                            <div class="control-row">
+                                <label>Gain (dB): <span id="audio-preEmphasisGain-display">+3.0 dB</span></label>
+                                <input type="range" id="audio-preEmphasisGain" min="0" max="10" step="0.1" value="3">
+                            </div>
+                            <div class="control-row">
+                                <label>Fréquence (Hz): <span id="audio-preEmphasisFreq-display">3000 Hz</span></label>
+                                <input type="range" id="audio-preEmphasisFreq" min="1000" max="8000" step="100" value="3000">
+                            </div>
+                        </div>
+
+                        <!-- Égaliseur -->
+                        <div class="audio-control-group">
+                            <h3>🎚️ Égaliseur</h3>
+                            <div class="eq-band">
+                                <h4>Basse (200Hz)</h4>
+                                <div class="control-row">
+                                    <label>Fréquence (Hz): <span id="audio-eqLowFreq-display">200 Hz</span></label>
+                                    <input type="range" id="audio-eqLowFreq" min="50" max="500" step="10" value="200">
+                                </div>
+                                <div class="control-row">
+                                    <label>Gain (dB): <span id="audio-eqLowGain-display">+1.5 dB</span></label>
+                                    <input type="range" id="audio-eqLowGain" min="-10" max="10" step="0.1" value="1.5">
+                                </div>
+                                <div class="control-row">
+                                    <label>Q: <span id="audio-eqLowQ-display">1.00</span></label>
+                                    <input type="range" id="audio-eqLowQ" min="0.1" max="5" step="0.1" value="1.0">
+                                </div>
+                            </div>
+                            <div class="eq-band">
+                                <h4>Médium (2kHz)</h4>
+                                <div class="control-row">
+                                    <label>Fréquence (Hz): <span id="audio-eqMidFreq-display">2000 Hz</span></label>
+                                    <input type="range" id="audio-eqMidFreq" min="500" max="5000" step="50" value="2000">
+                                </div>
+                                <div class="control-row">
+                                    <label>Gain (dB): <span id="audio-eqMidGain-display">+2.5 dB</span></label>
+                                    <input type="range" id="audio-eqMidGain" min="-10" max="10" step="0.1" value="2.5">
+                                </div>
+                                <div class="control-row">
+                                    <label>Q: <span id="audio-eqMidQ-display">1.20</span></label>
+                                    <input type="range" id="audio-eqMidQ" min="0.1" max="5" step="0.1" value="1.2">
+                                </div>
+                            </div>
+                            <div class="eq-band">
+                                <h4>Haute (6kHz)</h4>
+                                <div class="control-row">
+                                    <label>Fréquence (Hz): <span id="audio-eqHighFreq-display">6000 Hz</span></label>
+                                    <input type="range" id="audio-eqHighFreq" min="2000" max="12000" step="100" value="6000">
+                                </div>
+                                <div class="control-row">
+                                    <label>Gain (dB): <span id="audio-eqHighGain-display">+2.0 dB</span></label>
+                                    <input type="range" id="audio-eqHighGain" min="-10" max="10" step="0.1" value="2">
+                                </div>
+                                <div class="control-row">
+                                    <label>Q: <span id="audio-eqHighQ-display">1.00</span></label>
+                                    <input type="range" id="audio-eqHighQ" min="0.1" max="5" step="0.1" value="1.0">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Compresseur -->
+                        <div class="audio-control-group">
+                            <h3>🎚️ Compresseur</h3>
+                            <div class="control-row">
+                                <label>Seuil (dB): <span id="audio-compressorThreshold-display">-18.0 dB</span></label>
+                                <input type="range" id="audio-compressorThreshold" min="-60" max="0" step="1" value="-18">
+                            </div>
+                            <div class="control-row">
+                                <label>Knee (dB): <span id="audio-compressorKnee-display">15.0 dB</span></label>
+                                <input type="range" id="audio-compressorKnee" min="0" max="40" step="1" value="15">
+                            </div>
+                            <div class="control-row">
+                                <label>Ratio: <span id="audio-compressorRatio-display">3.0:1</span></label>
+                                <input type="range" id="audio-compressorRatio" min="1" max="20" step="0.1" value="3">
+                            </div>
+                            <div class="control-row">
+                                <label>Attack (ms): <span id="audio-compressorAttack-display">3.0 ms</span></label>
+                                <input type="range" id="audio-compressorAttack" min="0.001" max="0.1" step="0.001" value="0.003">
+                            </div>
+                            <div class="control-row">
+                                <label>Release (ms): <span id="audio-compressorRelease-display">150.0 ms</span></label>
+                                <input type="range" id="audio-compressorRelease" min="0.01" max="1" step="0.01" value="0.15">
+                            </div>
+                        </div>
+
+                        <!-- AGC -->
+                        <div class="audio-control-group">
+                            <h3>🔊 AGC (Auto Gain Control)</h3>
+                            <div class="control-row">
+                                <label>Gain: <span id="audio-agcGain-display">1.00</span></label>
+                                <input type="range" id="audio-agcGain" min="0.1" max="2" step="0.01" value="1.0">
+                            </div>
+                        </div>
+
+                        <!-- Limiter -->
+                        <div class="audio-control-group">
+                            <h3>🛡️ Limiter</h3>
+                            <div class="control-row">
+                                <label>Seuil (dB): <span id="audio-limiterThreshold-display">-0.3 dB</span></label>
+                                <input type="range" id="audio-limiterThreshold" min="-3" max="0" step="0.1" value="-0.3">
+                            </div>
+                            <div class="control-row">
+                                <label>Knee (dB): <span id="audio-limiterKnee-display">0.0 dB</span></label>
+                                <input type="range" id="audio-limiterKnee" min="0" max="10" step="0.1" value="0">
+                            </div>
+                            <div class="control-row">
+                                <label>Ratio: <span id="audio-limiterRatio-display">20.0:1</span></label>
+                                <input type="range" id="audio-limiterRatio" min="5" max="30" step="0.1" value="20">
+                            </div>
+                            <div class="control-row">
+                                <label>Attack (ms): <span id="audio-limiterAttack-display">1.0 ms</span></label>
+                                <input type="range" id="audio-limiterAttack" min="0.001" max="0.01" step="0.001" value="0.001">
+                            </div>
+                            <div class="control-row">
+                                <label>Release (ms): <span id="audio-limiterRelease-display">50.0 ms</span></label>
+                                <input type="range" id="audio-limiterRelease" min="0.01" max="0.2" step="0.01" value="0.05">
+                            </div>
+                        </div>
+
+                        <!-- De-emphasis -->
+                        <div class="audio-control-group">
+                            <h3>📉 De-emphasis</h3>
+                            <div class="control-row">
+                                <label>Gain (dB): <span id="audio-deEmphasisGain-display">-1.0 dB</span></label>
+                                <input type="range" id="audio-deEmphasisGain" min="-5" max="0" step="0.1" value="-1">
+                            </div>
+                            <div class="control-row">
+                                <label>Fréquence (Hz): <span id="audio-deEmphasisFreq-display">3000 Hz</span></label>
+                                <input type="range" id="audio-deEmphasisFreq" min="1000" max="8000" step="100" value="3000">
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -389,6 +716,7 @@
             <!-- Onglet Finance -->
             <div class="tab-content" id="finance">
                 <div class="finance-dashboard">
+                    <!-- Métriques financières principales -->
                     <div class="finance-metrics-grid">
                         <div class="metric-card revenue">
                             <div class="metric-icon">💰</div>
@@ -398,6 +726,7 @@
                                 <div class="metric-change">+0.00 (30j)</div>
                             </div>
                         </div>
+
                         <div class="metric-card expenses">
                             <div class="metric-icon">💸</div>
                             <div class="metric-content">
@@ -406,6 +735,7 @@
                                 <div class="metric-change">+0.00 (30j)</div>
                             </div>
                         </div>
+
                         <div class="metric-card profit">
                             <div class="metric-icon">📈</div>
                             <div class="metric-content">
@@ -414,6 +744,7 @@
                                 <div class="metric-change">+0.00 (30j)</div>
                             </div>
                         </div>
+
                         <div class="metric-card roi">
                             <div class="metric-icon">🎯</div>
                             <div class="metric-content">
@@ -423,8 +754,223 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- Graphiques financiers -->
+                    <div class="finance-charts">
+                        <div class="chart-container">
+                            <h3>📊 Revenus par Source</h3>
+                            <div class="chart-placeholder">
+                                <div class="chart-bar" data-value="$0.00" style="height: 20%"></div>
+                                <div class="chart-bar" data-value="$0.00" style="height: 40%"></div>
+                                <div class="chart-bar" data-value="$0.00" style="height: 60%"></div>
+                            </div>
+                        </div>
+
+                        <div class="chart-container">
+                            <h3>📈 Répartition des Dépenses</h3>
+                            <div class="pie-chart">
+                                <div class="pie-center">
+                                    <div class="pie-value">$0.00</div>
+                                    <div class="pie-label">Total</div>
+                                </div>
+                            </div>
+                            <div class="pie-legend">
+                                <div class="legend-item">
+                                    <div class="legend-color server"></div>
+                                    <div class="legend-label">Serveur</div>
+                                    <div class="legend-value">$0.00 (0.0%)</div>
+                                </div>
+                                <div class="legend-item">
+                                    <div class="legend-color marketing"></div>
+                                    <div class="legend-label">Marketing</div>
+                                    <div class="legend-value">$0.00 (0.0%)</div>
+                                </div>
+                                <div class="legend-item">
+                                    <div class="legend-color staff"></div>
+                                    <div class="legend-label">Staff</div>
+                                    <div class="legend-value">$0.00 (0.0%)</div>
+                                </div>
+                                <div class="legend-item">
+                                    <div class="legend-color other"></div>
+                                    <div class="legend-label">Autre</div>
+                                    <div class="legend-value">$0.00 (0.0%)</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section Transactions -->
+                    <div class="transactions-section">
+                        <div class="section-header">
+                            <h3>📋 Historique des Transactions</h3>
+                            <div class="transaction-filters">
+                                <select id="transaction-type-filter" class="filter-select">
+                                    <option value="all">Toutes les transactions</option>
+                                    <option value="revenue">Revenus</option>
+                                    <option value="expense">Dépenses</option>
+                                    <option value="transfer">Transferts</option>
+                                </select>
+                                <select id="transaction-sort" class="sort-select">
+                                    <option value="date-desc">Plus récent</option>
+                                    <option value="date-asc">Plus ancien</option>
+                                    <option value="amount-desc">Montant ↓</option>
+                                    <option value="amount-asc">Montant ↑</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="transactions-table">
+                            <div class="transaction-header">
+                                <div class="transaction-col">Date</div>
+                                <div class="transaction-col">Type</div>
+                                <div class="transaction-col">Description</div>
+                                <div class="transaction-col">Montant</div>
+                                <div class="transaction-col">Catégorie</div>
+                            </div>
+                            <div class="transaction-body">
+                                <div class="transaction-row empty">Aucune transaction trouvée</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section Budgets -->
+                    <div class="budget-section">
+                        <div class="section-header">
+                            <h3>🎯 Gestion des Budgets</h3>
+                            <button class="action-btn primary" onclick="createBudget('Nouveau Budget', 100)">➕ Nouveau Budget</button>
+                        </div>
+
+                        <div class="budgets-grid">
+                            <!-- Les budgets seront ajoutés dynamiquement -->
+                        </div>
+                    </div>
+
+                    <!-- Section Portefeuilles -->
+                    <div class="wallets-section">
+                        <div class="section-header">
+                            <h3>👥 Gestion des Portefeuilles</h3>
+                            <div class="wallets-controls">
+                                <div class="search-filter">
+                                    <input type="text" id="wallet-search" placeholder="Rechercher un utilisateur..." class="search-input">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="wallets-list">
+                            <!-- Les portefeuilles seront ajoutés dynamiquement -->
+                        </div>
+                    </div>
+
+                    <!-- Actions Administratives Financières -->
+                    <div class="admin-financial-actions">
+                        <div class="section-header">
+                            <h3>⚙️ Actions Administratives</h3>
+                        </div>
+
+                        <div class="admin-actions-grid">
+                            <div class="action-card">
+                                <h4>💰 Gestion des Revenus</h4>
+                                <div class="action-buttons">
+                                    <button class="action-btn success" onclick="addRevenue(prompt('Montant:'), 'streaming', prompt('Description:'))">➕ Ajouter Revenus</button>
+                                    <button class="action-btn info" onclick="generateFinancialReport()">📊 Rapport</button>
+                                </div>
+                            </div>
+
+                            <div class="action-card">
+                                <h4>💸 Gestion des Dépenses</h4>
+                                <div class="action-buttons">
+                                    <button class="action-btn warning" onclick="addExpense(prompt('Montant:'), 'server', prompt('Description:'))">➖ Ajouter Dépenses</button>
+                                    <button class="action-btn secondary" onclick="createBudget(prompt('Catégorie:'), prompt('Limite:'))">🎯 Créer Budget</button>
+                                </div>
+                            </div>
+
+                            <div class="action-card">
+                                <h4>📊 Export & Sauvegarde</h4>
+                                <div class="action-buttons">
+                                    <button class="action-btn primary" onclick="exportFinancialData()">💾 Exporter</button>
+                                    <button class="action-btn danger" onclick="resetFinancialData()">🔄 Réinitialiser</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
+
+    <!-- Modal d'édition des modérateurs -->
+    <div class="modal" id="editModeratorModal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>✏️ Modifier le Modérateur</h3>
+                <span class="modal-close" id="cancelEditModeratorBtn">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="editModeratorForm">
+                    <div class="form-group">
+                        <label>Nom du modérateur:</label>
+                        <input type="text" id="editModeratorName" placeholder="Nom du modérateur" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; font-size: 14px;">
+                    </div>
+                    <div class="form-group">
+                        <label>Label affiché (dans les parenthèses):</label>
+                        <input type="text" id="editModeratorDisplayLabel" placeholder="Ex: STAFF, MOD, ADMIN..." style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; font-size: 14px;">
+                    </div>
+                    <div class="form-group">
+                        <label>Code d'accès:</label>
+                        <input type="text" id="editModeratorCode" placeholder="Code d'accès" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; font-size: 14px;">
+                    </div>
+                    <div class="form-group">
+                        <label>Permissions:</label>
+                        <div style="display: flex; gap: 15px; margin-top: 5px;">
+                            <label style="display: flex; align-items: center; gap: 5px; color: rgba(255,255,255,0.8);">
+                                <input type="checkbox" id="editChatPermission"> 💬 Chat
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 5px; color: rgba(255,255,255,0.8);">
+                                <input type="checkbox" id="editBroadcastPermission"> 📡 Diffusion
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 5px; color: rgba(255,255,255,0.8);">
+                                <input type="checkbox" id="editFinancePermission"> 💰 Finance
+                            </label>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="cancel-btn" id="cancelEditModeratorBtn">Annuler</button>
+                <button class="save-btn" id="saveEditModeratorBtn">💾 Sauvegarder</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal d'ajout de fonds -->
+    <div class="modal" id="addFinanceModal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>💰 Ajouter des Fonds</h3>
+                <span class="modal-close" id="cancelAddFinanceBtn">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="addFinanceForm">
+                    <div class="form-group">
+                        <label>Sélectionner l'utilisateur:</label>
+                        <select id="financeUserSelect" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; font-size: 14px;">
+                            <option value="">Choisir un utilisateur...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Montant à ajouter (€):</label>
+                        <input type="number" id="financeAmount" placeholder="0.00" min="0" step="0.01" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; font-size: 14px;">
+                    </div>
+                    <div class="form-group">
+                        <label>Description:</label>
+                        <input type="text" id="financeDescription" placeholder="Ex: Salaire mensuel, Bonus..." style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; font-size: 14px;">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="cancel-btn" id="cancelAddFinanceBtn">Annuler</button>
+                <button class="save-btn" id="saveAddFinanceBtn">💰 Ajouter</button>
+            </div>
+        </div>
+    </div>
         </div>
     </div>
 

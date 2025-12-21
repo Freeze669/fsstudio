@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connexion - FS STUDIO Administration</title>
+    <link rel="stylesheet" href="admin.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="login-active">
+    <!-- Écran de connexion -->
+    <div class="login-screen" id="loginScreen">
+        <div class="login-background">
+            <div class="login-pattern"></div>
+        </div>
+        <div class="login-container">
+            <div class="login-logo">
+                <div class="logo-icon">🔐</div>
+                <div class="logo-glow"></div>
+            </div>
+            <div class="login-header">
+                <h1>Administration FS STUDIO</h1>
+                <p>Accès sécurisé au panneau d'administration</p>
+            </div>
+            <div class="login-form">
+                <div class="input-wrapper">
+                    <div class="input-icon">🔑</div>
+                    <input type="password" id="adminCodeInput" placeholder="Entrez votre code d'accès" maxlength="20" autocomplete="off">
+                    <div class="input-line"></div>
+                </div>
+                <button id="loginBtn" class="login-button">
+                    <span class="btn-text">Se connecter</span>
+                    <span class="btn-icon">→</span>
+                    <div class="btn-shine"></div>
+                </button>
+            </div>
+            <div class="login-error" id="loginError" style="display: none;">
+                <div class="error-icon">⚠️</div>
+                <div class="error-text"></div>
+            </div>
+            <div class="login-footer">
+                <p>Système sécurisé • Accès restreint</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    
+    <!-- Configuration Firebase -->
+    <script src="firebase-config.js"></script>
+    
+    <!-- Script de connexion -->
+    <script src="login.js"></script>
+</body>
+</html>
+
