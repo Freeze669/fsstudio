@@ -1,10 +1,10 @@
 // Configuration Admin - Système hiérarchique
 const ADMIN_USERS = {
     // Directeur Général - Contrôle total absolu
-    'FOUNDER2024': { role: 'directeur_general', name: 'Directeur Général FS Studio', permissions: ['all'] },
+    'DIRECTEUR2024': { role: 'directeur_general', name: 'Directeur Général FS Studio', permissions: ['all'] },
     
-    // Management Team - Studio
-    'STUDIO2024': { role: 'management', name: 'Management FS Studio', permissions: ['chat', 'broadcast', 'stats'] },
+    // Directeur de Niveau 1 - Contrôle total
+    'STUDIO2024': { role: 'directeur_de_1', name: 'Directeur de Niveau 1 FS Studio', permissions: ['all'] },
     
     // Moderators (peuvent être ajoutés dynamiquement par le Directeur Général)
 };
@@ -31,7 +31,7 @@ function createModerator(code, name) {
     }
     
     dynamicModerators[code] = {
-        role: 'moderator',
+        role: 'directeur_de_2',
         name: name,
         permissions: ['chat'],
         createdBy: currentUser.name,
@@ -71,7 +71,7 @@ function updateModerator(oldCode, newCode, newName, newPermissions) {
     
     // Créer le nouveau modérateur
     dynamicModerators[newCode] = {
-        role: 'moderator',
+        role: 'directeur_de_2',
         name: newName,
         permissions: newPermissions,
         createdBy: currentUser.name,
