@@ -4,7 +4,7 @@ const ADMIN_USERS = {
     'DIRECTEUR2024': { role: 'directeur_general', name: 'Directeur Général FS Studio', permissions: ['all'] },
     
     // Directeur de Niveau 1 - Contrôle total
-    'STUDIO2024': { role: 'directeur_de_1', name: 'Directeur de Niveau 1 FS Studio', permissions: ['all'] },
+    'STUDIO2024': { role: 'MANAGER STUDIO', name: 'Directeur de Niveau 1 FS Studio', permissions: ['all'] },
     
     // Moderators (peuvent être ajoutés dynamiquement par le Directeur Général)
 };
@@ -49,7 +49,7 @@ function createModerator(code, name, displayLabel) {
 }
 
 // Fonction pour modifier un modérateur
-function updateModerator(oldCode, newCode, newName, newPermissions, newDisplayLabel) {
+function updateModerator (oldCode, newCode, newName, newPermissions, newDisplayLabel) {
     if (!isAuthenticated || !currentUser || currentUser.role !== 'directeur_general') {
         alert('❌ Seuls les Directeurs Généraux peuvent modifier les modérateurs');
         return false;
@@ -72,7 +72,7 @@ function updateModerator(oldCode, newCode, newName, newPermissions, newDisplayLa
     
     // Créer le nouveau modérateur
     dynamicModerators[newCode] = {
-        role: 'directeur_de_2',
+        role: 'STAFF',
         name: newName,
         displayLabel: newDisplayLabel || 'STAFF', // Utiliser le nouveau label ou défaut
         permissions: newPermissions,
@@ -127,7 +127,7 @@ function displayModerators() {
         moderatorDiv.className = 'moderator-item';
         moderatorDiv.innerHTML = `
             <div class="moderator-info">
-                <strong>${moderator.name}</strong> (${moderator.displayLabel || moderator.role || 'STAFF'})
+                <strong>${moderator.name}</strong> (${moderator.displayLabel || 'STAFF'})
                 <br><small>Créé par: ${moderator.createdBy} • ${new Date(moderator.createdAt).toLocaleDateString()}</small>
                 <br><small>Permissions: ${moderator.permissions.join(', ')}</small>
             </div>
@@ -664,6 +664,14 @@ function showAdmin() {
                 const firebaseModerators = snapshot.val() || {};
                 const oldCount = Object.keys(dynamicModerators).length;
                 dynamicModerators = { ...dynamicModerators, ...firebaseModerators };
+                
+                // S'assurer que tous les modérateurs ont un displayLabel
+                Object.keys(dynamicModerators).forEach(code => {
+                    if (!dynamicModerators[code].displayLabel) {
+                        dynamicModerators[code].displayLabel = dynamicModerators[code].role || 'STAFF';
+                    }
+                });
+                
                 localStorage.setItem('dynamicModerators', JSON.stringify(dynamicModerators));
                 
                 const newCount = Object.keys(dynamicModerators).length;
