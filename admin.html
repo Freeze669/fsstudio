@@ -239,6 +239,111 @@
                     </div>
                 </div>
 
+                <!-- Section Profils Audio -->
+                <div class="admin-section">
+                    <div class="section-header">
+                        <h2>🎵 Profils Audio - Qualité Optimisée</h2>
+                    </div>
+                    <div class="audio-profiles">
+                        <div class="profile-selector">
+                            <label>Profil Audio:</label>
+                            <select id="audioProfileSelect" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; font-size: 14px;">
+                                <option value="broadcast">📡 Broadcast (48kHz Stéréo) - Qualité radio professionnelle</option>
+                                <option value="music">🎵 Musique (44.1kHz Stéréo) - Qualité CD pour musique</option>
+                                <option value="voice">🎙️ Voix (16kHz Mono) - Optimisé pour la parole</option>
+                            </select>
+                        </div>
+                        <div class="profile-info" id="profileInfo" style="margin-top: 15px; padding: 15px; background: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);">
+                            <h4 style="margin: 0 0 10px 0; color: #43b581;">📡 Broadcast (48kHz Stéréo)</h4>
+                            <p style="margin: 0; font-size: 13px; color: rgba(255,255,255,0.8);">
+                                Profil optimisé pour la diffusion radio professionnelle avec latence minimale et qualité broadcast.
+                            </p>
+                        </div>
+                        <div class="audio-quality-indicator" style="margin-top: 15px; text-align: center;">
+                            <div class="quality-meter">
+                                <span class="quality-label">Qualité Audio: </span>
+                                <span class="quality-value" id="qualityValue">EXCELLENTE</span>
+                            </div>
+                            <div class="quality-bar" style="margin-top: 10px; height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden;">
+                                <div class="quality-fill" id="qualityFill" style="height: 100%; background: linear-gradient(90deg, #f04747, #faa61a, #43b581); width: 95%; border-radius: 4px;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section Contrôles Audio Avancés -->
+                <div class="admin-section">
+                    <div class="section-header">
+                        <h2>🎚️ Contrôles Audio Avancés</h2>
+                    </div>
+                    <div class="audio-controls-grid">
+                        <div class="control-group">
+                            <label>🎛️ Égaliseur</label>
+                            <div class="eq-controls">
+                                <div class="eq-slider">
+                                    <label>Basses (250Hz)</label>
+                                    <input type="range" id="eqLowGain" min="-10" max="10" step="0.1" value="2.0">
+                                    <span id="eqLowGainValue">2.0 dB</span>
+                                </div>
+                                <div class="eq-slider">
+                                    <label>Médiums (3kHz)</label>
+                                    <input type="range" id="eqMidGain" min="-10" max="10" step="0.1" value="3.0">
+                                    <span id="eqMidGainValue">3.0 dB</span>
+                                </div>
+                                <div class="eq-slider">
+                                    <label>Aigus (8kHz)</label>
+                                    <input type="range" id="eqHighGain" min="-10" max="10" step="0.1" value="2.5">
+                                    <span id="eqHighGainValue">2.5 dB</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="control-group">
+                            <label>🎚️ Compression</label>
+                            <div class="compressor-controls">
+                                <div class="compressor-slider">
+                                    <label>Seuil</label>
+                                    <input type="range" id="compressorThreshold" min="-40" max="0" step="1" value="-20">
+                                    <span id="compressorThresholdValue">-20 dB</span>
+                                </div>
+                                <div class="compressor-slider">
+                                    <label>Ratio</label>
+                                    <input type="range" id="compressorRatio" min="1" max="20" step="0.5" value="4">
+                                    <span id="compressorRatioValue">4:1</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="control-group">
+                            <label>🎚️ Effets Spéciaux</label>
+                            <div class="effects-controls">
+                                <div class="effect-toggle">
+                                    <label>
+                                        <input type="checkbox" id="stereoEnhancement" checked>
+                                        Amélioration Stéréo
+                                    </label>
+                                </div>
+                                <div class="effect-slider">
+                                    <label>Réverbération</label>
+                                    <input type="range" id="reverbMix" min="0" max="0.3" step="0.01" value="0.1">
+                                    <span id="reverbMixValue">10%</span>
+                                </div>
+                                <div class="effect-slider">
+                                    <label>Porte de Bruit</label>
+                                    <input type="range" id="noiseGateThreshold" min="-60" max="-20" step="1" value="-45">
+                                    <span id="noiseGateThresholdValue">-45 dB</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="audio-actions" style="margin-top: 20px; display: flex; gap: 10px;">
+                        <button class="action-btn primary" id="applyAudioSettings">✅ Appliquer les réglages</button>
+                        <button class="action-btn info" id="resetAudioSettings">🔄 Réinitialiser</button>
+                        <button class="action-btn warning" id="testAudioSettings">🎧 Tester l'audio</button>
+                    </div>
+                </div>
+
                 <!-- Section Radio / Streaming -->
                 <div class="admin-section">
                     <div class="section-header">

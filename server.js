@@ -79,12 +79,20 @@ wss.on('connection', (ws, req) => {
             } else if (data.type === 'audio') {
                 // Audio reçu du diffuseur - rediffuser à tous les auditeurs
                 if (ws.isBroadcaster) {
+                    // Améliorer les métadonnées audio pour une meilleure qualité
                     const audioData = {
                         type: 'audio',
                         data: data.data,
-                        sampleRate: data.sampleRate || 48000,
-                        channels: data.channels || 2,
-                        timestamp: Date.now()
+                        sampleRate: data.sampleRate || 48000, // Défaut 48kHz pour broadcast
+                        channels: data.channels || 2, // Stéréo par défaut
+                        bitrate: data.bitrate || 128, // Bitrate par défaut
+                        codec: data.codec || 'opus', // Codec par défaut
+                        quality: data.quality || 'high', // Qualité par défaut
+                        timestamp: Date.now(),
+                        // Métadonnées supplémentaires pour monitoring
+                        audioLevel: data.audioLevel || 0,
+                        noiseLevel: data.noiseLevel || 0,
+                        compressionRatio: data.compressionRatio || 1.0
                     };
                     
                     // Envoyer à tous les auditeurs

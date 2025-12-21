@@ -1037,6 +1037,7 @@ function initAudioControlPanel() {
         
         // Initialiser les contrôles
         setupAudioControls();
+        setupAdvancedAudioControls();
     } else {
         // Réessayer après un court délai
         setTimeout(initAudioControlPanel, 1000);
@@ -1097,6 +1098,204 @@ function setupAudioControls() {
             panel.saveParams();
             alert('✅ Paramètres audio sauvegardés !');
         });
+    }
+}
+
+// Configurer les contrôles audio avancés (profils et effets)
+function setupAdvancedAudioControls() {
+    const panel = window.audioControlPanel;
+    if (!panel) return;
+
+    // Sélecteur de profil audio
+    const profileSelect = document.getElementById('audioProfileSelect');
+    if (profileSelect) {
+        // Charger le profil sauvegardé
+        const savedProfile = localStorage.getItem('audioProfile') || 'broadcast';
+        profileSelect.value = savedProfile;
+        updateProfileInfo(savedProfile);
+
+        profileSelect.addEventListener('change', (e) => {
+            const profile = e.target.value;
+            localStorage.setItem('audioProfile', profile);
+            updateProfileInfo(profile);
+
+            // Recharger la page pour appliquer le nouveau profil
+            if (confirm('Le profil audio a été changé. Recharger la page pour appliquer les modifications ?')) {
+                location.reload();
+            }
+        });
+    }
+
+    // Contrôles d'égaliseur
+    const eqControls = [
+        { id: 'eqLowGain', param: 'eqLowGain', display: 'eqLowGainValue' },
+        { id: 'eqMidGain', param: 'eqMidGain', display: 'eqMidGainValue' },
+        { id: 'eqHighGain', param: 'eqHighGain', display: 'eqHighGainValue' }
+    ];
+
+    eqControls.forEach(control => {
+        const input = document.getElementById(control.id);
+        const display = document.getElementById(control.display);
+
+        if (input && display) {
+            // Valeur initiale
+            input.value = panel.currentParams[control.param];
+            display.textContent = panel.currentParams[control.param] + ' dB';
+
+            input.addEventListener('input', (e) => {
+                const value = parseFloat(e.target.value);
+                panel.updateParam(control.param, value);
+                display.textContent = value + ' dB';
+            });
+        }
+    });
+
+    // Contrôles de compression
+    const compressorControls = [
+        { id: 'compressorThreshold', param: 'compressorThreshold', display: 'compressorThresholdValue', unit: ' dB' },
+        { id: 'compressorRatio', param: 'compressorRatio', display: 'compressorRatioValue', unit: ':1' }
+    ];
+
+    compressorControls.forEach(control => {
+        const input = document.getElementById(control.id);
+        const display = document.getElementById(control.display);
+
+        if (input && display) {
+            input.value = panel.currentParams[control.param];
+            display.textContent = panel.currentParams[control.param] + control.unit;
+
+            input.addEventListener('input', (e) => {
+                const value = parseFloat(e.target.value);
+                panel.updateParam(control.param, value);
+                display.textContent = value + control.unit;
+            });
+        }
+    });
+
+    // Contrôles d'effets
+    const effectControls = [
+        { id: 'stereoEnhancement', param: 'stereoEnhancement', type: 'checkbox' },
+        { id: 'reverbMix', param: 'reverbMix', display: 'reverbMixValue', unit: '%' },
+        { id: 'noiseGateThreshold', param: 'noiseGateThreshold', display: 'noiseGateThresholdValue', unit: ' dB' }
+    ];
+
+    effectControls.forEach(control => {
+        const input = document.getElementById(control.id);
+
+        if (input) {
+            if (control.type === 'checkbox') {
+                input.checked = panel.currentParams[control.param];
+                input.addEventListener('change', (e) => {
+                    panel.updateParam(control.param, e.target.checked);
+                });
+            } else {
+                const display = document.getElementById(control.display);
+                input.value = panel.currentParams[control.param];
+
+                if (control.unit === '%') {
+                    display.textContent = Math.round(panel.currentParams[control.param] * 100) + control.unit;
+                } else {
+                    display.textContent = panel.currentParams[control.param] + control.unit;
+                }
+
+                input.addEventListener('input', (e) => {
+                    const value = parseFloat(e.target.value);
+                    panel.updateParam(control.param, value);
+
+                    if (control.unit === '%') {
+                        display.textContent = Math.round(value * 100) + control.unit;
+                    } else {
+                        display.textContent = value + control.unit;
+                    }
+                });
+            }
+        }
+    });
+
+    // Boutons d'action
+    const applyBtn = document.getElementById('applyAudioSettings');
+    if (applyBtn) {
+        applyBtn.addEventListener('click', () => {
+            panel.saveParams();
+            alert('✅ Réglages audio appliqués et sauvegardés !');
+        });
+    }
+
+    const resetBtn = document.getElementById('resetAudioSettings');
+    if (resetBtn) {
+        resetBtn.addEventListener('click', () => {
+            if (confirm('Réinitialiser tous les réglages audio aux valeurs par défaut ?')) {
+                panel.resetToDefaults();
+                location.reload(); // Recharger pour appliquer les changements
+            }
+        });
+    }
+
+    const testBtn = document.getElementById('testAudioSettings');
+    if (testBtn) {
+        testBtn.addEventListener('click', () => {
+            // Créer un son de test
+            if (panel.audioContext) {
+                const oscillator = panel.audioContext.createOscillator();
+                const gainNode = panel.audioContext.createGain();
+
+                oscillator.frequency.value = 440; // La 440Hz
+                gainNode.gain.value = 0.1;
+
+                oscillator.connect(gainNode);
+                gainNode.connect(panel.audioContext.destination);
+
+                oscillator.start();
+                oscillator.stop(panel.audioContext.currentTime + 1);
+
+                alert('🎧 Son de test joué (1 seconde à 440Hz)');
+            } else {
+                alert('❌ AudioContext non disponible. Démarrez d\'abord la diffusion.');
+            }
+        });
+    }
+}
+
+// Mettre à jour les informations du profil
+function updateProfileInfo(profile) {
+    const profileInfo = document.getElementById('profileInfo');
+    const qualityValue = document.getElementById('qualityValue');
+    const qualityFill = document.getElementById('qualityFill');
+
+    const profiles = {
+        broadcast: {
+            title: '📡 Broadcast (48kHz Stéréo)',
+            description: 'Profil optimisé pour la diffusion radio professionnelle avec latence minimale et qualité broadcast.',
+            quality: 'EXCELLENTE',
+            percentage: 95
+        },
+        music: {
+            title: '🎵 Musique (44.1kHz Stéréo)',
+            description: 'Profil optimisé pour la musique avec qualité CD et traitement adapté au contenu musical.',
+            quality: 'TRÈS BONNE',
+            percentage: 88
+        },
+        voice: {
+            title: '🎙️ Voix (16kHz Mono)',
+            description: 'Profil optimisé pour la parole avec réduction de bruit avancée et compression vocale.',
+            quality: 'BONNE',
+            percentage: 75
+        }
+    };
+
+    const info = profiles[profile];
+    if (profileInfo && info) {
+        profileInfo.innerHTML = `
+            <h4 style="margin: 0 0 10px 0; color: #43b581;">${info.title}</h4>
+            <p style="margin: 0; font-size: 13px; color: rgba(255,255,255,0.8);">
+                ${info.description}
+            </p>
+        `;
+    }
+
+    if (qualityValue && qualityFill) {
+        qualityValue.textContent = info.quality;
+        qualityFill.style.width = info.percentage + '%';
     }
 }
 

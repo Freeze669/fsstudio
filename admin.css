@@ -992,6 +992,23 @@ body {
     .control-group label {
         min-width: auto;
     }
+
+    .audio-controls-grid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+
+    .audio-controls-grid .control-group {
+        padding: 16px;
+    }
+
+    .audio-actions {
+        flex-direction: column;
+    }
+
+    .audio-actions .action-btn {
+        width: 100%;
+    }
 }
 .audio-control-panel {
     display: flex;
@@ -1731,5 +1748,134 @@ body {
     color: rgba(255, 255, 255, 0.5);
     font-style: italic;
     padding: 40px;
+}
+
+/* Styles pour les contrôles audio avancés */
+.audio-profiles {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.profile-selector label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+#audioProfileSelect {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    color: white;
+    font-size: 14px;
+}
+
+.quality-meter {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.quality-value {
+    color: #43b581;
+}
+
+.audio-controls-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+}
+
+.audio-controls-grid .control-group {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.audio-controls-grid .control-group label {
+    display: block;
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 16px;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.eq-controls, .compressor-controls, .effects-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.eq-slider, .compressor-slider, .effect-slider {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.eq-slider label, .compressor-slider label, .effect-slider label {
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.7);
+    font-weight: 500;
+}
+
+.eq-slider input, .compressor-slider input, .effect-slider input {
+    width: 100%;
+    -webkit-appearance: none;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 3px;
+    outline: none;
+}
+
+.eq-slider input::-webkit-slider-thumb, .compressor-slider input::-webkit-slider-thumb, .effect-slider input::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    background: #43b581;
+    border-radius: 50%;
+    cursor: pointer;
+}
+
+.eq-slider span, .compressor-slider span, .effect-slider span {
+    font-size: 12px;
+    color: #43b581;
+    font-weight: 600;
+    text-align: right;
+}
+
+.effect-toggle {
+    display: flex;
+    align-items: center;
+}
+
+.effect-toggle label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.effect-toggle input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: #43b581;
+}
+
+.audio-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.audio-actions .action-btn {
+    flex: 1;
+    min-width: 120px;
 }
 

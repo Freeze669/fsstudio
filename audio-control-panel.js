@@ -16,40 +16,46 @@ class AudioControlPanel {
         if (saved) {
             return JSON.parse(saved);
         }
-        // Paramètres par défaut (radio FM)
+        // Paramètres par défaut optimisés pour broadcast radio
         return {
-            // Filtres
-            highPassFreq: 50,
-            lowPassFreq: 15000,
-            preEmphasisGain: 3,
-            preEmphasisFreq: 3000,
-            // EQ
-            eqLowFreq: 200,
-            eqLowGain: 1.5,
-            eqLowQ: 1.0,
-            eqMidFreq: 2000,
-            eqMidGain: 2.5,
-            eqMidQ: 1.2,
-            eqHighFreq: 6000,
-            eqHighGain: 2,
-            eqHighQ: 1.0,
-            // Compresseur
-            compressorThreshold: -18,
-            compressorKnee: 15,
-            compressorRatio: 3,
-            compressorAttack: 0.003,
-            compressorRelease: 0.15,
-            // AGC
-            agcGain: 1.0,
-            // Limiter
-            limiterThreshold: -0.3,
-            limiterKnee: 0,
-            limiterRatio: 20,
+            profile: 'broadcast', // Profil audio sélectionné
+            // Filtres améliorés
+            highPassFreq: 80, // Filtre passe-haut plus élevé pour éliminer les basses fréquences indésirables
+            lowPassFreq: 18000, // Filtre passe-bas étendu pour préserver les hautes fréquences
+            preEmphasisGain: 4, // Pré-accentuation augmentée pour la clarté
+            preEmphasisFreq: 4000, // Fréquence d'accentuation optimisée
+            // EQ optimisé pour la voix et la musique
+            eqLowFreq: 250,
+            eqLowGain: 2.0, // Basses plus présentes
+            eqLowQ: 1.2,
+            eqMidFreq: 3000,
+            eqMidGain: 3.0, // Médiums accentués pour la clarté vocale
+            eqMidQ: 1.4,
+            eqHighFreq: 8000,
+            eqHighGain: 2.5, // Aigus équilibrés
+            eqHighQ: 1.2,
+            // Compresseur optimisé pour broadcast
+            compressorThreshold: -20, // Seuil plus bas pour plus de compression
+            compressorKnee: 12,
+            compressorRatio: 4, // Ratio plus élevé pour contrôler la dynamique
+            compressorAttack: 0.002, // Attaque plus rapide
+            compressorRelease: 0.12, // Relâchement optimisé
+            // AGC amélioré
+            agcGain: 1.2, // Gain légèrement augmenté
+            // Limiter plus strict
+            limiterThreshold: -0.5, // Seuil plus élevé pour éviter la saturation
+            limiterKnee: 0.5,
+            limiterRatio: 15,
             limiterAttack: 0.001,
-            limiterRelease: 0.05,
-            // De-emphasis
-            deEmphasisGain: -1,
-            deEmphasisFreq: 3000
+            limiterRelease: 0.03,
+            // De-emphasis ajusté
+            deEmphasisGain: -1.5,
+            deEmphasisFreq: 4000,
+            // Nouveaux paramètres pour qualité supérieure
+            stereoEnhancement: true, // Amélioration stéréo
+            noiseGateThreshold: -45, // Porte de bruit pour éliminer le silence
+            expanderRatio: 2.5, // Expandeur pour améliorer la dynamique
+            reverbMix: 0.1 // Léger effet de salle pour la chaleur
         };
     }
     
@@ -145,8 +151,69 @@ class AudioControlPanel {
             deEmphasis.gain.value = this.currentParams.deEmphasisGain;
             deEmphasis.Q.value = 0.7;
             this.audioNodes.deEmphasis = deEmphasis;
-            
-            // Chaînage
+
+            // 9. Noise Gate (porte de bruit)
+            const noiseGate = this.audioContext.createDynamicsCompressor();
+            noiseGate.threshold.value = this.currentParams.noiseGateThreshold;
+            noiseGate.knee.value = 0;
+            noiseGate.ratio.value = 20; // Ratio élevé pour gate
+            noiseGate.attack.value = 0.001;
+            noiseGate.release.value = 0.1;
+            this.audioNodes.noiseGate = noiseGate;
+
+            // 10. Expander (pour améliorer la dynamique)
+            const expander = this.audioContext.createDynamicsCompressor();
+            expander.threshold.value = -30;
+            expander.knee.value = 5;
+            expander.ratio.value = this.currentParams.expanderRatio;
+            expander.attack.value = 0.01;
+            expander.release.value = 0.2;
+            this.audioNodes.expander = expander;
+
+            // 11. Stereo Enhancement (si stéréo activé)
+            let stereoEnhancer = null;
+            if (this.currentParams.stereoEnhancement && profile.channelCount === 2) {
+                // Créer un splitter pour traiter les canaux séparément
+                const splitter = this.audioContext.createChannelSplitter(2);
+                const merger = this.audioContext.createChannelMerger(2);
+
+                // Delay léger sur un canal pour effet stéréo
+                const delay = this.audioContext.createDelay(0.01);
+                delay.delayTime.value = 0.005;
+
+                // Connecter le splitter
+                expander.connect(splitter);
+
+                // Canal gauche direct
+                splitter.connect(merger, 0, 0);
+                // Canal droit avec delay
+                splitter.connect(delay, 1);
+                delay.connect(merger, 0, 1);
+
+                stereoEnhancer = { splitter, merger, delay };
+                this.audioNodes.stereoEnhancer = stereoEnhancer;
+            }
+
+            // 12. Reverb léger pour chaleur
+            const reverbGain = this.audioContext.createGain();
+            reverbGain.gain.value = this.currentParams.reverbMix;
+            this.audioNodes.reverbGain = reverbGain;
+
+            // Convolver pour reverb simple
+            const convolver = this.audioContext.createConvolver();
+            // Créer un impulse response simple pour petite salle
+            const length = this.audioContext.sampleRate * 0.5; // 0.5 secondes
+            const impulse = this.audioContext.createBuffer(2, length, this.audioContext.sampleRate);
+            for (let channel = 0; channel < 2; channel++) {
+                const channelData = impulse.getChannelData(channel);
+                for (let i = 0; i < length; i++) {
+                    channelData[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, 2) * 0.1;
+                }
+            }
+            convolver.buffer = impulse;
+            this.audioNodes.convolver = convolver;
+
+            // Chaînage amélioré
             source.connect(highPassFilter);
             highPassFilter.connect(lowPassFilter);
             lowPassFilter.connect(preEmphasis);
@@ -157,10 +224,34 @@ class AudioControlPanel {
             compressor.connect(agcGain);
             agcGain.connect(limiter);
             limiter.connect(deEmphasis);
-            
+            deEmphasis.connect(noiseGate);
+            noiseGate.connect(expander);
+
+            // Brancher la reverb en parallèle
+            expander.connect(convolver);
+            convolver.connect(reverbGain);
+
+            // Connexion finale
+            let finalNode = expander;
+            if (stereoEnhancer) {
+                stereoEnhancer.merger.connect(reverbGain);
+                finalNode = stereoEnhancer.merger;
+            } else {
+                expander.connect(reverbGain);
+            }
+
+            const dryGain = this.audioContext.createGain();
+            dryGain.gain.value = 1 - this.currentParams.reverbMix;
+            expander.connect(dryGain);
+
+            const mixGain = this.audioContext.createGain();
+            mixGain.gain.value = 1;
+            dryGain.connect(mixGain);
+            reverbGain.connect(mixGain);
+
             const destination = this.audioContext.createMediaStreamDestination();
-            deEmphasis.connect(destination);
-            
+            mixGain.connect(destination);
+
             this.isInitialized = true;
             return destination.stream;
         } catch (error) {

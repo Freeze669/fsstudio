@@ -78,26 +78,79 @@ class MediasoupBroadcaster {
     
     async startBroadcasting() {
         try {
-            // Obtenir le stream audio du microphone - 44.1kHz 16-bit (qualité CD)
+            // Profils audio optimisés pour différentes qualités
+            const audioProfiles = {
+                broadcast: {
+                    sampleRate: 48000, // 48kHz standard broadcast
+                    channelCount: 2,
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true,
+                    latency: 0.005, // Latence ultra-faible
+                    volume: 1.0
+                },
+                music: {
+                    sampleRate: 44100, // 44.1kHz qualité CD
+                    channelCount: 2,
+                    echoCancellation: false, // Désactiver pour la musique
+                    noiseSuppression: false,
+                    autoGainControl: false,
+                    latency: 0.01,
+                    volume: 1.0
+                },
+                voice: {
+                    sampleRate: 16000, // 16kHz optimisé pour la voix
+                    channelCount: 1, // Mono pour la voix
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true,
+                    latency: 0.02,
+                    volume: 1.2
+                }
+            };
+
+            // Sélectionner le profil selon le type de contenu (défaut: broadcast)
+            const currentProfile = localStorage.getItem('audioProfile') || 'broadcast';
+            const profile = audioProfiles[currentProfile];
+
+            console.log(`🎵 Profil audio sélectionné: ${currentProfile}`, profile);
+
+            // Obtenir le stream audio avec les paramètres optimisés
             const rawStream = await navigator.mediaDevices.getUserMedia({
                 audio: {
-                    // Paramètres optimisés pour qualité vocale maximale
-                    echoCancellation: true, // Essentiel pour éviter l'écho
-                    noiseSuppression: true, // Supprime le bruit ambiant
-                    autoGainControl: true, // Contrôle automatique du volume
-                    sampleRate: 44100, // 44.1kHz (qualité CD, standard audio)
-                    channelCount: 2, // STÉRÉO pour meilleure qualité
-                    latency: 0.01, // Latence minimale
-                    // Paramètres Google Chrome optimisés
-                    googEchoCancellation: true,
-                    googAutoGainControl: true,
-                    googNoiseSuppression: true,
+                    // Paramètres du profil sélectionné
+                    echoCancellation: profile.echoCancellation,
+                    noiseSuppression: profile.noiseSuppression,
+                    autoGainControl: profile.autoGainControl,
+                    sampleRate: profile.sampleRate,
+                    channelCount: profile.channelCount,
+                    latency: profile.latency,
+
+                    // Paramètres avancés pour qualité maximale
+                    googEchoCancellation: profile.echoCancellation,
+                    googAutoGainControl: profile.autoGainControl,
+                    googNoiseSuppression: profile.noiseSuppression,
                     googHighpassFilter: true,
                     googTypingNoiseDetection: true,
                     googNoiseReduction: true,
-                    googEchoCancellation2: true, // Version améliorée
-                    googDAEchoCancellation: true, // Double AEC
-                    googAECM: true // Acoustic Echo Cancellation Mobile
+                    googEchoCancellation2: true,
+                    googDAEchoCancellation: true,
+                    googAECM: true,
+
+                    // Paramètres supplémentaires pour qualité broadcast
+                    googExperimentalEchoCancellation: true,
+                    googExperimentalNoiseSuppression: true,
+                    googExperimentalAutoGainControl: true,
+
+                    // Optimisations pour faible latence
+                    latencyHint: 'interactive',
+                    advanced: [{
+                        echoCancellation: [profile.echoCancellation],
+                        noiseSuppression: [profile.noiseSuppression],
+                        autoGainControl: [profile.autoGainControl],
+                        sampleRate: [profile.sampleRate],
+                        channelCount: [profile.channelCount]
+                    }]
                 }
             });
             
