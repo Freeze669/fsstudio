@@ -41,6 +41,7 @@
                 <button class="tab-btn active" data-tab="site-info">📊 Informations du Site</button>
                 <button class="tab-btn" data-tab="broadcasting">📡 Diffusion</button>
                 <button class="tab-btn" data-tab="chat">💬 Chat</button>
+                <button class="tab-btn" data-tab="finance">💰 Finance</button>
             </div>
 
             <!-- Onglet Informations du Site -->
@@ -614,7 +615,34 @@
             </div>
         </div>
 
-            <!-- Onglet Diffusion -->
+        <!-- Onglet Finance -->
+        <div class="tab-content" id="finance">
+            <!-- Section Gestion des Finances -->
+            <div class="admin-section">
+                <div class="section-header">
+                    <h2>💰 Gestion des Finances</h2>
+                    <div class="online-stats">
+                        <span class="stat-item">
+                            <span class="stat-label">Total Portefeuilles:</span>
+                            <span class="stat-value" id="totalWallets">0</span>
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Liste des portefeuilles -->
+                <div class="finance-list" id="financeList">
+                    <div class="loading-message">Chargement des finances...</div>
+                </div>
+
+                <!-- Actions pour Directeur Général -->
+                <div class="admin-actions" id="financeActions" style="display: none;">
+                    <button class="action-btn" id="addFinanceBtn">➕ Ajouter des fonds</button>
+                    <button class="action-btn danger" id="resetAllWalletsBtn">🔄 Réinitialiser tous les portefeuilles</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Onglet Diffusion -->
             <div class="tab-content" id="broadcasting">
         </div>
     </div>
@@ -656,6 +684,38 @@
             <div class="modal-footer">
                 <button class="cancel-btn" id="cancelEditModeratorBtn">Annuler</button>
                 <button class="save-btn" id="saveEditModeratorBtn">💾 Sauvegarder</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal d'ajout de fonds -->
+    <div class="modal" id="addFinanceModal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>💰 Ajouter des Fonds</h3>
+                <span class="modal-close" id="cancelAddFinanceBtn">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="addFinanceForm">
+                    <div class="form-group">
+                        <label>Sélectionner l'utilisateur:</label>
+                        <select id="financeUserSelect" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; font-size: 14px;">
+                            <option value="">Choisir un utilisateur...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Montant à ajouter (€):</label>
+                        <input type="number" id="financeAmount" placeholder="0.00" min="0" step="0.01" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; font-size: 14px;">
+                    </div>
+                    <div class="form-group">
+                        <label>Description:</label>
+                        <input type="text" id="financeDescription" placeholder="Ex: Salaire mensuel, Bonus..." style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; font-size: 14px;">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="cancel-btn" id="cancelAddFinanceBtn">Annuler</button>
+                <button class="save-btn" id="saveAddFinanceBtn">💰 Ajouter</button>
             </div>
         </div>
     </div>

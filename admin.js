@@ -1,10 +1,10 @@
 // Configuration Admin - Système hiérarchique
 const ADMIN_USERS = {
     // Directeur Général - Contrôle total absolu
-    'DIRECTEUR2024': { role: 'directeur_general', name: 'Directeur Général FS Studio', permissions: ['all'] },
+    'DIRECTEUR2024': { role: 'directeur_general', name: 'Directeur Général FS Studio', permissions: ['all'], wallet: 0, earnings: [] },
     
     // Directeur de Niveau 1 - Contrôle total
-    'STUDIO2024': { role: 'staff', name: 'Directeur de Niveau 1 FS Studio', permissions: ['all'] },
+    'STUDIO2024': { role: 'STAFF', name: 'Directeur de Niveau 1 FS Studio', permissions: ['all'], wallet: 0, earnings: [] },
     
     // Moderators (peuvent être ajoutés dynamiquement par le Directeur Général)
 };
@@ -31,10 +31,12 @@ function createModerator(code, name, displayLabel) {
     }
     
     dynamicModerators[code] = {
-        role: 'staff',
+        role: 'STAFF',
         name: name,
-        displayLabel: displayLabel || 'staff', // Utiliser le label fourni ou défaut
+        displayLabel: displayLabel || 'STAFF', // Utiliser le label fourni ou défaut
         permissions: ['chat'],
+        wallet: 0,
+        earnings: [],
         createdBy: currentUser.name,
         createdAt: new Date().toISOString()
     };
@@ -72,10 +74,12 @@ function updateModerator (oldCode, newCode, newName, newPermissions, newDisplayL
     
     // Créer le nouveau modérateur
     dynamicModerators[newCode] = {
-        role: 'staff',
+        role: 'STAFF',
         name: newName,
-        displayLabel: newDisplayLabel || 'staff', // Utiliser le nouveau label ou défaut
+        displayLabel: newDisplayLabel || 'STAFF', // Utiliser le nouveau label ou défaut
         permissions: newPermissions,
+        wallet: dynamicModerators[oldCode]?.wallet || 0,
+        earnings: dynamicModerators[oldCode]?.earnings || [],
         createdBy: currentUser.name,
         updatedAt: new Date().toISOString()
     };
@@ -115,6 +119,172 @@ function deleteModerator(code) {
     return true;
 }
 
+// Fonction pour ajouter des fonds à un utilisateur
+function addFunds(userCode, amount, description) {
+    if (!isAuthenticated || !currentUser || currentUser.role !== 'directeur_general') {
+        alert('❌ Seuls les Directeurs Généraux peuvent gérer les finances');
+        return false;
+    }
+    
+    if (amount <= 0) {
+        alert('❌ Le montant doit être positif');
+        return false;
+    }
+    
+    let user = ADMIN_USERS[userCode] || dynamicModerators[userCode];
+    if (!user) {
+        alert('❌ Utilisateur introuvable');
+        return false;
+    }
+    
+    // Ajouter au wallet
+    user.wallet = (user.wallet || 0) + amount;
+    
+    // Ajouter à l'historique des gains
+    if (!user.earnings) user.earnings = [];
+    user.earnings.push({
+        amount: amount,
+        description: description,
+        date: new Date().toISOString(),
+        addedBy: currentUser.name
+    });
+    
+    // Sauvegarder
+    if (ADMIN_USERS[userCode]) {
+        // Pour les utilisateurs statiques, sauvegarder dans Firebase
+        database.ref('admin/finances/' + userCode).set({
+            wallet: user.wallet,
+            earnings: user.earnings
+        });
+    } else {
+        // Pour les modérateurs dynamiques
+        localStorage.setItem('dynamicModerators', JSON.stringify(dynamicModerators));
+        database.ref('admin/moderators/' + userCode).set(dynamicModerators[userCode]);
+    }
+    
+    alert(`✅ ${amount}€ ajoutés au portefeuille de ${user.name}`);
+    loadFinances();
+    return true;
+}
+
+// Fonction pour réinitialiser tous les portefeuilles
+function resetAllWallets() {
+    if (!isAuthenticated || !currentUser || currentUser.role !== 'directeur_general') {
+        alert('❌ Seuls les Directeurs Généraux peuvent réinitialiser les finances');
+        return false;
+    }
+    
+    if (!confirm('Êtes-vous sûr de vouloir réinitialiser TOUS les portefeuilles à 0€ ? Cette action est irréversible.')) {
+        return false;
+    }
+    
+    // Réinitialiser utilisateurs statiques
+    Object.keys(ADMIN_USERS).forEach(code => {
+        ADMIN_USERS[code].wallet = 0;
+        ADMIN_USERS[code].earnings = [];
+        database.ref('admin/finances/' + code).set({
+            wallet: 0,
+            earnings: []
+        });
+    });
+    
+    // Réinitialiser modérateurs dynamiques
+    Object.keys(dynamicModerators).forEach(code => {
+        dynamicModerators[code].wallet = 0;
+        dynamicModerators[code].earnings = [];
+    });
+    
+    localStorage.setItem('dynamicModerators', JSON.stringify(dynamicModerators));
+    database.ref('admin/moderators').set(dynamicModerators);
+    
+    alert('✅ Tous les portefeuilles ont été réinitialisés');
+    loadFinances();
+    return true;
+}
+
+// Fonction pour charger et afficher les finances
+function loadFinances() {
+    const financeList = document.getElementById('financeList');
+    const totalWallets = document.getElementById('totalWallets');
+    const financeActions = document.getElementById('financeActions');
+    
+    if (!financeList) return;
+    
+    let html = '';
+    let total = 0;
+    let userCount = 0;
+    
+    // Afficher les utilisateurs statiques
+    Object.keys(ADMIN_USERS).forEach(code => {
+        const user = ADMIN_USERS[code];
+        if (currentUser.role === 'directeur_general' || user === currentUser) {
+            html += generateFinanceCard(user, code);
+            total += user.wallet || 0;
+            userCount++;
+        }
+    });
+    
+    // Afficher les modérateurs dynamiques
+    Object.keys(dynamicModerators).forEach(code => {
+        const user = dynamicModerators[code];
+        if (currentUser.role === 'directeur_general' || user === currentUser) {
+            html += generateFinanceCard(user, code);
+            total += user.wallet || 0;
+            userCount++;
+        }
+    });
+    
+    if (html === '') {
+        html = '<div class="no-data">Aucune donnée financière disponible</div>';
+    }
+    
+    financeList.innerHTML = html;
+    if (totalWallets) totalWallets.textContent = userCount;
+    
+    // Afficher les actions seulement pour le Directeur Général
+    if (financeActions) {
+        financeActions.style.display = currentUser.role === 'directeur_general' ? 'flex' : 'none';
+    }
+}
+
+// Fonction pour générer une carte de finance
+function generateFinanceCard(user, code) {
+    const earnings = user.earnings || [];
+    const recentEarnings = earnings.slice(-3).reverse(); // Les 3 derniers
+    
+    let earningsHtml = '';
+    recentEarnings.forEach(earning => {
+        earningsHtml += `
+            <div class="earning-item">
+                <span class="earning-amount">+${earning.amount}€</span>
+                <span class="earning-desc">${earning.description}</span>
+                <span class="earning-date">${new Date(earning.date).toLocaleDateString('fr-FR')}</span>
+            </div>
+        `;
+    });
+    
+    if (earningsHtml === '') {
+        earningsHtml = '<div class="no-earnings">Aucun gain récent</div>';
+    }
+    
+    return `
+        <div class="finance-card">
+            <div class="finance-header">
+                <h3>${user.name}</h3>
+                <span class="finance-role">(${user.role})</span>
+            </div>
+            <div class="finance-wallet">
+                <div class="wallet-amount">${(user.wallet || 0).toFixed(2)}€</div>
+                <div class="wallet-label">Portefeuille</div>
+            </div>
+            <div class="finance-earnings">
+                <h4>Derniers gains</h4>
+                ${earningsHtml}
+            </div>
+        </div>
+    `;
+}
+
 // Fonction pour afficher la liste des modérateurs
 function displayModerators() {
     const moderatorList = document.getElementById('moderatorList');
@@ -127,7 +297,7 @@ function displayModerators() {
         moderatorDiv.className = 'moderator-item';
         moderatorDiv.innerHTML = `
             <div class="moderator-info">
-                <strong>${moderator.name}</strong> (${moderator.displayLabel || 'staff'})
+                <strong>${moderator.name}</strong> (${moderator.displayLabel || 'STAFF'})
                 <br><small>Créé par: ${moderator.createdBy} • ${new Date(moderator.createdAt).toLocaleDateString()}</small>
                 <br><small>Permissions: ${moderator.permissions.join(', ')}</small>
             </div>
@@ -168,7 +338,7 @@ function editModerator(code) {
     
     if (editName) editName.value = moderator.name;
     if (editCode) editCode.value = code;
-    if (editDisplayLabel) editDisplayLabel.value = moderator.displayLabel || 'staff';
+    if (editDisplayLabel) editDisplayLabel.value = moderator.displayLabel || 'STAFF';
     if (editChat) editChat.checked = moderator.permissions.includes('chat');
     if (editBroadcast) editBroadcast.checked = moderator.permissions.includes('broadcast');
     
@@ -232,6 +402,11 @@ function switchTab(tabId) {
     
     // Sauvegarder l'onglet actif
     localStorage.setItem('adminActiveTab', tabId);
+    
+    // Charger le contenu spécifique à l'onglet
+    if (tabId === 'finance') {
+        loadFinances();
+    }
 }
 
 // Fonction pour mettre à jour l'uptime
@@ -383,9 +558,26 @@ function checkAuth() {
             // S'assurer que tous les modérateurs ont un displayLabel
             Object.keys(dynamicModerators).forEach(code => {
                 if (!dynamicModerators[code].displayLabel) {
-                    dynamicModerators[code].displayLabel = dynamicModerators[code].role || 'staff';
+                    dynamicModerators[code].displayLabel = dynamicModerators[code].role || 'STAFF';
+                }
+                // Migrer les anciens rôles
+                if (dynamicModerators[code].role === 'directeur_de_2' || dynamicModerators[code].role === 'MANAGER STUDIO') {
+                    dynamicModerators[code].role = 'STAFF';
+                    if (!dynamicModerators[code].displayLabel || dynamicModerators[code].displayLabel === 'directeur_de_2' || dynamicModerators[code].displayLabel === 'MANAGER STUDIO') {
+                        dynamicModerators[code].displayLabel = 'STAFF';
+                    }
+                }
+                // Ajouter wallet et earnings si manquants
+                if (typeof dynamicModerators[code].wallet === 'undefined') {
+                    dynamicModerators[code].wallet = 0;
+                }
+                if (!dynamicModerators[code].earnings) {
+                    dynamicModerators[code].earnings = [];
                 }
             });
+            
+            // Sauvegarder les modérateurs mis à jour dans Firebase
+            database.ref('admin/moderators').set(dynamicModerators);
             
             localStorage.setItem('dynamicModerators', JSON.stringify(dynamicModerators));
             console.log('✅ Modérateurs chargés et fusionnés:', Object.keys(dynamicModerators).length, 'modérateurs');
@@ -574,7 +766,7 @@ function showAdmin() {
             
             if (createModerator(code, name, displayLabel)) {
                 moderatorName.value = '';
-                document.getElementById('moderatorDisplayLabel').value = 'staff';
+                document.getElementById('moderatorDisplayLabel').value = 'STAFF';
                 moderatorCode.value = '';
                 displayModerators(); // Rafraîchir la liste
             }
@@ -627,6 +819,92 @@ function showAdmin() {
         editModal.addEventListener('click', (e) => {
             if (e.target === editModal) {
                 editModal.style.display = 'none';
+            }
+        });
+    }
+    
+    // Écouteurs pour la gestion des finances
+    const addFinanceBtn = document.getElementById('addFinanceBtn');
+    const resetAllWalletsBtn = document.getElementById('resetAllWalletsBtn');
+    const saveAddFinanceBtn = document.getElementById('saveAddFinanceBtn');
+    const cancelAddFinanceBtn = document.getElementById('cancelAddFinanceBtn');
+    const addFinanceModal = document.getElementById('addFinanceModal');
+    const financeUserSelect = document.getElementById('financeUserSelect');
+    const financeAmount = document.getElementById('financeAmount');
+    const financeDescription = document.getElementById('financeDescription');
+    
+    if (addFinanceBtn) {
+        addFinanceBtn.addEventListener('click', () => {
+            if (financeUserSelect) {
+                // Remplir la liste des utilisateurs
+                financeUserSelect.innerHTML = '<option value="">Choisir un utilisateur...</option>';
+                
+                // Utilisateurs statiques
+                Object.keys(ADMIN_USERS).forEach(code => {
+                    const option = document.createElement('option');
+                    option.value = code;
+                    option.textContent = `${ADMIN_USERS[code].name} (${ADMIN_USERS[code].role})`;
+                    financeUserSelect.appendChild(option);
+                });
+                
+                // Modérateurs dynamiques
+                Object.keys(dynamicModerators).forEach(code => {
+                    const option = document.createElement('option');
+                    option.value = code;
+                    option.textContent = `${dynamicModerators[code].name} (${dynamicModerators[code].role})`;
+                    financeUserSelect.appendChild(option);
+                });
+            }
+            
+            if (addFinanceModal) addFinanceModal.style.display = 'block';
+        });
+    }
+    
+    if (saveAddFinanceBtn) {
+        saveAddFinanceBtn.addEventListener('click', () => {
+            const userCode = financeUserSelect.value;
+            const amount = parseFloat(financeAmount.value);
+            const description = financeDescription.value.trim();
+            
+            if (!userCode) {
+                alert('Veuillez sélectionner un utilisateur');
+                return;
+            }
+            
+            if (isNaN(amount) || amount <= 0) {
+                alert('Veuillez entrer un montant valide');
+                return;
+            }
+            
+            if (!description) {
+                alert('Veuillez entrer une description');
+                return;
+            }
+            
+            if (addFunds(userCode, amount, description)) {
+                financeUserSelect.value = '';
+                financeAmount.value = '';
+                financeDescription.value = '';
+                if (addFinanceModal) addFinanceModal.style.display = 'none';
+            }
+        });
+    }
+    
+    if (cancelAddFinanceBtn) {
+        cancelAddFinanceBtn.addEventListener('click', () => {
+            if (addFinanceModal) addFinanceModal.style.display = 'none';
+        });
+    }
+    
+    if (resetAllWalletsBtn) {
+        resetAllWalletsBtn.addEventListener('click', resetAllWallets);
+    }
+    
+    // Fermer la modal finance en cliquant en dehors
+    if (addFinanceModal) {
+        addFinanceModal.addEventListener('click', (e) => {
+            if (e.target === addFinanceModal) {
+                addFinanceModal.style.display = 'none';
             }
         });
     }
@@ -1012,6 +1290,17 @@ function connectToFirebase() {
             // Fusionner avec les modérateurs locaux
             dynamicModerators = { ...dynamicModerators, ...firebaseModerators };
             localStorage.setItem('dynamicModerators', JSON.stringify(dynamicModerators));
+        });
+        
+        // Charger les finances des utilisateurs statiques depuis Firebase
+        Object.keys(ADMIN_USERS).forEach(code => {
+            database.ref('admin/finances/' + code).once('value', (snapshot) => {
+                const financeData = snapshot.val();
+                if (financeData) {
+                    ADMIN_USERS[code].wallet = financeData.wallet || 0;
+                    ADMIN_USERS[code].earnings = financeData.earnings || [];
+                }
+            });
         });
         
         console.log('✅ Admin connecté à Firebase');
