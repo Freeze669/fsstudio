@@ -4,7 +4,7 @@ const ADMIN_USERS = {
     'DIRECTEUR2024': { role: 'directeur_general', name: 'Directeur Général FS Studio', permissions: ['all'] },
     
     // Directeur de Niveau 1 - Contrôle total
-    'STUDIO2024': { role: 'MANAGER STUDIO', name: 'Directeur de Niveau 1 FS Studio', permissions: ['all'] },
+    'STUDIO2024': { role: 'staff', name: 'Directeur de Niveau 1 FS Studio', permissions: ['all'] },
     
     // Moderators (peuvent être ajoutés dynamiquement par le Directeur Général)
 };
@@ -31,9 +31,9 @@ function createModerator(code, name, displayLabel) {
     }
     
     dynamicModerators[code] = {
-        role: 'STAFF',
+        role: 'staff',
         name: name,
-        displayLabel: displayLabel || 'STAFF', // Utiliser le label fourni ou défaut
+        displayLabel: displayLabel || 'staff', // Utiliser le label fourni ou défaut
         permissions: ['chat'],
         createdBy: currentUser.name,
         createdAt: new Date().toISOString()
@@ -72,9 +72,9 @@ function updateModerator (oldCode, newCode, newName, newPermissions, newDisplayL
     
     // Créer le nouveau modérateur
     dynamicModerators[newCode] = {
-        role: 'STAFF',
+        role: 'staff',
         name: newName,
-        displayLabel: newDisplayLabel || 'STAFF', // Utiliser le nouveau label ou défaut
+        displayLabel: newDisplayLabel || 'staff', // Utiliser le nouveau label ou défaut
         permissions: newPermissions,
         createdBy: currentUser.name,
         updatedAt: new Date().toISOString()
@@ -127,7 +127,7 @@ function displayModerators() {
         moderatorDiv.className = 'moderator-item';
         moderatorDiv.innerHTML = `
             <div class="moderator-info">
-                <strong>${moderator.name}</strong> (${moderator.displayLabel || 'STAFF'})
+                <strong>${moderator.name}</strong> (${moderator.displayLabel || 'staff'})
                 <br><small>Créé par: ${moderator.createdBy} • ${new Date(moderator.createdAt).toLocaleDateString()}</small>
                 <br><small>Permissions: ${moderator.permissions.join(', ')}</small>
             </div>
@@ -168,7 +168,7 @@ function editModerator(code) {
     
     if (editName) editName.value = moderator.name;
     if (editCode) editCode.value = code;
-    if (editDisplayLabel) editDisplayLabel.value = moderator.displayLabel || 'STAFF';
+    if (editDisplayLabel) editDisplayLabel.value = moderator.displayLabel || 'staff';
     if (editChat) editChat.checked = moderator.permissions.includes('chat');
     if (editBroadcast) editBroadcast.checked = moderator.permissions.includes('broadcast');
     
@@ -383,7 +383,7 @@ function checkAuth() {
             // S'assurer que tous les modérateurs ont un displayLabel
             Object.keys(dynamicModerators).forEach(code => {
                 if (!dynamicModerators[code].displayLabel) {
-                    dynamicModerators[code].displayLabel = dynamicModerators[code].role || 'STAFF';
+                    dynamicModerators[code].displayLabel = dynamicModerators[code].role || 'staff';
                 }
             });
             
@@ -574,7 +574,7 @@ function showAdmin() {
             
             if (createModerator(code, name, displayLabel)) {
                 moderatorName.value = '';
-                document.getElementById('moderatorDisplayLabel').value = 'STAFF';
+                document.getElementById('moderatorDisplayLabel').value = 'staff';
                 moderatorCode.value = '';
                 displayModerators(); // Rafraîchir la liste
             }
