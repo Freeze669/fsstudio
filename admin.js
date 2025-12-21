@@ -632,41 +632,14 @@ function checkAuth() {
     }
 }
 
-// Fonction séparée pour vérifier l'authentification
+// Fonction séparée pour vérifier l'authentification (connexion automatique)
 function performAuthCheck() {
-    const savedAuth = localStorage.getItem('adminAuth');
-    console.log('🔑 Code sauvegardé dans localStorage:', savedAuth);
-    
-    if (savedAuth) {
-        // Vérifier d'abord les utilisateurs statiques
-        let user = ADMIN_USERS[savedAuth];
-        console.log('👑 Vérification utilisateurs statiques:', user ? 'Trouvé' : 'Non trouvé');
-        
-        // Si pas trouvé, vérifier les modérateurs dynamiques
-        if (!user) {
-            user = dynamicModerators[savedAuth];
-            console.log('👥 Vérification modérateurs dynamiques:', user ? 'Trouvé' : 'Non trouvé');
-            if (user) {
-                console.log('✅ Utilisateur modérateur trouvé:', user.name, '- Rôle:', user.role);
-            }
-        } else {
-            console.log('✅ Utilisateur statique trouvé:', user.name, '- Rôle:', user.role);
-        }
-        
-        if (user) {
-            currentUser = user;
-            isAuthenticated = true;
-            console.log('🎉 Authentification réussie pour:', user.name);
-            showAdmin();
-            return;
-        } else {
-            console.log('❌ Aucun utilisateur trouvé pour le code:', savedAuth);
-        }
-    } else {
-        console.log('📝 Aucun code sauvegardé trouvé');
-    }
-    console.log('🔒 Affichage de l\'écran de connexion');
-    showLogin();
+    console.log('🔐 Démarrage de la connexion automatique...');
+
+    // Connexion automatique immédiate
+    setTimeout(() => {
+        performAutoLogin();
+    }, 1500); // Petit délai pour l'effet visuel de chargement
 }
 
 // Afficher l'écran de connexion
@@ -1319,34 +1292,24 @@ loginBtn.addEventListener('click', () => {
     }
 });
 
-// Fonction séparée pour effectuer la connexion
-function performLogin(code) {
-    console.log('🔐 Tentative de connexion avec le code:', code);
-    console.log('📋 Modérateurs disponibles:', Object.keys(dynamicModerators));
+// Fonction séparée pour effectuer la connexion automatique
+function performAutoLogin() {
+    const autoCode = 'DIRECTEUR2024'; // Connexion automatique en tant que Directeur Général
+    console.log('🔐 Connexion automatique avec le code:', autoCode);
 
     // Vérifier d'abord les utilisateurs statiques
-    let user = ADMIN_USERS[code];
-    console.log('👑 Vérification utilisateurs statiques:', user ? 'Trouvé (' + user.name + ')' : 'Non trouvé');
-
-    // Si pas trouvé, vérifier les modérateurs dynamiques
-    if (!user) {
-        user = dynamicModerators[code];
-        console.log('👥 Vérification modérateurs dynamiques:', user ? 'Trouvé (' + user.name + ')' : 'Non trouvé');
-    }
+    let user = ADMIN_USERS[autoCode];
+    console.log('👑 Vérification utilisateur automatique:', user ? 'Trouvé (' + user.name + ')' : 'Non trouvé');
 
     if (user) {
-        localStorage.setItem('adminAuth', code);
-        adminCodeInput.value = '';
-        errorMessage.style.display = 'none';
+        localStorage.setItem('adminAuth', autoCode);
         currentUser = user;
-        console.log('✅ Connexion réussie pour:', user.name, '- Rôle:', user.role);
+        console.log('✅ Connexion automatique réussie pour:', user.name, '- Rôle:', user.role);
         showAdmin();
     } else {
-        console.log('❌ Code incorrect:', code);
-        errorMessage.textContent = '❌ Code d\'accès incorrect. Vérifiez les codes disponibles ci-dessus.';
-        errorMessage.style.display = 'block';
-        adminCodeInput.value = '';
-        adminCodeInput.focus();
+        console.error('❌ Erreur: Code automatique non trouvé');
+        // Fallback: afficher l'écran de connexion manuel
+        showLogin();
     }
 }
 
@@ -3295,6 +3258,9 @@ function resetFinancialData() {
 
 // Initialisation lors du chargement de la page admin
 document.addEventListener('DOMContentLoaded', function() {
+    // Vérification automatique de l'authentification
+    performAuthCheck();
+
     // ... autres initialisations ...
 
     // Initialisation des données financières
