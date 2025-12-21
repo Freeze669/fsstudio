@@ -172,6 +172,20 @@
                             <label>Code d'accès (auto-généré):</label>
                             <input type="text" id="moderatorCode" placeholder="Généré automatiquement" readonly style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.5); color: rgba(255,255,255,0.7); font-size: 14px;">
                         </div>
+                        <div class="form-group">
+                            <label>Permissions:</label>
+                            <div style="display: flex; gap: 15px; margin-top: 5px;">
+                                <label style="display: flex; align-items: center; gap: 5px; color: rgba(255,255,255,0.8);">
+                                    <input type="checkbox" id="moderatorChatPermission" checked> 💬 Chat
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 5px; color: rgba(255,255,255,0.8);">
+                                    <input type="checkbox" id="moderatorBroadcastPermission"> 📡 Diffusion
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 5px; color: rgba(255,255,255,0.8);">
+                                    <input type="checkbox" id="moderatorFinancePermission"> 💰 Finance
+                                </label>
+                            </div>
+                        </div>
                         <div class="form-actions">
                             <button class="send-btn" id="generateCodeBtn">🎲 Générer Code</button>
                             <button class="send-btn" id="createModeratorBtn">✅ Créer Modérateur</button>
@@ -626,6 +640,32 @@
                             <span class="stat-label">Total Portefeuilles:</span>
                             <span class="stat-value" id="totalWallets">0</span>
                         </span>
+                        <span class="stat-item">
+                            <span class="stat-label">Total Fonds:</span>
+                            <span class="stat-value" id="totalFunds">0€</span>
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Statistiques globales -->
+                <div class="finance-stats">
+                    <div class="stat-circle" id="fundsDistribution">
+                        <div class="circle-content">
+                            <div class="circle-value" id="distributionPercent">0%</div>
+                            <div class="circle-label">Répartition</div>
+                        </div>
+                    </div>
+                    <div class="stat-circle" id="averageWallet">
+                        <div class="circle-content">
+                            <div class="circle-value" id="averageAmount">0€</div>
+                            <div class="circle-label">Moyenne</div>
+                        </div>
+                    </div>
+                    <div class="stat-circle" id="topEarner">
+                        <div class="circle-content">
+                            <div class="circle-value" id="topEarnerName">-</div>
+                            <div class="circle-label">Top</div>
+                        </div>
                     </div>
                 </div>
 
@@ -676,6 +716,9 @@
                             </label>
                             <label style="display: flex; align-items: center; gap: 5px; color: rgba(255,255,255,0.8);">
                                 <input type="checkbox" id="editBroadcastPermission"> 📡 Diffusion
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 5px; color: rgba(255,255,255,0.8);">
+                                <input type="checkbox" id="editFinancePermission"> 💰 Finance
                             </label>
                         </div>
                     </div>

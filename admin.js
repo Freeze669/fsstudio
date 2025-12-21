@@ -1,10 +1,10 @@
 // Configuration Admin - Système hiérarchique
 const ADMIN_USERS = {
     // Directeur Général - Contrôle total absolu
-    'DIRECTEUR2024': { role: 'directeur_general', name: 'Directeur Général FS Studio', permissions: ['all'], wallet: 0, earnings: [] },
+    'DIRECTEUR2024': { role: 'directeur_general', name: 'Directeur Général FS Studio', permissions: ['all'], wallet: 0, earnings: [], goal: 1000 },
     
     // Directeur de Niveau 1 - Contrôle total
-    'STUDIO2024': { role: 'STAFF', name: 'Directeur de Niveau 1 FS Studio', permissions: ['all'], wallet: 0, earnings: [] },
+    'STUDIO2024': { role: 'STAFF', name: 'Directeur de Niveau 1 FS Studio', permissions: ['all'], wallet: 0, earnings: [], goal: 500 },
     
     // Moderators (peuvent être ajoutés dynamiquement par le Directeur Général)
 };
@@ -19,7 +19,7 @@ function hasPermission(user, permission) {
 }
 
 // Fonction pour créer un modérateur (seulement pour le Directeur Général)
-function createModerator(code, name, displayLabel) {
+function createModerator(code, name, displayLabel, permissions = ['chat']) {
     if (!isAuthenticated || !currentUser || currentUser.role !== 'directeur_general') {
         alert('❌ Seuls les Directeurs Généraux peuvent créer des modérateurs');
         return false;
@@ -34,9 +34,10 @@ function createModerator(code, name, displayLabel) {
         role: 'STAFF',
         name: name,
         displayLabel: displayLabel || 'STAFF', // Utiliser le label fourni ou défaut
-        permissions: ['chat'],
+        permissions: permissions,
         wallet: 0,
         earnings: [],
+        goal: 100, // Objectif par défaut
         createdBy: currentUser.name,
         createdAt: new Date().toISOString()
     };
@@ -80,6 +81,7 @@ function updateModerator (oldCode, newCode, newName, newPermissions, newDisplayL
         permissions: newPermissions,
         wallet: dynamicModerators[oldCode]?.wallet || 0,
         earnings: dynamicModerators[oldCode]?.earnings || [],
+        goal: dynamicModerators[oldCode]?.goal || 100,
         createdBy: currentUser.name,
         updatedAt: new Date().toISOString()
     };
@@ -121,8 +123,8 @@ function deleteModerator(code) {
 
 // Fonction pour ajouter des fonds à un utilisateur
 function addFunds(userCode, amount, description) {
-    if (!isAuthenticated || !currentUser || currentUser.role !== 'directeur_general') {
-        alert('❌ Seuls les Directeurs Généraux peuvent gérer les finances');
+    if (!isAuthenticated || !currentUser || (currentUser.role !== 'directeur_general' && !currentUser.permissions.includes('finance'))) {
+        alert('❌ Accès refusé : Vous n\'avez pas la permission de gérer les finances');
         return false;
     }
     
@@ -169,8 +171,8 @@ function addFunds(userCode, amount, description) {
 
 // Fonction pour réinitialiser tous les portefeuilles
 function resetAllWallets() {
-    if (!isAuthenticated || !currentUser || currentUser.role !== 'directeur_general') {
-        alert('❌ Seuls les Directeurs Généraux peuvent réinitialiser les finances');
+    if (!isAuthenticated || !currentUser || (currentUser.role !== 'directeur_general' && !currentUser.permissions.includes('finance'))) {
+        alert('❌ Accès refusé : Vous n\'avez pas la permission de gérer les finances');
         return false;
     }
     
@@ -206,32 +208,53 @@ function resetAllWallets() {
 function loadFinances() {
     const financeList = document.getElementById('financeList');
     const totalWallets = document.getElementById('totalWallets');
+    const totalFunds = document.getElementById('totalFunds');
     const financeActions = document.getElementById('financeActions');
+    const distributionPercent = document.getElementById('distributionPercent');
+    const averageAmount = document.getElementById('averageAmount');
+    const topEarnerName = document.getElementById('topEarnerName');
     
     if (!financeList) return;
     
     let html = '';
     let total = 0;
     let userCount = 0;
+    let maxWallet = 0;
+    let topEarner = '';
+    const allUsers = [];
     
-    // Afficher les utilisateurs statiques
-    Object.keys(ADMIN_USERS).forEach(code => {
-        const user = ADMIN_USERS[code];
-        if (currentUser.role === 'directeur_general' || user === currentUser) {
-            html += generateFinanceCard(user, code);
-            total += user.wallet || 0;
-            userCount++;
-        }
-    });
+    // Collecter tous les utilisateurs visibles
+    const collectUsers = (users, isStatic = false) => {
+        Object.keys(users).forEach(code => {
+            const user = users[code];
+            if (currentUser.role === 'directeur_general' || currentUser.permissions.includes('finance') || user === currentUser) {
+                allUsers.push({ ...user, code, isStatic });
+                total += user.wallet || 0;
+                userCount++;
+                if ((user.wallet || 0) > maxWallet) {
+                    maxWallet = user.wallet || 0;
+                    topEarner = user.name;
+                }
+            }
+        });
+    };
     
-    // Afficher les modérateurs dynamiques
-    Object.keys(dynamicModerators).forEach(code => {
-        const user = dynamicModerators[code];
-        if (currentUser.role === 'directeur_general' || user === currentUser) {
-            html += generateFinanceCard(user, code);
-            total += user.wallet || 0;
-            userCount++;
-        }
+    collectUsers(ADMIN_USERS, true);
+    collectUsers(dynamicModerators, false);
+    
+    // Calculer les statistiques
+    const average = userCount > 0 ? total / userCount : 0;
+    const distribution = userCount > 0 ? Math.min((total / (userCount * 100)) * 100, 100) : 0; // Pourcentage arbitraire
+    
+    // Afficher les statistiques
+    if (totalFunds) totalFunds.textContent = total.toFixed(2) + '€';
+    if (distributionPercent) distributionPercent.textContent = distribution.toFixed(1) + '%';
+    if (averageAmount) averageAmount.textContent = average.toFixed(2) + '€';
+    if (topEarnerName) topEarnerName.textContent = topEarner || '-';
+    
+    // Générer les cartes
+    allUsers.forEach(user => {
+        html += generateFinanceCard(user, user.code);
     });
     
     if (html === '') {
@@ -241,9 +264,9 @@ function loadFinances() {
     financeList.innerHTML = html;
     if (totalWallets) totalWallets.textContent = userCount;
     
-    // Afficher les actions seulement pour le Directeur Général
+    // Afficher les actions seulement pour ceux qui ont la permission finance ou directeur
     if (financeActions) {
-        financeActions.style.display = currentUser.role === 'directeur_general' ? 'flex' : 'none';
+        financeActions.style.display = (currentUser.role === 'directeur_general' || currentUser.permissions.includes('finance')) ? 'flex' : 'none';
     }
 }
 
@@ -251,6 +274,9 @@ function loadFinances() {
 function generateFinanceCard(user, code) {
     const earnings = user.earnings || [];
     const recentEarnings = earnings.slice(-3).reverse(); // Les 3 derniers
+    const wallet = user.wallet || 0;
+    const goal = user.goal || 100;
+    const progressPercent = Math.min((wallet / goal) * 100, 100);
     
     let earningsHtml = '';
     recentEarnings.forEach(earning => {
@@ -274,8 +300,13 @@ function generateFinanceCard(user, code) {
                 <span class="finance-role">(${user.role})</span>
             </div>
             <div class="finance-wallet">
-                <div class="wallet-amount">${(user.wallet || 0).toFixed(2)}€</div>
+                <div class="wallet-amount">${wallet.toFixed(2)}€</div>
                 <div class="wallet-label">Portefeuille</div>
+                <div class="goal-info">Objectif: ${goal}€</div>
+            </div>
+            <div class="progress-bar">
+                <div class="progress-fill" style="width: ${progressPercent}%"></div>
+                <div class="progress-text">${progressPercent.toFixed(1)}%</div>
             </div>
             <div class="finance-earnings">
                 <h4>Derniers gains</h4>
@@ -335,12 +366,14 @@ function editModerator(code) {
     const editDisplayLabel = document.getElementById('editModeratorDisplayLabel');
     const editChat = document.getElementById('editChatPermission');
     const editBroadcast = document.getElementById('editBroadcastPermission');
+    const editFinance = document.getElementById('editFinancePermission');
     
     if (editName) editName.value = moderator.name;
     if (editCode) editCode.value = code;
     if (editDisplayLabel) editDisplayLabel.value = moderator.displayLabel || 'STAFF';
     if (editChat) editChat.checked = moderator.permissions.includes('chat');
     if (editBroadcast) editBroadcast.checked = moderator.permissions.includes('broadcast');
+    if (editFinance) editFinance.checked = moderator.permissions.includes('finance');
     
     // Stocker le code original
     document.getElementById('editModeratorForm').dataset.originalCode = code;
@@ -574,6 +607,9 @@ function checkAuth() {
                 if (!dynamicModerators[code].earnings) {
                     dynamicModerators[code].earnings = [];
                 }
+                if (!dynamicModerators[code].goal) {
+                    dynamicModerators[code].goal = 100;
+                }
             });
             
             // Sauvegarder les modérateurs mis à jour dans Firebase
@@ -748,6 +784,9 @@ function showAdmin() {
             const name = moderatorName.value.trim();
             const displayLabel = document.getElementById('moderatorDisplayLabel').value.trim();
             const code = moderatorCode.value.trim();
+            const chatPermission = document.getElementById('moderatorChatPermission').checked;
+            const broadcastPermission = document.getElementById('moderatorBroadcastPermission').checked;
+            const financePermission = document.getElementById('moderatorFinancePermission').checked;
             
             if (!name) {
                 alert('Veuillez entrer un nom pour le modérateur');
@@ -764,10 +803,23 @@ function showAdmin() {
                 return;
             }
             
-            if (createModerator(code, name, displayLabel)) {
+            const permissions = [];
+            if (chatPermission) permissions.push('chat');
+            if (broadcastPermission) permissions.push('broadcast');
+            if (financePermission) permissions.push('finance');
+            
+            if (permissions.length === 0) {
+                alert('Au moins une permission doit être sélectionnée');
+                return;
+            }
+            
+            if (createModerator(code, name, displayLabel, permissions)) {
                 moderatorName.value = '';
                 document.getElementById('moderatorDisplayLabel').value = 'STAFF';
                 moderatorCode.value = '';
+                document.getElementById('moderatorChatPermission').checked = true;
+                document.getElementById('moderatorBroadcastPermission').checked = false;
+                document.getElementById('moderatorFinancePermission').checked = false;
                 displayModerators(); // Rafraîchir la liste
             }
         });
@@ -786,6 +838,7 @@ function showAdmin() {
             const newDisplayLabel = document.getElementById('editModeratorDisplayLabel').value.trim();
             const chatPermission = document.getElementById('editChatPermission').checked;
             const broadcastPermission = document.getElementById('editBroadcastPermission').checked;
+            const financePermission = document.getElementById('editFinancePermission').checked;
             
             if (!newName || !newCode) {
                 alert('Veuillez remplir tous les champs');
@@ -795,6 +848,7 @@ function showAdmin() {
             const newPermissions = [];
             if (chatPermission) newPermissions.push('chat');
             if (broadcastPermission) newPermissions.push('broadcast');
+            if (financePermission) newPermissions.push('finance');
             
             if (newPermissions.length === 0) {
                 alert('Au moins une permission doit être sélectionnée');
