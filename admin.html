@@ -150,12 +150,14 @@
                     </div>
                 </div>
 
-                <!-- Section Gestion des Modérateurs (Founder seulement) -->
+                <!-- Section Gestion des Modérateurs (Directeur Général seulement) -->
                 <div class="admin-section" id="createModeratorSection" style="display: none;">
                     <div class="section-header">
                         <h2>👑 Gestion des Modérateurs</h2>
-                        <p style="font-size: 12px; color: rgba(255,255,255,0.6); margin: 0;">Créer de nouveaux comptes modérateurs</p>
+                        <p style="font-size: 12px; color: rgba(255,255,255,0.6); margin: 0;">Créer et gérer les comptes modérateurs</p>
                     </div>
+                    
+                    <!-- Création de modérateur -->
                     <div class="send-message-form">
                         <div class="form-group">
                             <label>Nom du modérateur:</label>
@@ -172,6 +174,11 @@
                         <p style="margin-top: 10px; font-size: 12px; color: rgba(255,255,255,0.6);">
                             ⚠️ Le code généré sera le mot de passe du modérateur. Notez-le bien !
                         </p>
+                    </div>
+                    
+                    <!-- Liste des modérateurs -->
+                    <div class="moderator-list" id="moderatorList" style="margin-top: 20px;">
+                        <!-- Les modérateurs seront affichés ici -->
                     </div>
                 </div>
             </div>
@@ -605,6 +612,43 @@
 
             <!-- Onglet Diffusion -->
             <div class="tab-content" id="broadcasting">
+        </div>
+    </div>
+
+    <!-- Modal d'édition des modérateurs -->
+    <div class="modal" id="editModeratorModal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>✏️ Modifier le Modérateur</h3>
+                <span class="modal-close" id="cancelEditModeratorBtn">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="editModeratorForm">
+                    <div class="form-group">
+                        <label>Nom du modérateur:</label>
+                        <input type="text" id="editModeratorName" placeholder="Nom du modérateur" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; font-size: 14px;">
+                    </div>
+                    <div class="form-group">
+                        <label>Code d'accès:</label>
+                        <input type="text" id="editModeratorCode" placeholder="Code d'accès" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; font-size: 14px;">
+                    </div>
+                    <div class="form-group">
+                        <label>Permissions:</label>
+                        <div style="display: flex; gap: 15px; margin-top: 5px;">
+                            <label style="display: flex; align-items: center; gap: 5px; color: rgba(255,255,255,0.8);">
+                                <input type="checkbox" id="editChatPermission"> 💬 Chat
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 5px; color: rgba(255,255,255,0.8);">
+                                <input type="checkbox" id="editBroadcastPermission"> 📡 Diffusion
+                            </label>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="cancel-btn" id="cancelEditModeratorBtn">Annuler</button>
+                <button class="save-btn" id="saveEditModeratorBtn">💾 Sauvegarder</button>
+            </div>
         </div>
     </div>
 

@@ -1,12 +1,12 @@
 // Configuration Admin - Système hiérarchique
 const ADMIN_USERS = {
-    // Founder - Contrôle total
-    'FOUNDER2024': { role: 'founder', name: 'Founder FS Studio', permissions: ['all'] },
+    // Directeur Général - Contrôle total absolu
+    'FOUNDER2024': { role: 'directeur_general', name: 'Directeur Général FS Studio', permissions: ['all'] },
     
     // Management Team - Studio
     'STUDIO2024': { role: 'management', name: 'Management FS Studio', permissions: ['chat', 'broadcast', 'stats'] },
     
-    // Moderators (peuvent être ajoutés dynamiquement par le founder)
+    // Moderators (peuvent être ajoutés dynamiquement par le Directeur Général)
 };
 
 // Stockage des modérateurs créés dynamiquement
@@ -18,10 +18,10 @@ function hasPermission(user, permission) {
     return user.permissions.includes('all') || user.permissions.includes(permission);
 }
 
-// Fonction pour créer un modérateur (seulement pour founder)
+// Fonction pour créer un modérateur (seulement pour le Directeur Général)
 function createModerator(code, name) {
-    if (!isAuthenticated || !currentUser || currentUser.role !== 'founder') {
-        alert('❌ Seuls les fondateurs peuvent créer des modérateurs');
+    if (!isAuthenticated || !currentUser || currentUser.role !== 'directeur_general') {
+        alert('❌ Seuls les Directeurs Généraux peuvent créer des modérateurs');
         return false;
     }
     
@@ -45,6 +45,135 @@ function createModerator(code, name) {
     
     alert(`✅ Modérateur "${name}" créé avec le code: ${code}`);
     return true;
+}
+
+// Fonction pour modifier un modérateur
+function updateModerator(oldCode, newCode, newName, newPermissions) {
+    if (!isAuthenticated || !currentUser || currentUser.role !== 'directeur_general') {
+        alert('❌ Seuls les Directeurs Généraux peuvent modifier les modérateurs');
+        return false;
+    }
+    
+    if (!dynamicModerators[oldCode]) {
+        alert('❌ Modérateur introuvable');
+        return false;
+    }
+    
+    // Vérifier si le nouveau code existe déjà (sauf si c'est le même)
+    if (newCode !== oldCode && (ADMIN_USERS[newCode] || dynamicModerators[newCode])) {
+        alert('❌ Ce code existe déjà');
+        return false;
+    }
+    
+    // Supprimer l'ancien modérateur
+    delete dynamicModerators[oldCode];
+    database.ref('admin/moderators/' + oldCode).remove();
+    
+    // Créer le nouveau modérateur
+    dynamicModerators[newCode] = {
+        role: 'moderator',
+        name: newName,
+        permissions: newPermissions,
+        createdBy: currentUser.name,
+        updatedAt: new Date().toISOString()
+    };
+    
+    localStorage.setItem('dynamicModerators', JSON.stringify(dynamicModerators));
+    
+    // Sauvegarder dans Firebase
+    database.ref('admin/moderators/' + newCode).set(dynamicModerators[newCode]);
+    
+    alert(`✅ Modérateur "${newName}" mis à jour`);
+    return true;
+}
+
+// Fonction pour supprimer un modérateur
+function deleteModerator(code) {
+    if (!isAuthenticated || !currentUser || currentUser.role !== 'directeur_general') {
+        alert('❌ Seuls les Directeurs Généraux peuvent supprimer les modérateurs');
+        return false;
+    }
+    
+    if (!dynamicModerators[code]) {
+        alert('❌ Modérateur introuvable');
+        return false;
+    }
+    
+    if (!confirm(`Êtes-vous sûr de vouloir supprimer le modérateur "${dynamicModerators[code].name}" ?`)) {
+        return false;
+    }
+    
+    delete dynamicModerators[code];
+    localStorage.setItem('dynamicModerators', JSON.stringify(dynamicModerators));
+    
+    // Supprimer de Firebase
+    database.ref('admin/moderators/' + code).remove();
+    
+    alert('✅ Modérateur supprimé');
+    return true;
+}
+
+// Fonction pour afficher la liste des modérateurs
+function displayModerators() {
+    const moderatorList = document.getElementById('moderatorList');
+    if (!moderatorList) return;
+    
+    moderatorList.innerHTML = '';
+    
+    Object.entries(dynamicModerators).forEach(([code, moderator]) => {
+        const moderatorDiv = document.createElement('div');
+        moderatorDiv.className = 'moderator-item';
+        moderatorDiv.innerHTML = `
+            <div class="moderator-info">
+                <strong>${moderator.name}</strong> (${code})
+                <br><small>Créé par: ${moderator.createdBy} • ${new Date(moderator.createdAt).toLocaleDateString()}</small>
+                <br><small>Permissions: ${moderator.permissions.join(', ')}</small>
+            </div>
+            <div class="moderator-actions">
+                <button class="edit-btn" data-code="${code}">✏️ Modifier</button>
+                <button class="delete-btn" data-code="${code}">🗑️ Supprimer</button>
+            </div>
+        `;
+        moderatorList.appendChild(moderatorDiv);
+    });
+    
+    // Ajouter les écouteurs d'événements
+    moderatorList.addEventListener('click', (e) => {
+        const code = e.target.dataset.code;
+        if (!code) return;
+        
+        if (e.target.classList.contains('edit-btn')) {
+            editModerator(code);
+        } else if (e.target.classList.contains('delete-btn')) {
+            if (deleteModerator(code)) {
+                displayModerators(); // Rafraîchir la liste
+            }
+        }
+    });
+}
+
+// Fonction pour éditer un modérateur
+function editModerator(code) {
+    const moderator = dynamicModerators[code];
+    if (!moderator) return;
+    
+    // Remplir le formulaire d'édition
+    const editName = document.getElementById('editModeratorName');
+    const editCode = document.getElementById('editModeratorCode');
+    const editChat = document.getElementById('editChatPermission');
+    const editBroadcast = document.getElementById('editBroadcastPermission');
+    
+    if (editName) editName.value = moderator.name;
+    if (editCode) editCode.value = code;
+    if (editChat) editChat.checked = moderator.permissions.includes('chat');
+    if (editBroadcast) editBroadcast.checked = moderator.permissions.includes('broadcast');
+    
+    // Stocker le code original
+    document.getElementById('editModeratorForm').dataset.originalCode = code;
+    
+    // Afficher la modal d'édition
+    const editModal = document.getElementById('editModeratorModal');
+    if (editModal) editModal.style.display = 'flex';
 }
 
 // Variables globales
@@ -285,10 +414,10 @@ function showAdmin() {
         if (chatTab) chatTab.style.display = 'none';
     }
     
-    // Masquer la section de création de modérateurs si pas founder
+    // Masquer la section de création de modérateurs si pas directeur_general
     const createModeratorSection = document.getElementById('createModeratorSection');
     if (createModeratorSection) {
-        createModeratorSection.style.display = currentUser && currentUser.role === 'founder' ? 'block' : 'none';
+        createModeratorSection.style.display = currentUser && currentUser.role === 'directeur_general' ? 'block' : 'none';
     }
     
     // Initialiser les éléments DOM radio
@@ -383,6 +512,56 @@ function showAdmin() {
             if (createModerator(code, name)) {
                 moderatorName.value = '';
                 moderatorCode.value = '';
+                displayModerators(); // Rafraîchir la liste
+            }
+        });
+    }
+    
+    // Écouteurs pour l'édition des modérateurs
+    const saveEditBtn = document.getElementById('saveEditModeratorBtn');
+    const cancelEditBtn = document.getElementById('cancelEditModeratorBtn');
+    const editModal = document.getElementById('editModeratorModal');
+    
+    if (saveEditBtn) {
+        saveEditBtn.addEventListener('click', () => {
+            const originalCode = document.getElementById('editModeratorForm').dataset.originalCode;
+            const newName = document.getElementById('editModeratorName').value.trim();
+            const newCode = document.getElementById('editModeratorCode').value.trim();
+            const chatPermission = document.getElementById('editChatPermission').checked;
+            const broadcastPermission = document.getElementById('editBroadcastPermission').checked;
+            
+            if (!newName || !newCode) {
+                alert('Veuillez remplir tous les champs');
+                return;
+            }
+            
+            const newPermissions = [];
+            if (chatPermission) newPermissions.push('chat');
+            if (broadcastPermission) newPermissions.push('broadcast');
+            
+            if (newPermissions.length === 0) {
+                alert('Au moins une permission doit être sélectionnée');
+                return;
+            }
+            
+            if (updateModerator(originalCode, newCode, newName, newPermissions)) {
+                if (editModal) editModal.style.display = 'none';
+                displayModerators(); // Rafraîchir la liste
+            }
+        });
+    }
+    
+    if (cancelEditBtn) {
+        cancelEditBtn.addEventListener('click', () => {
+            if (editModal) editModal.style.display = 'none';
+        });
+    }
+    
+    // Fermer la modal en cliquant en dehors
+    if (editModal) {
+        editModal.addEventListener('click', (e) => {
+            if (e.target === editModal) {
+                editModal.style.display = 'none';
             }
         });
     }
@@ -393,6 +572,11 @@ function showAdmin() {
     connectToFirebase();
     initRadio();
     initAudioControlPanel();
+    
+    // Afficher la liste des modérateurs si directeur_general
+    if (currentUser && currentUser.role === 'directeur_general') {
+        displayModerators();
+    }
     
     // Mettre à jour les statistiques en temps réel toutes les 30 secondes
     setInterval(() => {
@@ -767,48 +951,73 @@ function listenToNewMessages() {
 
 // Mettre à jour les statistiques
 function updateStats() {
+    // Mettre à jour les utilisateurs en ligne en temps réel
+    usersRef.once('value', (snapshot) => {
+        const users = snapshot.val();
+        if (users) {
+            const now = new Date().getTime();
+            const onlineUsers = Object.values(users).filter(user => {
+                const lastSeen = new Date(user.lastSeen).getTime();
+                return (now - lastSeen) < 120000; // 2 minutes
+            });
+            adminOnlineCount.textContent = onlineUsers.length;
+            if (onlineUsers) onlineUsers.textContent = onlineUsers.length;
+            if (totalUsers) totalUsers.textContent = Object.keys(users).length;
+        } else {
+            adminOnlineCount.textContent = '0';
+            if (onlineUsers) onlineUsers.textContent = '0';
+            if (totalUsers) totalUsers.textContent = '0';
+        }
+    });
+
+    // Mettre à jour les messages
     messagesRef.once('value', (snapshot) => {
         const messages = snapshot.val();
         const messageCount = messages ? Object.keys(messages).length : 0;
-        totalMessages.textContent = messageCount;
-        
+        if (totalMessages) totalMessages.textContent = messageCount;
+
         // Calculer le taux d'engagement (messages par utilisateur)
         const userCount = parseInt(totalUsers.textContent) || 1;
         const engagement = messageCount / userCount;
-        engagementRate.textContent = engagement.toFixed(2);
-        
+        if (engagementRate) engagementRate.textContent = engagement.toFixed(2);
+
         // Mettre à jour l'uptime
         const uptimeMs = Date.now() - startTime;
         const uptimeHours = Math.floor(uptimeMs / (1000 * 60 * 60));
         const uptimeMinutes = Math.floor((uptimeMs % (1000 * 60 * 60)) / (1000 * 60));
-        uptime.textContent = `${uptimeHours}h ${uptimeMinutes}m`;
-        
+        if (uptime) uptime.textContent = `${uptimeHours}h ${uptimeMinutes}m`;
+
         // Calculer les changements depuis la dernière mise à jour
         const messageChange = messageCount - lastMessageCount;
         const userChange = parseInt(totalUsers.textContent) - lastUserCount;
         const engagementChange = engagement - lastEngagement;
-        
+
         // Mettre à jour les indicateurs de changement
         if (messagesChange) {
             messagesChange.textContent = messageChange >= 0 ? `+${messageChange}` : messageChange.toString();
             messagesChange.className = `change ${messageChange >= 0 ? 'positive' : 'negative'}`;
         }
-        
+
         if (usersChange) {
             usersChange.textContent = userChange >= 0 ? `+${userChange}` : userChange.toString();
             usersChange.className = `change ${userChange >= 0 ? 'positive' : 'negative'}`;
         }
-        
+
         if (engagementChange) {
             engagementChange.textContent = engagementChange >= 0 ? `+${engagementChange.toFixed(2)}` : engagementChange.toFixed(2);
             engagementChange.className = `change ${engagementChange >= 0 ? 'positive' : 'negative'}`;
         }
-        
+
         // Sauvegarder les valeurs actuelles
         lastMessageCount = messageCount;
         lastUserCount = parseInt(totalUsers.textContent);
         lastEngagement = engagement;
     });
+
+    // Mettre à jour la dernière activité
+    if (lastActivity) {
+        lastActivity.textContent = new Date().toLocaleTimeString();
+    }
 }
 
 // Gérer les clics sur les boutons de suppression
