@@ -3,174 +3,281 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="FS STUDIO - Radio Web en direct">
-    
-    <!-- Permissions pour l'audio automatique -->
-    <meta http-equiv="Permissions-Policy" content="autoplay=*, microphone=*">
-    <meta name="autoplay-policy" content="no-user-gesture-required">
-    
-    <title>FS STUDIO - Radio Web</title>
-    <link rel="stylesheet" href="style.css">
+    <title>FS STUDIO - Administration</title>
+    <link rel="stylesheet" href="admin.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    
-    <!-- Google AdSense -->
-    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5628991534225681"
-     crossorigin="anonymous"></script>
 </head>
 <body>
-    <div class="background-blur"></div>
-    
-    <div class="container">
-        <header class="header">
-            <div class="status-bar">
-                <span class="time" id="currentTime">20:49</span>
-                <div class="status-icons">
-                    <span class="signal">●●●</span>
-                    <span class="battery"></span>
-                </div>
+    <!-- Écran de connexion -->
+    <div class="login-screen" id="loginScreen">
+        <div class="login-container">
+            <div class="login-header">
+                <h1>🔐 Administration</h1>
+                <p>Accès réservé aux administrateurs</p>
             </div>
+            <div class="login-form">
+                <input type="password" id="adminCode" placeholder="Code d'accès" autocomplete="off">
+                <button id="loginBtn">Se connecter</button>
+                <p class="error-message" id="errorMessage" style="display: none;"></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Interface Admin -->
+    <div class="admin-container" id="adminContainer" style="display: none;">
+        <header class="admin-header">
+            <div class="admin-title">
+                <h1>⚙️ Administration FS STUDIO</h1>
+                <span class="admin-badge" id="userInfo">ADMIN</span>
+            </div>
+            <button class="logout-btn" id="logoutBtn">Déconnexion</button>
         </header>
 
-        <main class="main-content">
-            <div class="player-card">
-                <div class="album-art">
-                    <div class="vinyl-record">
-                        <div class="vinyl-center"></div>
-                    </div>
-                </div>
-                <div class="player-info">
-                    <p class="station-label">En ce moment sur FS STUDIO :</p>
-                    <h2 class="track-title" id="trackTitle">EN DIRECT</h2>
-                    <div class="audio-status" id="audioStatus" style="display: none;">
-                        <span class="status-dot" id="statusDot"></span>
-                        <span id="audioStatusText">En attente...</span>
-                    </div>
-                </div>
-                <div class="player-controls">
-                    <!-- Contrôle de volume -->
-                    <div class="volume-control" id="volumeControl">
-                        <button class="volume-btn" id="volumeBtn" title="Volume">
-                            <svg viewBox="0 0 24 24" fill="white" width="20" height="20">
-                                <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
-                            </svg>
-                        </button>
-                        <div class="volume-slider-container" id="volumeSliderContainer" style="display: none;">
-                            <input type="range" id="volumeSlider" min="0" max="100" value="100" class="volume-slider">
-                            <span class="volume-value" id="volumeValue">100%</span>
+        <div class="admin-content">
+            <!-- Navigation par onglets -->
+            <div class="tab-navigation">
+                <button class="tab-btn active" data-tab="site-info">📊 Informations du Site</button>
+                <button class="tab-btn" data-tab="broadcasting">📡 Diffusion</button>
+                <button class="tab-btn" data-tab="chat">💬 Chat</button>
+                <button class="tab-btn" data-tab="finance">💰 Finance</button>
+            </div>
+
+            <!-- Onglet Informations du Site -->
+            <div class="tab-content active" id="site-info">
+                <!-- Section Statistiques étendues -->
+                <div class="admin-section">
+                    <div class="section-header">
+                        <h2>📊 Statistiques du Site</h2>
+                        <div class="real-time-indicator">
+                            <span class="pulse-dot"></span>
+                            <span>Temps réel</span>
                         </div>
                     </div>
-                    <button class="play-pause-btn" id="playPauseBtn">
-                        <svg class="pause-icon" viewBox="0 0 24 24" fill="white">
-                            <rect x="6" y="4" width="4" height="16"></rect>
-                            <rect x="14" y="4" width="4" height="16"></rect>
-                        </svg>
-                        <svg class="play-icon" viewBox="0 0 24 24" fill="white" style="display: none;">
-                            <path d="M8 5v14l11-7z"></path>
-                        </svg>
-                    </button>
-                </div>
-            </div>
-        </main>
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-icon">💬</div>
+                            <div class="stat-info">
+                                <div class="stat-number" id="totalMessages">0</div>
+                                <div class="stat-label">Messages totaux</div>
+                                <div class="stat-change" id="messagesChange">+0 aujourd'hui</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">👥</div>
+                            <div class="stat-info">
+                                <div class="stat-number" id="totalUsers">0</div>
+                                <div class="stat-label">Utilisateurs uniques</div>
+                                <div class="stat-change" id="usersChange">+0 aujourd'hui</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">🎙️</div>
+                            <div class="stat-info">
+                                <div class="stat-number" id="listenersCount">0</div>
+                                <div class="stat-label">Auditeurs actifs</div>
+                                <div class="stat-percentage" id="listenersPercentage">0%</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">🟢</div>
+                            <div class="stat-info">
+                                <div class="stat-number" id="onlineUsers">0</div>
+                                <div class="stat-label">Utilisateurs en ligne</div>
+                                <div class="stat-percentage" id="onlinePercentage">0%</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">⏱️</div>
+                            <div class="stat-info">
+                                <div class="stat-number" id="uptime">00:00:00</div>
+                                <div class="stat-label">Temps de fonctionnement</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">📈</div>
+                            <div class="stat-info">
+                                <div class="stat-number" id="engagementRate">0%</div>
+                                <div class="stat-label">Taux d'engagement</div>
+                                <div class="stat-change" id="engagementChange">+0%</div>
+                            </div>
+                        </div>
+                    </div>
 
-        <!-- Informations de diffusion -->
-        <section class="broadcasting-info">
-            <div class="info-card">
-                <div class="info-header">
-                    <span class="info-icon">📡</span>
-                    <h3>Horaires de Diffusion</h3>
-                </div>
-                <div class="schedule">
-                    <div class="schedule-item">
-                        <span class="day">Tous les jours</span>
-                        <span class="time">14h00 - 16h00</span>
+                    <!-- Graphiques et métriques avancées -->
+                    <div class="advanced-metrics">
+                        <div class="metric-row">
+                            <div class="metric-item">
+                                <h4>Activité par heure</h4>
+                                <div class="activity-chart" id="activityChart">
+                                    <div class="chart-placeholder">Chargement des données...</div>
+                                </div>
+                            </div>
+                            <div class="metric-item">
+                                <h4>Top messages</h4>
+                                <div class="top-messages" id="topMessages">
+                                    <div class="message-item">
+                                        <span class="message-text">Aucun message récent</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <p class="broadcast-note">Rejoignez-nous en direct pour des émissions exclusives !</p>
+
+                <!-- Section État du Serveur -->
+                <div class="admin-section">
+                    <div class="section-header">
+                        <h2>🖥️ État du Serveur</h2>
+                    </div>
+                    <div class="server-status">
+                        <div class="status-item">
+                            <span class="status-label">WebSocket:</span>
+                            <span class="status-value" id="websocketStatus">🔄 Connexion...</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">Firebase:</span>
+                            <span class="status-value" id="firebaseStatus">🔄 Connexion...</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">Streaming:</span>
+                            <span class="status-value" id="streamingStatus">⏸️ Arrêté</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">Dernière activité:</span>
+                            <span class="status-value" id="lastActivity">-</span>
+                        </div>
+                    </div>
+                </div>
             </div>
 
-            <div class="info-card">
-                <div class="info-header">
-                    <span class="info-icon">📧</span>
-                    <h3>Contact</h3>
+            <!-- Onglet Diffusion -->
+            <div class="tab-content" id="broadcasting">
+                <div class="admin-section">
+                    <div class="section-header">
+                        <h2>📡 Contrôles de Diffusion</h2>
+                        <div class="admin-actions">
+                            <button class="action-btn primary" id="startBroadcastBtn">▶️ Démarrer</button>
+                            <button class="action-btn danger" id="stopBroadcastBtn">⏹️ Arrêter</button>
+                        </div>
+                    </div>
+
+                    <div class="broadcast-status">
+                        <div class="status-indicator" id="broadcastStatus">
+                            <span class="status-light" id="statusLight"></span>
+                            <span class="status-text" id="statusText">Statut: Arrêté</span>
+                        </div>
+                        <div class="broadcast-info">
+                            <div class="info-item">
+                                <span class="info-label">Durée:</span>
+                                <span class="info-value" id="broadcastDuration">00:00:00</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Auditeurs:</span>
+                                <span class="info-value" id="currentListeners">0</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div class="contact-details">
-                    <div class="contact-item">
-                        <span class="contact-label">Email:</span>
-                        <span class="contact-value">contact@fsstudio.com</span>
+
+                <!-- Section Médias -->
+                <div class="admin-section">
+                    <div class="section-header">
+                        <h2>🎵 Gestion des Médias</h2>
                     </div>
-                    <div class="contact-item">
-                        <span class="contact-label">Site web:</span>
-                        <span class="contact-value">www.fsstudio.com</span>
-                    </div>
-                    <div class="contact-item">
-                        <span class="contact-label">Téléphone:</span>
-                        <span class="contact-value">+33 1 23 45 67 89</span>
-                    </div>
-                    <div class="contact-item">
-                        <span class="contact-label">Adresse:</span>
-                        <span class="contact-value">123 Rue de la Radio, 75001 Paris, France</span>
+                    <div class="media-controls">
+                        <div class="control-group">
+                            <label>Volume Micro:</label>
+                            <input type="range" id="micVolume" min="0" max="100" value="75" class="volume-slider">
+                            <span id="micVolumeValue">75%</span>
+                        </div>
+                        <div class="control-group">
+                            <label>Volume Sortie:</label>
+                            <input type="range" id="outputVolume" min="0" max="100" value="80" class="volume-slider">
+                            <span id="outputVolumeValue">80%</span>
+                        </div>
                     </div>
                 </div>
             </div>
-        </section>
+
+            <!-- Onglet Chat -->
+            <div class="tab-content" id="chat">
+                <div class="admin-section">
+                    <div class="section-header">
+                        <h2>💬 Modération du Chat</h2>
+                        <div class="admin-actions">
+                            <button class="action-btn warning" id="clearChatBtn">🗑️ Vider le chat</button>
+                            <button class="action-btn info" id="exportChatBtn">📄 Exporter</button>
+                        </div>
+                    </div>
+
+                    <div class="chat-admin-container">
+                        <div class="chat-messages-admin" id="chatMessagesAdmin">
+                            <div class="chat-message system">
+                                <span class="message-time">00:00</span>
+                                <span class="message-content">Chargement des messages...</span>
+                            </div>
+                        </div>
+
+                        <div class="chat-admin-controls">
+                            <div class="send-message-form">
+                                <div class="form-group">
+                                    <label for="adminMessage">Message admin:</label>
+                                    <textarea id="adminMessage" placeholder="Tapez votre message d'administration..." rows="3"></textarea>
+                                </div>
+                                <button class="action-btn primary" id="sendAdminMessageBtn">📤 Envoyer</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Onglet Finance -->
+            <div class="tab-content" id="finance">
+                <div class="admin-section">
+                    <div class="section-header">
+                        <h2>💰 Gestion Financière</h2>
+                    </div>
+
+                    <div class="finance-overview">
+                        <div class="finance-card">
+                            <div class="finance-icon">💵</div>
+                            <div class="finance-info">
+                                <div class="finance-amount" id="totalRevenue">$0.00</div>
+                                <div class="finance-label">Revenus totaux</div>
+                            </div>
+                        </div>
+                        <div class="finance-card">
+                            <div class="finance-icon">📊</div>
+                            <div class="finance-info">
+                                <div class="finance-amount" id="monthlyRevenue">$0.00</div>
+                                <div class="finance-label">Ce mois-ci</div>
+                            </div>
+                        </div>
+                        <div class="finance-card">
+                            <div class="finance-icon">🎯</div>
+                            <div class="finance-info">
+                                <div class="finance-amount" id="conversionRate">0%</div>
+                                <div class="finance-label">Taux de conversion</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="transactions-list">
+                        <h3>Transactions récentes</h3>
+                        <div class="transactions-container" id="transactionsList">
+                            <div class="transaction-item">
+                                <span class="transaction-desc">Aucune transaction récente</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
-    <!-- Chat Public Sidebar -->
-    <div class="public-chat" id="publicChat">
-        <div class="chat-header">
-            <div class="chat-icon">💬</div>
-            <h3>Chat Public</h3>
-            <div class="online-indicator" id="onlineIndicator">
-                <span class="online-dot"></span>
-                <span id="onlineCount">0</span>
-            </div>
-        </div>
-        
-        <!-- Formulaire de connexion (si pas de pseudo) -->
-        <div class="chat-login" id="chatLogin" style="display: none;">
-            <div class="login-form">
-                <p>Choisissez un pseudo pour participer au chat</p>
-                <input type="text" id="usernameInput" placeholder="Votre pseudo" maxlength="20">
-                <button id="loginBtn">Rejoindre</button>
-            </div>
-        </div>
-        
-        <div class="chat-messages" id="chatMessages">
-            <div class="chat-message system">
-                <span class="message-time">00:00</span>
-                <span class="message-content">Connexion au chat...</span>
-            </div>
-        </div>
-        
-        <div class="chat-input-container" id="chatInputContainer" style="display: none;">
-            <div class="chat-input-wrapper">
-                <input type="text" id="messageInput" placeholder="Tapez votre message..." maxlength="500">
-                <button id="sendBtn">
-                    <svg viewBox="0 0 24 24" fill="white" width="20" height="20">
-                        <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
-                    </svg>
-                </button>
-            </div>
-        </div>
-        
-        <div class="chat-status">
-            <span class="status-text" id="chatStatus">Connexion...</span>
-        </div>
-    </div>
-
-    <audio id="audioPlayer" preload="auto" autoplay playsinline></audio>
-    
-    <!-- Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-    
-    <!-- Configuration Firebase -->
-    <script src="firebase-config.js"></script>
-    
-    <!-- Script principal -->
-    <script src="script.js"></script>
+    <script src="admin.js"></script>
 </body>
 </html>
 
