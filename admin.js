@@ -646,12 +646,12 @@ function performAuthCheck() {
     if (savedAuth) {
         // Vérifier d'abord dans les utilisateurs statiques
         let user = ADMIN_USERS[savedAuth];
-        
+
         // Si pas trouvé, vérifier dans les modérateurs dynamiques
         if (!user) {
             user = dynamicModerators[savedAuth];
         }
-        
+
         if (user) {
             currentUser = user;
             console.log('✅ Session restaurée pour:', user.name);
@@ -659,16 +659,35 @@ function performAuthCheck() {
             return;
         }
     }
-    
-    // Pas de session valide, rediriger vers la page de connexion
-    console.log('⚠️ Aucune session valide, redirection vers login.html');
-    window.location.href = 'login.html';
+
+    // Pas de session valide, afficher l'écran de connexion
+    showLogin();
 }
 
 // Afficher l'écran de connexion
 function showLogin() {
-    // Rediriger vers la page de connexion
-    window.location.href = 'login.html';
+    // Afficher l'écran de connexion
+    if (loginScreen) {
+        loginScreen.style.display = 'flex';
+        loginScreen.style.visibility = 'visible';
+        loginScreen.style.opacity = '1';
+        loginScreen.style.pointerEvents = 'auto';
+        loginScreen.style.position = 'fixed';
+        loginScreen.style.zIndex = '99999';
+    }
+
+    // Masquer complètement l'interface admin
+    if (adminContainer) {
+        adminContainer.style.display = 'none';
+        adminContainer.style.visibility = 'hidden';
+        adminContainer.style.opacity = '0';
+    }
+
+    // Changer la classe du body
+    document.body.classList.remove('admin-active');
+    document.body.classList.add('login-active');
+
+    isAuthenticated = false;
 }
 
 // Fonction pour déconnecter tous les membres/utilisateurs
@@ -1415,15 +1434,16 @@ function performLogin(code) {
         localStorage.setItem('adminAuth', code);
         currentUser = user;
         console.log('✅ Connexion réussie pour:', user.name, '- Rôle:', user.role);
-        
+
         // Masquer l'erreur si elle était affichée
         if (errorElement) {
             errorElement.style.display = 'none';
         }
-        
+
         // Réinitialiser le champ
         if (adminCodeInput) adminCodeInput.value = '';
-        
+
+        // Afficher l'interface admin
         showAdmin();
     } else {
         // Code incorrect
@@ -1495,8 +1515,8 @@ function performAutoLogin() {
 if (logoutBtn) {
     logoutBtn.addEventListener('click', () => {
         localStorage.removeItem('adminAuth');
-        // Rediriger vers la page de connexion
-        window.location.href = 'login.html';
+        currentUser = null;
+        showLogin();
     });
 }
 
@@ -3381,12 +3401,6 @@ function addExpense(amount, category, description) {
     updateFinancialDashboard();
     
     console.log('✅ Dépense ajoutée:', transaction);
-}
-    financialData.expenses[category] += transaction.amount;
-    financialData.expenses.total += transaction.amount;
-
-    saveFinancialData();
-    updateFinancialDashboard();
 }
 
 // Gestion des budgets
