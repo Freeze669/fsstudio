@@ -636,27 +636,146 @@ function checkAuth() {
 function performAuthCheck() {
     // Vérifier si déjà authentifié
     const savedAuth = localStorage.getItem('adminAuth');
-    if (savedAuth && ADMIN_USERS[savedAuth]) {
-        currentUser = ADMIN_USERS[savedAuth];
-        console.log('✅ Session restaurée pour:', currentUser.name);
-        showAdmin();
-    } else {
-        showLogin();
+    if (savedAuth) {
+        // Vérifier d'abord dans les utilisateurs statiques
+        let user = ADMIN_USERS[savedAuth];
+        
+        // Si pas trouvé, vérifier dans les modérateurs dynamiques
+        if (!user) {
+            user = dynamicModerators[savedAuth];
+        }
+        
+        if (user) {
+            currentUser = user;
+            console.log('✅ Session restaurée pour:', user.name);
+            showAdmin();
+            return;
+        }
     }
+    
+    // Pas de session valide, afficher l'écran de connexion
+    showLogin();
 }
 
 // Afficher l'écran de connexion
 function showLogin() {
-    loginScreen.style.display = 'flex';
-    adminContainer.style.display = 'none';
+    // Afficher l'écran de connexion
+    if (loginScreen) {
+        loginScreen.style.display = 'flex';
+        loginScreen.style.visibility = 'visible';
+        loginScreen.style.opacity = '1';
+        loginScreen.style.pointerEvents = 'auto';
+        loginScreen.style.position = 'fixed';
+        loginScreen.style.zIndex = '99999';
+    }
+    
+    // Masquer complètement l'interface admin
+    if (adminContainer) {
+        adminContainer.style.display = 'none';
+        adminContainer.style.visibility = 'hidden';
+        adminContainer.style.opacity = '0';
+    }
+    
+    // Changer la classe du body
+    document.body.classList.remove('admin-active');
+    document.body.classList.add('login-active');
+    
     isAuthenticated = false;
+    
+    // Réinitialiser le champ de code
+    if (adminCodeInput) {
+        adminCodeInput.value = '';
+        setTimeout(() => {
+            adminCodeInput.focus();
+        }, 100);
+    }
+    
+    // Masquer les erreurs
+    if (loginError) {
+        loginError.style.display = 'none';
+    }
+}
+
+// Fonction pour déconnecter tous les membres/utilisateurs
+function disconnectAllMembers() {
+    console.log('🔄 Déconnexion de tous les membres...');
+    
+    try {
+        // Déconnecter tous les utilisateurs du chat Firebase
+        if (typeof firebase !== 'undefined' && firebase.apps.length > 0 && database) {
+            // Utiliser le chemin correct pour les utilisateurs
+            const usersRef = database.ref(FIREBASE_USERS_PATH);
+            usersRef.once('value', (snapshot) => {
+                const users = snapshot.val();
+                if (users) {
+                    Object.keys(users).forEach(userId => {
+                        database.ref(`${FIREBASE_USERS_PATH}/${userId}`).remove();
+                    });
+                    console.log('✅ Tous les utilisateurs du chat déconnectés');
+                }
+            });
+            
+            // Nettoyer les sessions actives dans publicChat
+            database.ref('publicChat/sessions').remove().then(() => {
+                console.log('✅ Sessions nettoyées');
+            }).catch(err => {
+                console.log('ℹ️ Aucune session à nettoyer');
+            });
+            
+            // Nettoyer aussi les sessions générales
+            database.ref('sessions').remove().then(() => {
+                console.log('✅ Sessions générales nettoyées');
+            }).catch(err => {
+                console.log('ℹ️ Aucune session générale à nettoyer');
+            });
+        }
+        
+        // Envoyer un signal de déconnexion via WebSocket si disponible
+        if (typeof audioWebSocket !== 'undefined' && audioWebSocket && audioWebSocket.readyState === WebSocket.OPEN) {
+            try {
+                audioWebSocket.send(JSON.stringify({
+                    type: 'disconnect_all',
+                    timestamp: Date.now()
+                }));
+                console.log('✅ Signal de déconnexion envoyé via WebSocket');
+            } catch (wsError) {
+                console.log('ℹ️ WebSocket non disponible pour déconnexion');
+            }
+        }
+        
+        console.log('✅ Déconnexion de tous les membres terminée');
+    } catch (error) {
+        console.error('❌ Erreur lors de la déconnexion des membres:', error);
+    }
 }
 
 // Afficher l'interface admin
 function showAdmin() {
-    loginScreen.style.display = 'none';
-    adminContainer.style.display = 'block';
+    // Masquer complètement l'écran de connexion
+    if (loginScreen) {
+        loginScreen.style.display = 'none';
+        loginScreen.style.visibility = 'hidden';
+        loginScreen.style.opacity = '0';
+        loginScreen.style.pointerEvents = 'none';
+        loginScreen.style.position = 'fixed';
+        loginScreen.style.zIndex = '-1';
+    }
+    
+    // Afficher l'interface admin
+    if (adminContainer) {
+        adminContainer.style.display = 'block';
+        adminContainer.style.visibility = 'visible';
+        adminContainer.style.opacity = '1';
+    }
+    
+    // Changer la classe du body
+    document.body.classList.remove('login-active');
+    document.body.classList.add('admin-active');
+    
     isAuthenticated = true;
+    
+    // Déconnecter automatiquement tous les membres
+    disconnectAllMembers();
     
     // Afficher le nom et rôle de l'utilisateur
     const userInfo = document.getElementById('userInfo');
