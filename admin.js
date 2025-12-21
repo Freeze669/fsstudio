@@ -389,10 +389,10 @@ let currentUser = null;
 // Éléments DOM
 const loginScreen = document.getElementById('loginScreen');
 const adminContainer = document.getElementById('adminContainer');
-const adminCodeInput = document.getElementById('adminCode');
+const adminCodeInput = document.getElementById('adminCodeInput');
 const loginBtn = document.getElementById('loginBtn');
 const logoutBtn = document.getElementById('logoutBtn');
-const errorMessage = document.getElementById('errorMessage');
+const loginError = document.getElementById('loginError');
 const chatMessagesAdmin = document.getElementById('chatMessagesAdmin');
 const adminOnlineCount = document.getElementById('adminOnlineCount');
 const clearAllBtn = document.getElementById('clearAllBtn');
@@ -1277,21 +1277,21 @@ function updateProfileInfo(profile) {
 
 // Fonction pour effectuer la connexion
 function performLogin(code) {
-    const loginError = document.getElementById('loginError');
-    const errorText = loginError ? loginError.querySelector('.error-text') : null;
+    const errorElement = loginError || document.getElementById('loginError');
+    const errorText = errorElement ? errorElement.querySelector('.error-text') : null;
     
     // Masquer l'erreur précédente
-    if (loginError) {
-        loginError.style.display = 'none';
+    if (errorElement) {
+        errorElement.style.display = 'none';
     }
     
     // Vérifier si le code est vide
     if (!code || code.trim() === '') {
-        if (loginError && errorText) {
+        if (errorElement && errorText) {
             errorText.textContent = 'Veuillez entrer un code d\'accès';
-            loginError.style.display = 'flex';
+            errorElement.style.display = 'flex';
         }
-        adminCodeInput.focus();
+        if (adminCodeInput) adminCodeInput.focus();
         return;
     }
     
@@ -1310,54 +1310,58 @@ function performLogin(code) {
         console.log('✅ Connexion réussie pour:', user.name, '- Rôle:', user.role);
         
         // Masquer l'erreur si elle était affichée
-        if (loginError) {
-            loginError.style.display = 'none';
+        if (errorElement) {
+            errorElement.style.display = 'none';
         }
         
         // Réinitialiser le champ
-        adminCodeInput.value = '';
+        if (adminCodeInput) adminCodeInput.value = '';
         
         showAdmin();
     } else {
         // Code incorrect
-        if (loginError && errorText) {
+        if (errorElement && errorText) {
             errorText.textContent = 'Code d\'accès incorrect. Veuillez réessayer.';
-            loginError.style.display = 'flex';
+            errorElement.style.display = 'flex';
         }
         
         // Effet de secousse sur le champ
-        adminCodeInput.style.animation = 'none';
-        setTimeout(() => {
-            adminCodeInput.style.animation = 'errorShake 0.5s ease-out';
-        }, 10);
-        
-        // Réinitialiser le champ après l'animation
-        setTimeout(() => {
-            adminCodeInput.value = '';
-            adminCodeInput.focus();
-        }, 500);
+        if (adminCodeInput) {
+            adminCodeInput.style.animation = 'none';
+            setTimeout(() => {
+                adminCodeInput.style.animation = 'errorShake 0.5s ease-out';
+            }, 10);
+            
+            // Réinitialiser le champ après l'animation
+            setTimeout(() => {
+                adminCodeInput.value = '';
+                adminCodeInput.focus();
+            }, 500);
+        }
     }
 }
 
 // Connexion
-loginBtn.addEventListener('click', () => {
-    const code = adminCodeInput.value.trim();
-    
-    // Recharger les modérateurs depuis Firebase avant de vérifier
-    if (typeof firebase !== 'undefined' && firebase.apps.length > 0) {
-        database.ref('admin/moderators').once('value', (snapshot) => {
-            const firebaseModerators = snapshot.val() || {};
-            dynamicModerators = { ...dynamicModerators, ...firebaseModerators };
-            localStorage.setItem('dynamicModerators', JSON.stringify(dynamicModerators));
+if (loginBtn && adminCodeInput) {
+    loginBtn.addEventListener('click', () => {
+        const code = adminCodeInput.value.trim();
+        
+        // Recharger les modérateurs depuis Firebase avant de vérifier
+        if (typeof firebase !== 'undefined' && firebase.apps.length > 0) {
+            database.ref('admin/moderators').once('value', (snapshot) => {
+                const firebaseModerators = snapshot.val() || {};
+                dynamicModerators = { ...dynamicModerators, ...firebaseModerators };
+                localStorage.setItem('dynamicModerators', JSON.stringify(dynamicModerators));
+                performLogin(code);
+            }).catch((error) => {
+                console.error('❌ Erreur rechargement modérateurs:', error);
+                performLogin(code); // Continuer avec les modérateurs locaux
+            });
+        } else {
             performLogin(code);
-        }).catch((error) => {
-            console.error('❌ Erreur rechargement modérateurs:', error);
-            performLogin(code); // Continuer avec les modérateurs locaux
-        });
-    } else {
-        performLogin(code);
-    }
-});
+        }
+    });
+}
 
 // Fonction séparée pour effectuer la connexion automatique
 function performAutoLogin() {
@@ -1381,25 +1385,31 @@ function performAutoLogin() {
 }
 
 // Déconnexion
-logoutBtn.addEventListener('click', () => {
-    localStorage.removeItem('adminAuth');
-    showLogin();
-});
+if (logoutBtn) {
+    logoutBtn.addEventListener('click', () => {
+        localStorage.removeItem('adminAuth');
+        showLogin();
+    });
+}
 
 // Entrée sur le champ code
-adminCodeInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-        loginBtn.click();
-    }
-});
+if (adminCodeInput && loginBtn) {
+    adminCodeInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            loginBtn.click();
+        }
+    });
+}
 
 // Masquer l'erreur quand l'utilisateur commence à taper
-adminCodeInput.addEventListener('input', () => {
-    const loginError = document.getElementById('loginError');
-    if (loginError && loginError.style.display !== 'none') {
-        loginError.style.display = 'none';
-    }
-});
+if (adminCodeInput) {
+    adminCodeInput.addEventListener('input', () => {
+        const errorElement = loginError || document.getElementById('loginError');
+        if (errorElement && errorElement.style.display !== 'none') {
+            errorElement.style.display = 'none';
+        }
+    });
+}
 
 // Formatage de l'heure
 function formatMessageTime(date = new Date()) {

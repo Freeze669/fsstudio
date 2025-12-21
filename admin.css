@@ -9,6 +9,9 @@ body {
     background: linear-gradient(135deg, #000000 0%, #1a1a1a 50%, #2d2d2d 100%);
     color: white;
     min-height: 100vh;
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
 }
 
 /* Écran de connexion */
@@ -17,9 +20,15 @@ body {
     align-items: center;
     justify-content: center;
     min-height: 100vh;
-    position: relative;
+    width: 100%;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
     background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
     overflow: hidden;
+    z-index: 9999;
 }
 
 .login-background {
@@ -56,12 +65,14 @@ body {
     padding: 50px 40px;
     width: 100%;
     max-width: 450px;
+    margin: 0 auto;
     box-shadow: 
         0 20px 60px rgba(0, 0, 0, 0.5),
         0 0 0 1px rgba(255, 255, 255, 0.1),
         inset 0 1px 0 rgba(255, 255, 255, 0.1);
     border: 1px solid rgba(67, 181, 129, 0.2);
     animation: containerFadeIn 0.6s ease-out;
+    text-align: center;
 }
 
 @keyframes containerFadeIn {
@@ -142,6 +153,8 @@ body {
     display: flex;
     flex-direction: column;
     gap: 24px;
+    width: 100%;
+    align-items: stretch;
 }
 
 .input-wrapper {
@@ -328,6 +341,7 @@ body {
     text-align: center;
     padding-top: 20px;
     border-top: 1px solid rgba(255, 255, 255, 0.1);
+    width: 100%;
 }
 
 .login-footer p {
@@ -335,6 +349,7 @@ body {
     font-size: 12px;
     font-weight: 400;
     letter-spacing: 0.5px;
+    margin: 0;
 }
 
 .error-message {
@@ -1256,9 +1271,16 @@ body {
 
     .login-container {
         padding: 40px 30px;
-        margin: 16px;
-        max-width: none;
+        margin: 20px;
+        max-width: calc(100% - 40px);
         border-radius: 20px;
+        width: auto;
+    }
+    
+    .login-screen {
+        padding: 0;
+        align-items: center;
+        justify-content: center;
     }
     
     .login-logo {
