@@ -11,6 +11,23 @@ body {
     position: relative;
     background: linear-gradient(135deg, #000000 0%, #1a1a1a 50%, #ffffff 100%);
 }
+iframe {
+    pointer-events: auto;
+}
+iframe[src*="settings"],
+iframe[src*="param"] {
+    display: none !important;
+}
+/* Masque tout bouton flottant de paramètres */
+button[aria-label*="param"],
+button[aria-label*="settings"],
+.settings,
+.setting,
+.settings-button,
+.settings-icon {
+    display: none !important;
+}
+
 
 .background-blur {
     position: fixed;
