@@ -3879,4 +3879,256 @@ document.addEventListener('DOMContentLoaded', function() {
         initializeFinancialData();
     }
 });
+// Déclaration unique et globale
+var financeRef = firebase.database().ref('finances'); 
+
+function loadFinanceData() {
+    // On écoute les changements sur la branche 'finances'
+    financeRef.orderByChild('timestamp').on('value', (snapshot) => {
+        let totalRevenue = 0;
+        let totalExpenses = 0;
+        let donationCount = 0;
+        let html = '';
+
+        const data = snapshot.val();
+        if (!data) {
+            document.getElementById('transactionHistory').innerHTML = "<tr><td colspan='4'>Aucune donnée</td></tr>";
+            return;
+        }
+
+        // On transforme l'objet JSON en tableau pour l'afficher
+        Object.entries(data).reverse().forEach(([id, trans]) => {
+            const isRevenue = trans.type === 'revenue';
+            if(isRevenue) { totalRevenue += parseFloat(trans.amount); donationCount++; }
+            else { totalExpenses += parseFloat(trans.amount); }
+
+            const dateStr = trans.timestamp ? new Date(trans.timestamp).toLocaleDateString() : '-';
+
+            html += `
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                    <td style="padding:12px;">${dateStr}</td>
+                    <td style="padding:12px;">${trans.description}</td>
+                    <td style="padding:12px; color:${isRevenue ? '#43b581' : '#f04747'}">
+                        ${isRevenue ? '+' : '-'}${parseFloat(trans.amount).toFixed(2)}€
+                    </td>
+                    <td style="padding:12px;">
+                        <button onclick="deleteTransaction('${id}')" style="background:none; border:none; cursor:pointer;">🗑️</button>
+                    </td>
+                </tr>`;
+        });
+
+        // Mise à jour de l'interface
+        document.getElementById('transactionHistory').innerHTML = html;
+        document.getElementById('monthlyRevenue').innerText = totalRevenue.toFixed(2) + '€';
+        document.getElementById('monthlyExpenses').innerText = totalExpenses.toFixed(2) + '€';
+        document.getElementById('currentBalance').innerText = (totalRevenue - totalExpenses).toFixed(2);
+        document.getElementById('totalDonations').innerText = donationCount;
+    });
+}
+
+// Charger les transactions en temps réel
+function loadFinanceData() {
+    financeRef.orderBy('timestamp', 'desc').onSnapshot(snapshot => {
+        let totalRevenue = 0;
+        let totalExpenses = 0;
+        let donationCount = 0;
+        let html = '';
+
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            const isRevenue = data.type === 'revenue';
+            
+            if(isRevenue) {
+                totalRevenue += parseFloat(data.amount);
+                donationCount++;
+            } else {
+                totalExpenses += parseFloat(data.amount);
+            }
+
+            // Formater la date
+            const date = data.timestamp ? new Date(data.timestamp.toDate()).toLocaleDateString() : '-';
+
+            html += `
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                    <td style="padding:12px;">${date}</td>
+                    <td style="padding:12px;">${data.description}</td>
+                    <td style="padding:12px; color:${isRevenue ? '#43b581' : '#f04747'}">
+                        ${isRevenue ? '+' : '-'}${parseFloat(data.amount).toFixed(2)}€
+                    </td>
+                    <td style="padding:12px;">
+                        <button onclick="deleteTransaction('${doc.id}')" style="background:none; border:none; cursor:pointer;">🗑️</button>
+                    </td>
+                </tr>
+            `;
+        });
+
+        // Mise à jour de l'UI
+        document.getElementById('transactionHistory').innerHTML = html;
+        document.getElementById('monthlyRevenue').innerText = totalRevenue.toFixed(2) + '€';
+        document.getElementById('monthlyExpenses').innerText = totalExpenses.toFixed(2) + '€';
+        document.getElementById('currentBalance').innerText = (totalRevenue - totalExpenses).toFixed(2);
+        document.getElementById('totalDonations').innerText = donationCount;
+    });
+}
+
+// Ajouter une transaction
+document.getElementById('addTransactionBtn').addEventListener('click', async () => {
+    const type = document.getElementById('transType').value;
+    const amount = document.getElementById('transAmount').value;
+    const description = document.getElementById('transDesc').value;
+
+    if(!amount || !description) return alert("Veuillez remplir tous les champs");
+
+    try {
+        await financeRef.add({
+            type: type,
+            amount: parseFloat(amount),
+            description: description,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        // Reset form
+        document.getElementById('transAmount').value = '';
+        document.getElementById('transDesc').value = '';
+    } catch (error) {
+        console.error("Erreur:", error);
+    }
+});
+
+// Supprimer une transaction
+async function deleteTransaction(id) {
+    if(confirm("Supprimer cette transaction ?")) {
+        await financeRef.doc(id).delete();
+    }
+}
+// Déclaration unique et globale
+var financeRef = firebase.database().ref('finances'); 
+
+// On utilise 'var' ou on enlève 'const' si tu as des erreurs de redéclaration
+// Charger les transactions en temps réel
+function loadFinanceData() {
+    financeRef.orderByChild('timestamp').on('value', (snapshot) => {
+        let totalRevenue = 0;
+        let totalExpenses = 0;
+        let donationCount = 0;
+        let html = '';
+        
+        const data = snapshot.val();
+        if (!data) {
+            document.getElementById('transactionHistory').innerHTML = "<tr><td colspan='4' style='text-align:center; padding:20px;'>Aucune donnée</td></tr>";
+            return;
+        }
+
+        // Convertir l'objet en tableau et trier par date (plus récent en haut)
+        const entries = Object.entries(data).reverse();
+
+        entries.forEach(([id, trans]) => {
+            const isRevenue = trans.type === 'revenue';
+            
+            if(isRevenue) {
+                totalRevenue += parseFloat(trans.amount);
+                donationCount++;
+            } else {
+                totalExpenses += parseFloat(trans.amount);
+            }
+
+            const dateStr = trans.timestamp ? new Date(trans.timestamp).toLocaleDateString() : '-';
+
+            html += `
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                    <td style="padding:12px;">${dateStr}</td>
+                    <td style="padding:12px;">${trans.description}</td>
+                    <td style="padding:12px; color:${isRevenue ? '#43b581' : '#f04747'}">
+                        ${isRevenue ? '+' : '-'}${parseFloat(trans.amount).toFixed(2)}€
+                    </td>
+                    <td style="padding:12px;">
+                        <button onclick="deleteTransaction('${id}')" style="background:none; border:none; cursor:pointer; filter: grayscale(1);">🗑️</button>
+                    </td>
+                </tr>
+            `;
+        });
+
+        // Mise à jour de l'interface
+        document.getElementById('transactionHistory').innerHTML = html;
+        document.getElementById('monthlyRevenue').innerText = totalRevenue.toFixed(2) + '€';
+        document.getElementById('monthlyExpenses').innerText = totalExpenses.toFixed(2) + '€';
+        document.getElementById('currentBalance').innerText = (totalRevenue - totalExpenses).toFixed(2);
+        document.getElementById('totalDonations').innerText = donationCount;
+    });
+}
+
+// Ajouter une transaction
+document.getElementById('addTransactionBtn').addEventListener('click', async () => {
+    const type = document.getElementById('transType').value;
+    const amount = document.getElementById('transAmount').value;
+    const description = document.getElementById('transDesc').value;
+
+    if(!amount || !description) return alert("Veuillez remplir tous les champs");
+
+    try {
+        const newTransRef = financeRef.push();
+        await newTransRef.set({
+            type: type,
+            amount: parseFloat(amount),
+            description: description,
+            timestamp: firebase.database.ServerValue.TIMESTAMP
+        });
+        
+        // Reset formulaire
+        document.getElementById('transAmount').value = '';
+        document.getElementById('transDesc').value = '';
+    } catch (error) {
+        console.error("Erreur d'enregistrement:", error);
+    }
+});
+
+// Supprimer une transaction
+window.deleteTransaction = function(id) {
+    if(confirm("Supprimer cette transaction ?")) {
+        financeRef.child(id).remove();
+    }
+};// Déclaration propre de la référence
+const financeRef = firebase.database().ref('finances');
+
+function loadFinanceData() {
+    financeRef.orderByChild('timestamp').on('value', (snapshot) => {
+        let totalIn = 0, totalOut = 0, count = 0;
+        let html = '';
+        const data = snapshot.val();
+
+        if (data) {
+            Object.entries(data).reverse().forEach(([id, trans]) => {
+                const isInc = trans.type === 'revenue';
+                isInc ? totalIn += parseFloat(trans.amount) : totalOut += parseFloat(trans.amount);
+                count++;
+
+                const date = new Date(trans.timestamp).toLocaleDateString('fr-FR');
+                
+                // Design de ligne bancaire
+                html += `
+                    <div class="bank-history-item">
+                        <div class="history-main">
+                            <span class="history-desc">${trans.description}</span>
+                            <span class="history-date">${date}</span>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:15px;">
+                            <span style="font-weight:700; color:${isInc ? '#22c55e' : '#ef4444'}">
+                                ${isInc ? '+' : '-'}${parseFloat(trans.amount).toFixed(2)}€
+                            </span>
+                            <button onclick="deleteTransaction('${id}')" style="background:none; border:none; cursor:pointer;">🗑️</button>
+                        </div>
+                    </div>`;
+            });
+        }
+
+        // Mise à jour des montants
+        document.getElementById('transactionHistory').innerHTML = html || '<p style="text-align:center;color:#64748b">Aucune opération</p>';
+        document.getElementById('currentBalance').innerText = (totalIn - totalOut).toFixed(2) + '€';
+        document.getElementById('monthlyRevenue').innerText = totalIn.toFixed(2) + '€';
+        document.getElementById('monthlyExpenses').innerText = totalOut.toFixed(2) + '€';
+        document.getElementById('totalDonations').innerText = count + ' mouvement(s)';
+    });
+}
+
+// Lancer au démarrage
+loadFinanceData();
 
