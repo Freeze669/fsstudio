@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recrutement Élite | Fs Radio Studio</title>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tsparticles/2.12.0/tsparticles.bundle.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --primary: #00f2ff;
+            --secondary: #7000ff;
+            --accent: #ff007a;
+            --bg-dark: #020205;
+            --glass: rgba(255, 255, 255, 0.03);
+            --border-glass: rgba(255, 255, 255, 0.1);
+        }
+
+        * { box-sizing: border-box; cursor: default; }
+        input, select, textarea, button { cursor: pointer; }
+
+        body, html {
+            margin: 0; padding: 0;
+            font-family: 'Rajdhani', sans-serif;
+            background-color: var(--bg-dark);
+            color: #e0e0e0;
+            overflow-x: hidden;
+        }
+
+        /* Fond de Particules 3D */
+        #tsparticles {
+            position: fixed; width: 100%; height: 100%; z-index: -1;
+        }
+
+        .main-container {
+            display: flex; justify-content: center; align-items: center;
+            min-height: 100vh; padding: 60px 20px;
+        }
+
+        /* Carte de Recrutement avec effet Neon */
+        .form-card {
+            background: var(--glass);
+            backdrop-filter: blur(25px);
+            border: 1px solid var(--border-glass);
+            border-radius: 30px;
+            padding: 40px;
+            width: 100%;
+            max-width: 900px;
+            box-shadow: 0 0 40px rgba(0, 242, 255, 0.1);
+            position: relative;
+            z-index: 1;
+        }
+
+        header { text-align: center; margin-bottom: 50px; }
+        
+        header h1 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 2.5rem; letter-spacing: 5px; margin: 0;
+            background: linear-gradient(to right, #fff, var(--primary));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 20px rgba(0, 242, 255, 0.5);
+        }
+
+        header p { color: var(--primary); text-transform: uppercase; letter-spacing: 2px; font-weight: bold; margin-top: 10px; }
+
+        .form-grid {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 25px;
+        }
+
+        .input-group { position: relative; }
+        .full-width { grid-column: span 2; }
+
+        label {
+            display: block; margin-bottom: 8px; font-weight: 700;
+            color: var(--primary); text-transform: uppercase; font-size: 0.8rem;
+        }
+
+        input, select, textarea {
+            width: 100%; padding: 15px;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid var(--border-glass);
+            border-radius: 12px; color: white;
+            font-family: 'Rajdhani', sans-serif; font-size: 1rem;
+            transition: 0.3s all;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none; border-color: var(--primary);
+            box-shadow: 0 0 15px rgba(0, 242, 255, 0.3);
+            background: rgba(0, 0, 0, 0.7);
+        }
+
+        .btn-submit {
+            width: 100%; padding: 20px; margin-top: 30px;
+            background: linear-gradient(90deg, var(--secondary), var(--primary));
+            border: none; border-radius: 12px;
+            color: white; font-family: 'Orbitron', sans-serif;
+            font-weight: bold; font-size: 1.2rem;
+            transition: 0.5s; text-transform: uppercase;
+        }
+
+        .btn-submit:hover {
+            letter-spacing: 4px; filter: brightness(1.3);
+            box-shadow: 0 0 30px rgba(112, 0, 255, 0.6);
+            transform: translateY(-3px);
+        }
+
+        .btn-submit:disabled { opacity: 0.5; cursor: wait; }
+
+        .optional-tag { font-size: 0.7rem; color: #777; font-style: italic; }
+
+        @media (max-width: 768px) {
+            .form-grid { grid-template-columns: 1fr; }
+            .full-width { grid-column: span 1; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="tsparticles"></div>
+
+<div class="main-container">
+    <div class="form-card">
+        <header>
+            <h1>FS RADIO STUDIO</h1>
+            <p>Portail de Recrutement Officiel</p>
+        </header>
+
+        <form id="recruitmentForm">
+            <div class="form-grid">
+                <div class="input-group">
+                    <label>Pseudo Discord & ID</label>
+                    <input type="text" id="discord" placeholder="Ex: Lucas#0001" required>
+                </div>
+                <div class="input-group">
+                    <label>Âge</label>
+                    <input type="number" id="age" min="15" placeholder="Votre âge" required>
+                </div>
+
+                <div class="input-group">
+                    <label>Poste Souhaité</label>
+                    <select id="role" required>
+                        <option value="" disabled selected>Sélectionnez un poste...</option>
+                        <option value="Sous Directeur">Sous Directeur</option>
+                        <option value="Directeur Administratif">Directeur Administratif</option>
+                        <option value="Manageur Studio">Manageur Studio</option>
+                        <option value="Manageur Web">Manageur Web</option>
+                        <option value="Manageur Finances">Manageur Finances</option>
+                        <option value="Manageur Décisionnaire">Manageur Décisionnaire</option>
+                        <option value="EMP / RD">EMP / RD</option>
+                        <option value="EMP / RD2">EMP / RD2</option>
+                        <option value="Web Studio">EMP / Web Studio</option>
+                        <option value="Gestionnaire de tâches">Gestionnaire de tâches</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label>Niveau d'études <span class="optional-tag">(Optionnel)</span></label>
+                    <input type="text" id="etudes" placeholder="Ex: Bac Pro, Université, etc.">
+                </div>
+
+                <div class="input-group full-width">
+                    <label>Expériences passées (Staff / Radio / Pro)</label>
+                    <textarea id="experience" rows="2" placeholder="Détaillez vos anciennes responsabilités..." required></textarea>
+                </div>
+
+                <div class="input-group full-width">
+                    <label>Vision du travail d'équipe & Relation Staff</label>
+                    <textarea id="teamwork" rows="3" placeholder="Comment imaginez-vous l'ambiance idéale au sein de l'équipe ?" required></textarea>
+                </div>
+
+                <div class="input-group full-width">
+                    <label>Pourquoi FS Radio Studio ? (Motivations)</label>
+                    <textarea id="motivation" rows="4" placeholder="Qu'allez-vous apporter de plus à notre radio ?" required></textarea>
+                </div>
+            </div>
+
+            <button type="submit" class="btn-submit" id="submitBtn">Transmettre ma candidature</button>
+        </form>
+    </div>
+</div>
+
+<script>
+    // EFFET DE FOND : Particules Web Radio Style
+    tsParticles.load("tsparticles", {
+        background: { color: { value: "#020205" } },
+        particles: {
+            color: { value: ["#00f2ff", "#7000ff"] },
+            links: { color: "#00f2ff", distance: 150, enable: true, opacity: 0.15, width: 1 },
+            move: { enable: true, speed: 1.2, direction: "none" },
+            number: { density: { enable: true, area: 800 }, value: 90 },
+            opacity: { value: 0.4 },
+            shape: { type: "circle" },
+            size: { value: { min: 1, max: 3 } },
+        },
+        interactivity: {
+            events: { onHover: { enable: true, mode: "grab" } },
+            modes: { grab: { distance: 200, links: { opacity: 0.6 } } }
+        }
+    });
+
+    // CONFIGURATION DU WEBHOOK DISCORD
+    const WEBHOOK_URL = "https://discord.com/api/webhooks/1455141777995599872/ioCGKxjvQx8g74ZtKNtGmAfaKIdJ64XeBzGXnpXfrJvaB_oaXhq_dl6XYem4kPdrgqgd";
+
+    document.getElementById('recruitmentForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = document.getElementById('submitBtn');
+        btn.innerText = "ENVOI DU DOSSIER...";
+        btn.disabled = true;
+
+        const data = {
+            embeds: [{
+                title: "🎙️ NOUVEAU DOSSIER DE RECRUTEMENT",
+                color: 65535, // Cyan
+                fields: [
+                    { name: "👤 Candidat", value: `**Pseudo:** ${document.getElementById('discord').value}\n**Âge:** ${document.getElementById('age').value} ans`, inline: true },
+                    { name: "🎯 Poste Visé", value: `**${document.getElementById('role').value}**`, inline: true },
+                    { name: "🎓 Études", value: document.getElementById('etudes').value || "Non spécifié", inline: true },
+                    { name: "💼 Expérience", value: document.getElementById('experience').value },
+                    { name: "🤝 Esprit d'équipe", value: document.getElementById('teamwork').value },
+                    { name: "🚀 Motivations", value: document.getElementById('motivation').value }
+                ],
+                footer: { text: "FS Radio Studio | Automated HR System" },
+                timestamp: new Date()
+            }]
+        };
+
+        try {
+            const response = await fetch(WEBHOOK_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            if(response.ok) {
+                alert("✅ Ta candidature a été envoyée avec succès ! L'équipe de Direction va l'étudier.");
+                document.getElementById('recruitmentForm').reset();
+                btn.innerText = "DOSSIER TRANSMIS";
+                btn.style.background = "#2ed573";
+            } else {
+                throw new Error();
+            }
+        } catch (error) {
+            alert("❌ Erreur lors de l'envoi. Vérifie ta connexion ou contacte un administrateur.");
+            btn.innerText = "RÉESSAYER";
+            btn.disabled = false;
+        }
+    });
+</script>
+
+</body>
+</html>
