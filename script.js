@@ -1764,3 +1764,14 @@ function formatTime(timeString) {
     return `${hours}h${minutes.padStart(2, '0')}`;
 }
 
+function closeUiversePopup() {
+  const popup = document.getElementById("uiversePopup");
+  popup.style.animation = "fadeOut 0.6s ease forwards";
+  setTimeout(() => popup.remove(), 600);
+}
+
+// Optionnel : fermeture automatique après 8 secondes
+setTimeout(() => {
+  const popup = document.getElementById("uiversePopup");
+  if (popup) closeUiversePopup();
+}, 8000);

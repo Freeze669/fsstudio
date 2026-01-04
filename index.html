@@ -28,9 +28,19 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' data: https:; script-src 'self' https://www.gstatic.com https://www.googleapis.com https://www.google-analytics.com https://www.googletagmanager.com https://www.gstatic.com/firebasejs/ https://fonts.googleapis.com https://fonts.gstatic.com; connect-src 'self' https://firestore.googleapis.com https://www.googleapis.com https://firebase.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com wss://*; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://fonts.gstatic.com; font-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com; img-src 'self' data: https:; frame-src 'self'; child-src 'self'; object-src 'none'; form-action 'self'; block-all-mixed-content; report-uri /csp-report; script-src-elem 'self' https://www.gstatic.com https://www.googleapis.com https://www.google-analytics.com https://www.googletagmanager.com https://www.gstatic.com/firebasejs/ https://fonts.googleapis.com https://fonts.gstatic.com; script-src-attr 'self'; frame-ancestors 'self'; upgrade-insecure-requests;">
 <body>
+    
+    <!-- Animation de démarrage -->
+    <div id="startupOverlay" class="startup-overlay">
+        <div class="startup-content">
+            <h1 class="startup-title">Merci à tous !</h1>
+            <p class="startup-subtitle">L'ouverture est pour bientôt...</p>
+            <div class="startup-loader"></div>
+        </div>
+    </div>
+
     <div class="background-blur"></div>
 
-    <div class="container">
+    <div class="container">         
         <header class="header">
             <div class="status-bar">
                 <span class="time" id="currentTime">20:49</span>
@@ -183,4 +193,3 @@
     <script src="script.js"></script>
 </body>
 </html>
-
