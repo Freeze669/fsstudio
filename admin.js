@@ -2792,6 +2792,70 @@ function initStreamUrlConfig() {
             stopMp3Stream();
         });
     }
+    
+    // Configuration Podbean
+    const podbeanUrlInput = document.getElementById('podbeanUrlInput');
+    const activatePodbeanBtn = document.getElementById('activatePodbeanBtn');
+    const podbeanStatus = document.getElementById('podbeanStatus');
+    
+    if (podbeanUrlInput && activatePodbeanBtn) {
+        // Charger l'URL Podbean actuelle depuis Firebase (si disponible)
+        database.ref('radio/podbeanUrl').once('value', (snapshot) => {
+            const url = snapshot.val();
+            if (url) {
+                podbeanUrlInput.value = url;
+            }
+        });
+        
+        // Activer le stream Podbean
+        activatePodbeanBtn.addEventListener('click', () => {
+            const url = podbeanUrlInput.value.trim();
+            
+            if (!url || url === '') {
+                if (podbeanStatus) podbeanStatus.textContent = '❌ Veuillez entrer un lien Podbean';
+                alert('Veuillez entrer un lien de stream Podbean');
+                return;
+            }
+            
+            // Validation de l'URL
+            try {
+                const urlObj = new URL(url);
+                if (urlObj.protocol !== 'http:' && urlObj.protocol !== 'https:') {
+                    if (podbeanStatus) podbeanStatus.textContent = '❌ URL invalide : seules les URLs HTTP/HTTPS sont supportées';
+                    alert('❌ Erreur : Seules les URLs HTTP/HTTPS sont supportées.');
+                    return;
+                }
+            } catch (e) {
+                if (podbeanStatus) podbeanStatus.textContent = '❌ URL invalide';
+                alert('❌ Erreur : URL invalide. Format attendu: https://www.podbean.com/...');
+                return;
+            }
+            
+            // Sauvegarder l'URL Podbean
+            database.ref('radio/podbeanUrl').set(url)
+                .then(() => {
+                    // Activer le stream en mettant à jour streamUrl
+                    return database.ref('radio/streamUrl').set(url);
+                })
+                .then(() => {
+                    console.log('✅ Stream Podbean activé:', url);
+                    if (podbeanStatus) podbeanStatus.textContent = '✅ Stream Podbean activé avec succès !';
+                    alert('✅ Stream Podbean activé avec succès ! Le stream est maintenant actif sur le site.');
+                })
+                .catch((error) => {
+                    console.error('❌ Erreur activation Podbean:', error);
+                    if (podbeanStatus) podbeanStatus.textContent = '❌ Erreur lors de l\'activation';
+                    alert('Erreur lors de l\'activation du stream Podbean');
+                });
+        });
+        
+        // Permettre d'activer avec Enter
+        podbeanUrlInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                activatePodbeanBtn.click();
+            }
+        });
+    }
 }
 
 // Démarrer la boucle de diffusion MP3
