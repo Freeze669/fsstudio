@@ -35,6 +35,7 @@ let stateTick = null;
 let isHost = false;
 let commandsUnsub = null;
 let panelTick = null;
+let heartbeatTick = null;
 
 const ui = {
   panel: document.getElementById("mp-panel"),
@@ -87,7 +88,12 @@ function releaseSlot(uid, slot){
 
 async function joinRoom(){
   setStatus("Connexion...");
-  const cred = await signInAnonymously(auth);
+  let cred;
+  try{
+    cred = await signInAnonymously(auth);
+  }catch(e){
+    return failJoin("Auth impossible", e);
+  }
   const uid = cred.user.uid;
   currentUid = uid;
   window.__mp_uid = uid;
@@ -107,26 +113,35 @@ async function joinRoom(){
     }
   }catch(e){}
 
-  const slot = await claimSlot(uid);
+  let slot;
+  try{
+    slot = await claimSlot(uid);
+  }catch(e){
+    return failJoin("Slots indisponibles", e);
+  }
   if(slot === null){
-    setStatus("Serveur plein (3 joueurs max)");
-    await signOut(auth).catch(()=>{});
-    currentUid = null;
-    return false;
+    return failJoin("Serveur plein (3 joueurs max)");
   }
   currentSlot = slot;
 
   const playerRef = ref(db, `rooms/${ROOM_ID}/players/${uid}`);
-  await set(playerRef, {
-    name: playerName,
-    slot: slot,
-    selected: null,
-    joinedAt: serverTimestamp()
-  });
+  try{
+    await set(playerRef, {
+      name: playerName,
+      slot: slot,
+      selected: null,
+      joinedAt: serverTimestamp(),
+      lastSeen: Date.now()
+    });
+  }catch(e){
+    return failJoin("Ecriture joueur refusée", e);
+  }
 
-  onDisconnect(playerRef).remove();
-  const slotRef = ref(db, `rooms/${ROOM_ID}/slots/${slot}`);
-  onDisconnect(slotRef).set(null);
+  try{
+    onDisconnect(playerRef).remove();
+    const slotRef = ref(db, `rooms/${ROOM_ID}/slots/${slot}`);
+    onDisconnect(slotRef).set(null);
+  }catch(e){}
 
   setStatus(`Connecté (${playerName})`);
   return true;
@@ -161,8 +176,21 @@ function cleanupListeners(){
   if(voteTick){ clearInterval(voteTick); voteTick = null; }
   if(stateTick){ clearInterval(stateTick); stateTick = null; }
   if(panelTick){ clearInterval(panelTick); panelTick = null; }
+  if(heartbeatTick){ clearInterval(heartbeatTick); heartbeatTick = null; }
 }
 
+async function failJoin(msg, err){
+  console.error("[MP] join failed", msg, err);
+  setStatus(msg);
+  if(currentUid && currentSlot !== null && currentSlot !== undefined){
+    releaseSlot(currentUid, currentSlot);
+  }
+  try{ if(auth.currentUser) await signOut(auth); }catch(e){}
+  currentUid = null;
+  currentSlot = null;
+  window.__mp_uid = null;
+  return false;
+}
 function renderPlayers(players){
   if(!ui.list) return;
   ui.list.innerHTML = "";
@@ -381,6 +409,12 @@ async function start(){
   if(ui.panel && !panelTick){
     panelTick = setInterval(()=>{ if(currentUid) ui.panel.classList.remove("hidden"); }, 1500);
   }
+  if(!heartbeatTick && currentUid){
+    const playerRef = ref(db, `rooms/${ROOM_ID}/players/${currentUid}`);
+    heartbeatTick = setInterval(()=>{
+      update(playerRef, {lastSeen: Date.now()}).catch(()=>{});
+    }, 20000);
+  }
   if(window.MP_APP && typeof window.MP_APP.setMultiplayerMode === 'function'){
     window.MP_APP.setMultiplayerMode(true, false);
   }
@@ -388,6 +422,16 @@ async function start(){
   attachSlotsListener();
   attachVoteListener();
   attachKicksListener();
+
+  setTimeout(async ()=>{
+    if(!currentUid) return;
+    try{
+      const snap = await get(ref(db, `rooms/${ROOM_ID}/players`));
+      const players = snap.exists() ? snap.val() : {};
+      window.__mp_players = players;
+      renderPlayers(players);
+    }catch(e){}
+  }, 1200);
 }
 
 function init(){
@@ -403,4 +447,8 @@ function init(){
 init();
 
 window.MP = { start, leave: leaveRoom, setSelected, clearSelected, sendCommand };
+
+
+
+
 
