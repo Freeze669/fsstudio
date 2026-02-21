@@ -34,6 +34,7 @@ let stateUnsub = null;
 let stateTick = null;
 let isHost = false;
 let commandsUnsub = null;
+let panelTick = null;
 
 const ui = {
   panel: document.getElementById("mp-panel"),
@@ -145,6 +146,7 @@ function cleanupListeners(){
   if(commandsUnsub){ commandsUnsub(); commandsUnsub = null; }
   if(voteTick){ clearInterval(voteTick); voteTick = null; }
   if(stateTick){ clearInterval(stateTick); stateTick = null; }
+  if(panelTick){ clearInterval(panelTick); panelTick = null; }
 }
 
 function renderPlayers(players){
@@ -152,6 +154,12 @@ function renderPlayers(players){
   ui.list.innerHTML = "";
   const entries = Object.entries(players || {});
   entries.sort((a,b)=> (a[1]?.slot ?? 99) - (b[1]?.slot ?? 99));
+  const count = entries.length;
+  if(currentUid){
+    setStatus(`Connecté (${playerName}) — ${count}/${MAX_PLAYERS} en ligne`);
+  } else {
+    setStatus("Hors ligne");
+  }
   for(const [uid, p] of entries){
     const row = document.createElement("div");
     row.className = "mp-player";
@@ -349,8 +357,15 @@ async function start(){
   showPanel(true);
   const ok = await joinRoom();
   if(!ok){
-    showPanel(false);
+    showPanel(true);
+    if(window.MP_APP && typeof window.MP_APP.setMultiplayerMode === 'function'){
+      window.MP_APP.setMultiplayerMode(false, false);
+    }
     return;
+  }
+  showPanel(true);
+  if(ui.panel && !panelTick){
+    panelTick = setInterval(()=>{ if(currentUid) ui.panel.classList.remove("hidden"); }, 1500);
   }
   if(window.MP_APP && typeof window.MP_APP.setMultiplayerMode === 'function'){
     window.MP_APP.setMultiplayerMode(true, false);
