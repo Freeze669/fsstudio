@@ -1,6 +1,6 @@
 ﻿import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
 import { getAuth, signInAnonymously, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js";
-import { getDatabase, ref, set, update, onValue, onDisconnect, runTransaction, serverTimestamp, remove } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-database.js";
+import { getDatabase, ref, set, update, onValue, onDisconnect, runTransaction, serverTimestamp, remove, push, onChildAdded } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyC_kUoMvXWS7c5_NTPOBAzMWvPf6xnZw60",
@@ -33,6 +33,7 @@ let slotsUnsub = null;
 let stateUnsub = null;
 let stateTick = null;
 let isHost = false;
+let commandsUnsub = null;
 
 const ui = {
   panel: document.getElementById("mp-panel"),
@@ -141,6 +142,7 @@ function cleanupListeners(){
   if(kicksUnsub){ kicksUnsub(); kicksUnsub = null; }
   if(slotsUnsub){ slotsUnsub(); slotsUnsub = null; }
   if(stateUnsub){ stateUnsub(); stateUnsub = null; }
+  if(commandsUnsub){ commandsUnsub(); commandsUnsub = null; }
   if(voteTick){ clearInterval(voteTick); voteTick = null; }
   if(stateTick){ clearInterval(stateTick); stateTick = null; }
 }
@@ -270,6 +272,25 @@ function attachPlayersListener(){
   });
 }
 
+function attachCommandsListener(){
+  const cmdsRef = ref(db, `rooms/${ROOM_ID}/commands`);
+  commandsUnsub = onChildAdded(cmdsRef, (snap)=>{
+    const cmd = snap.val();
+    if(cmd && window.MP_APP && typeof window.MP_APP.applyCommand === 'function'){
+      window.MP_APP.applyCommand(cmd);
+    }
+    remove(snap.ref).catch(()=>{});
+  });
+}
+
+async function sendCommand(cmd){
+  if(!currentUid) return;
+  const cmdsRef = ref(db, `rooms/${ROOM_ID}/commands`);
+  const newRef = push(cmdsRef);
+  const payload = Object.assign({from: currentUid, ts: Date.now()}, cmd || {});
+  await set(newRef, payload).catch(()=>{});
+}
+
 function setHostMode(nextIsHost){
   if(isHost === nextIsHost) return;
   isHost = nextIsHost;
@@ -279,6 +300,7 @@ function setHostMode(nextIsHost){
 
   if(stateTick){ clearInterval(stateTick); stateTick = null; }
   if(stateUnsub){ stateUnsub(); stateUnsub = null; }
+  if(commandsUnsub){ commandsUnsub(); commandsUnsub = null; }
 
   if(isHost){
     // host: publish world state
@@ -291,6 +313,7 @@ function setHostMode(nextIsHost){
       };
       set(stateRef, payload).catch(()=>{});
     }, 350);
+    attachCommandsListener();
   } else {
     // client: consume world state
     const stateRef = ref(db, `rooms/${ROOM_ID}/state`);
@@ -350,5 +373,5 @@ function init(){
 
 init();
 
-window.MP = { start, leave: leaveRoom, setSelected, clearSelected };
+window.MP = { start, leave: leaveRoom, setSelected, clearSelected, sendCommand };
 
