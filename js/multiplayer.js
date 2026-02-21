@@ -106,6 +106,14 @@ async function joinRoom(){
     const players = playersSnap.exists() ? playersSnap.val() : {};
     const slots = slotsSnap.exists() ? slotsSnap.val() : {};
     const activeUids = new Set(Object.keys(players || {}));
+    const now = Date.now();
+    for(const [uid, p] of Object.entries(players || {})){
+      const lastSeen = p && p.lastSeen ? Number(p.lastSeen) : 0;
+      if(lastSeen && (now - lastSeen) > 120000){
+        await remove(ref(db, `rooms/${ROOM_ID}/players/${uid}`)).catch(()=>{});
+        activeUids.delete(uid);
+      }
+    }
     for(const [slotId, slotUid] of Object.entries(slots || {})){
       if(slotUid && !activeUids.has(slotUid)){
         await set(ref(db, `rooms/${ROOM_ID}/slots/${slotId}`), null).catch(()=>{});
@@ -361,7 +369,8 @@ function setHostMode(nextIsHost){
         ts: Date.now(),
         entities: window.MP_APP.getEntitiesSnapshot()
       };
-      set(stateRef, payload).catch(()=>{});
+      const clean = JSON.parse(JSON.stringify(payload));
+      set(stateRef, clean).catch(()=>{});
     }, 350);
     attachCommandsListener();
   } else {

@@ -988,21 +988,22 @@ function update(dt){
   }
 }
 
+function norm(v){ return v === undefined ? null : v; }
 function snapshotEntity(p){
   return {
-    id: p.id,
-    call: p.call,
-    x: p.x, y: p.y, hdg: p.hdg,
-    spd: p.spd, alt: p.alt,
-    type: p.type, model: p.model,
-    origin: p.origin, originCountry: p.originCountry,
-    destination: p.destination, destinationCountry: p.destinationCountry,
-    passengers: p.passengers, weight: p.weight, airline: p.airline,
-    fuel: p.fuel, _fuel: p._fuel,
-    returning: p.returning, _forcedByTanker: p._forcedByTanker,
-    _alerted: p._alerted, _crashed: p._crashed,
-    _crashTime: p._crashTime, _crashReason: p._crashReason,
-    targetId: p.targetId, _mode: p._mode, _beingTracked: p._beingTracked
+    id: norm(p.id),
+    call: norm(p.call),
+    x: norm(p.x), y: norm(p.y), hdg: norm(p.hdg),
+    spd: norm(p.spd), alt: norm(p.alt),
+    type: norm(p.type), model: norm(p.model),
+    origin: norm(p.origin), originCountry: norm(p.originCountry),
+    destination: norm(p.destination), destinationCountry: norm(p.destinationCountry),
+    passengers: norm(p.passengers), weight: norm(p.weight), airline: norm(p.airline),
+    fuel: norm(p.fuel), _fuel: norm(p._fuel),
+    returning: norm(p.returning), _forcedByTanker: norm(p._forcedByTanker),
+    _alerted: norm(p._alerted), _crashed: norm(p._crashed),
+    _crashTime: norm(p._crashTime), _crashReason: norm(p._crashReason),
+    targetId: norm(p.targetId), _mode: norm(p._mode), _beingTracked: norm(p._beingTracked)
   };
 }
 
