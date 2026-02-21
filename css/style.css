@@ -55,6 +55,17 @@ main{position:fixed;top:0;left:0;right:0;bottom:0}
 .info-line strong{color:rgba(230,242,255,0.9)}
 .hidden{display:none}
 
+/* multiplayer panel */
+.mp-panel{margin-top:8px;pointer-events:auto;background:rgba(0,0,0,0.5);backdrop-filter:blur(6px);border:1px solid rgba(45,212,191,0.25);border-radius:12px;padding:10px;box-shadow:0 6px 18px rgba(0,0,0,0.4)}
+.mp-header{display:flex;align-items:center;gap:10px;justify-content:space-between}
+.mp-title{font-size:12px;letter-spacing:1px;color:rgba(230,242,255,0.8)}
+.mp-status{margin-top:6px;font-size:12px;color:rgba(230,242,255,0.75)}
+.mp-players{margin-top:8px;display:flex;flex-direction:column;gap:6px}
+.mp-player{display:flex;align-items:center;justify-content:space-between;gap:8px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:6px 8px;font-size:12px}
+.mp-you{font-size:11px;color:rgba(230,242,255,0.6)}
+.mp-vote-row{margin-top:8px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.mp-vote-info{font-size:12px;color:rgba(230,242,255,0.7)}
+
 /* Orientation adjustments: ensure UI works well in portrait and landscape */
 @media (orientation:portrait){
 	#selected-info{right:12px;top:64px;}

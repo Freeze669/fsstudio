@@ -79,9 +79,9 @@
               </div>
             </div>
             <div class="card-right">
-              <button id="server-multi-btn" class="server-btn-secondary" disabled>
-                <span class="btn-icon">🚧</span>
-                Bientôt
+              <button id="server-multi-btn" class="server-btn-secondary">
+                <span class="btn-icon">🌐</span>
+                Multijoueur
               </button>
             </div>
           </li>
@@ -107,6 +107,19 @@
         <div id="fuel-alerts-list"></div>
       </div>
       <div id="info">Tapez un avion pour le sélectionner</div>
+
+      <div id="mp-panel" class="mp-panel hidden">
+        <div class="mp-header">
+          <span class="mp-title">SERVEUR MULTIJOUEUR</span>
+          <button id="mp-leave" class="btn-small">Quitter</button>
+        </div>
+        <div id="mp-status" class="mp-status">Hors ligne</div>
+        <div id="mp-players" class="mp-players"></div>
+        <div class="mp-vote-row">
+          <div id="mp-vote-info" class="mp-vote-info">Aucun vote en cours</div>
+          <button id="mp-vote" class="btn-small hidden">Voter</button>
+        </div>
+      </div>
       
       <!-- Interface réduite -->
       <div id="radio" class="control-panel compact">
@@ -164,6 +177,7 @@
   </footer>
 
   <script src="js/app.js"></script>
+  <script type="module" src="js/multiplayer.js"></script>
   <script>
     (function purgeOldSW(){
       if(!('serviceWorker' in navigator)) return;

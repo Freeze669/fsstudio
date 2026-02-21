@@ -149,6 +149,7 @@ function resize(){
   if(typeof cam !== 'undefined'){ cam.x = cx - W/2; cam.y = cy - H/2; }
   // recompute airports/zones based on new center
   initAirports(); initZonesAndRoutes();
+  initClouds();
   clampCamera();
 }
 
@@ -160,8 +161,14 @@ function getMapSize(){
 
 function latLonToWorld(lat, lon){
   const {mapW, mapH} = getMapSize();
-  const x = cx + (lon / 180) * (mapW / 2);
-  const y = cy - (lat / 90) * (mapH / 2);
+  const lonClamped = Math.max(MAP_LON_MIN, Math.min(MAP_LON_MAX, lon));
+  const latClamped = Math.max(MAP_LAT_MIN, Math.min(MAP_LAT_MAX, lat));
+  const lonRange = MAP_LON_MAX - MAP_LON_MIN;
+  const latRange = MAP_LAT_MAX - MAP_LAT_MIN;
+  const nx = (lonClamped - MAP_LON_MIN) / lonRange;
+  const ny = (MAP_LAT_MAX - latClamped) / latRange;
+  const x = cx - mapW/2 + nx * mapW;
+  const y = cy - mapH/2 + ny * mapH;
   return {x, y};
 }
 
@@ -472,6 +479,10 @@ imgEuropeMap.src = 'assets/world-map.png';
 const useAbstractMap = false;
 const MAP_SCALE = 2.6;
 const MAP_ASPECT = 0.5;
+const MAP_LAT_MIN = -60;
+const MAP_LAT_MAX = 85;
+const MAP_LON_MIN = -180;
+const MAP_LON_MAX = 180;
 
 function spawnPlane(type='civil', x=null, y=null, hdg=null){
   const angle = rand(0,Math.PI*2);
@@ -679,10 +690,29 @@ const zones = [];
 const routes = [];
 const waypoints = [];
 const burstEffects = [];
+const clouds = [];
 function initZonesAndRoutes(){
   zones.length = 0; routes.length = 0; waypoints.length = 0;
 }
 initZonesAndRoutes();
+
+function initClouds(){
+  clouds.length = 0;
+  const {mapW, mapH} = getMapSize();
+  const count = Math.max(10, Math.round((mapW * mapH) / 450000));
+  for(let i=0;i<count;i++){
+    const x = cx - mapW/2 + Math.random() * mapW;
+    const y = cy - mapH/2 + Math.random() * mapH;
+    clouds.push({
+      x, y,
+      r: rand(24, 90),
+      o: rand(0.08, 0.18),
+      s: rand(4, 16),
+      vx: rand(6, 18),
+      vy: rand(-3, 3)
+    });
+  }
+}
 
 function addBurstEffect(x, y, color='rgba(255,120,80,0.95)'){
   burstEffects.push({x, y, color, life: 220, maxLife: 220, r: 7 + Math.random()*6});
@@ -757,6 +787,22 @@ function update(dt){
   playElapsedMs += dt;
   updatePlayTimeHud();
   updateBurstEffects(dt);
+  // move clouds slowly across the map
+  if(clouds.length){
+    const {mapW, mapH} = getMapSize();
+    const left = cx - mapW/2 - 120;
+    const right = cx + mapW/2 + 120;
+    const top = cy - mapH/2 - 120;
+    const bottom = cy + mapH/2 + 120;
+    for(const c of clouds){
+      c.x += c.vx * (dt/1000);
+      c.y += c.vy * (dt/1000);
+      if(c.x > right) c.x = left;
+      if(c.x < left) c.x = right;
+      if(c.y > bottom) c.y = top;
+      if(c.y < top) c.y = bottom;
+    }
+  }
   enemyAttackFighters(dt);
   // entity behavior
   for(let i=entities.length-1;i>=0;i--){
@@ -964,6 +1010,21 @@ function drawBackgroundScreen(){
     // draw city dots
     for(const c of getCities()){ ctx.beginPath(); ctx.fillStyle='rgba(255,230,180,0.9)'; ctx.arc(c.x, c.y, 5,0,Math.PI*2); ctx.fill(); ctx.fillStyle='rgba(230,242,255,0.9)'; ctx.font='12px system-ui'; ctx.fillText(c.name, c.x + 10, c.y + 4); }
   }
+  // moving clouds
+  if(clouds.length){
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+    for(const c of clouds){
+      const grad = ctx.createRadialGradient(c.x, c.y, c.r*0.2, c.x, c.y, c.r);
+      grad.addColorStop(0, `rgba(255,255,255,${c.o})`);
+      grad.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.ellipse(c.x, c.y, c.r * 1.2, c.r * 0.8, 0, 0, Math.PI*2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
   ctx.restore();
   // dark overlay to keep HUD/aircraft readable
   ctx.fillStyle = 'rgba(3,10,18,0.35)';
@@ -1023,7 +1084,22 @@ function drawRadar(){
   ctx.restore();
 }
 
+function getOtherSelections(){
+  const players = window.__mp_players || {};
+  const selfUid = window.__mp_uid;
+  const map = new Map();
+  for(const [uid, p] of Object.entries(players)){
+    if(!p || uid === selfUid) continue;
+    const sel = p.selected;
+    if(!sel) continue;
+    if(!map.has(sel)) map.set(sel, []);
+    map.get(sel).push(p.name || 'Joueur');
+  }
+  return map;
+}
+
 function drawEntities(){
+  const selectionMap = getOtherSelections();
   // draw airports
   airports.forEach(a=>{
     ctx.drawImage(imgAirport, a.x-12, a.y-12, 24,24);
@@ -1099,6 +1175,14 @@ function drawEntities(){
     ctx.fillText(line2, dx+14, dy+7);
     ctx.fillStyle = 'rgba(230,242,255,0.58)';
     ctx.fillText(line3, dx+14, dy+20);
+
+    const selectors = selectionMap.get(p.id);
+    if(selectors && selectors.length){
+      const label = selectors.slice(0,2).join(', ') + (selectors.length > 2 ? ` +${selectors.length-2}` : '');
+      ctx.fillStyle = 'rgba(45,212,191,0.9)';
+      ctx.font='10px system-ui';
+      ctx.fillText('SEL: ' + label, dx+14, dy-20);
+    }
   });
   drawBurstEffects();
 }
@@ -1131,6 +1215,7 @@ setInterval(()=>{ if(gamePaused) return; if(entities.filter(e=>e.type==='enemy')
 (function initServerSelection(){
   const panel = document.getElementById('server-select');
   const btnLocal = document.getElementById('server-local-btn');
+  const btnMulti = document.getElementById('server-multi-btn');
   const openBtn = document.getElementById('btn-open-menu');
 
   function openMenu(){
@@ -1148,7 +1233,22 @@ setInterval(()=>{ if(gamePaused) return; if(entities.filter(e=>e.type==='enemy')
     showNotification('Connexion: Local', 'info', 1200);
   }
 
+  function chooseMulti(){
+    gamePaused = false;
+    if(panel) panel.style.display='none';
+    if(playElapsedMs <= 0) playElapsedMs = 0;
+    updatePlayTimeHud();
+    if(!_miniatc_loop_started) startMainLoop();
+    showNotification('Connexion: Multijoueur', 'info', 1200);
+    if(window.MP && typeof window.MP.start === 'function'){
+      window.MP.start();
+    } else {
+      showNotification('Multijoueur indisponible', 'warning', 2000);
+    }
+  }
+
   if(btnLocal) btnLocal.addEventListener('click', chooseLocal);
+  if(btnMulti) btnMulti.addEventListener('click', chooseMulti);
   if(openBtn) openBtn.addEventListener('click', openMenu);
 
   // À chaque chargement, afficher le menu si disponible; sinon démarrer directement
@@ -1173,6 +1273,7 @@ function selectEntity(p){
   if(p){ p.selected=true; controls.classList.remove('hidden');
     followSelected = true;
     followedEntityId = p.id;
+    if(window.MP && typeof window.MP.setSelected === 'function') window.MP.setSelected(p.id);
     cam.zoom = Math.min(cam.zoom, 0.68);
     selectedDiv.innerHTML = '<strong>'+p.call+'</strong><br>Type: '+(p.type||'civil')+' • ALT: '+Math.round(p.alt)+' ft<br>SPD: '+Math.round(p.spd)+' kt • HDG: '+Math.round((p.hdg*180/Math.PI+360)%360)+'°';
     // update top-right detailed info
@@ -1223,6 +1324,7 @@ function selectEntity(p){
     const refuelBtn = document.getElementById('refuel'); if(refuelBtn) refuelBtn.classList.add('hidden');
     info.textContent = 'Tapez un avion pour le sélectionner' 
     updateRadioLink();
+    if(window.MP && typeof window.MP.clearSelected === 'function') window.MP.clearSelected();
   } }
 
 function findEntityAt(x,y){ // x,y are screen coords; convert to world (with zoom)
