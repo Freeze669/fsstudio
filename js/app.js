@@ -149,6 +149,45 @@ function resize(){
   if(typeof cam !== 'undefined'){ cam.x = cx - W/2; cam.y = cy - H/2; }
   // recompute airports/zones based on new center
   initAirports(); initZonesAndRoutes();
+  clampCamera();
+}
+
+function getMapSize(){
+  const mapW = Math.max(W,H) * MAP_SCALE;
+  const mapH = mapW * MAP_ASPECT;
+  return {mapW, mapH};
+}
+
+function latLonToWorld(lat, lon){
+  const {mapW, mapH} = getMapSize();
+  const x = cx + (lon / 180) * (mapW / 2);
+  const y = cy - (lat / 90) * (mapH / 2);
+  return {x, y};
+}
+
+function clampCamera(){
+  if(!W || !H) return;
+  const {mapW, mapH} = getMapSize();
+  const left = cx - mapW/2;
+  const right = cx + mapW/2;
+  const top = cy - mapH/2;
+  const bottom = cy + mapH/2;
+
+  const minCamX = (left - cx) * cam.zoom + cx;
+  const maxCamX = (right - cx) * cam.zoom - W + cx;
+  if(minCamX > maxCamX){
+    cam.x = cx - W/2;
+  } else {
+    cam.x = Math.min(maxCamX, Math.max(minCamX, cam.x));
+  }
+
+  const minCamY = (top - cy) * cam.zoom + cy;
+  const maxCamY = (bottom - cy) * cam.zoom - H + cy;
+  if(minCamY > maxCamY){
+    cam.y = cy - H/2;
+  } else {
+    cam.y = Math.min(maxCamY, Math.max(minCamY, cam.y));
+  }
 }
 
 const entities = []; // planes, fighters, enemies
@@ -427,27 +466,18 @@ async function setSelectedInfoPhoto(p){
   }catch(e){}
 }
 
-// stylized world map SVG as background (low-detail, abstract continents)
-const svgWorld = svgDataURL(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 400">
-  <rect width="100%" height="100%" fill="none"/>
-  <g fill="%231c3a4a" opacity="0.55">
-    <path d="M120 140c30-20 80-40 140-30 40 7 90 35 120 20 20-10 40-40 80-46 30-5 70 6 100 22 18 10 32 30 40 50 12 30 4 70-18 92-28 28-76 36-120 30-46-6-92-30-140-30-46 0-86 18-124 6-28-9-44-34-42-64 2-24 10-48 26-62z"/>
-    <path d="M20 260c20-30 70-50 120-44 34 4 76 28 110 30 40 2 84-14 120-6 36 8 68 36 92 58 22 20 30 46 26 76-6 46-56 74-102 80-46 6-98-6-140-24-40-16-82-44-120-74-30-24-54-58-56-96-1-16 2-30 12-36z"/>
-    <path d="M480 40c60 6 120 36 170 70 40 28 70 66 82 106 10 34 2 76-20 104-28 36-78 54-124 52-40-2-84-22-120-44-34-20-68-48-92-82-22-30-28-70-10-104 18-34 56-64 134-102z"/>
-  </g>
-  <g fill="%23dbeff7" opacity="0.07">
-    <circle cx="200" cy="100" r="6" />
-    <circle cx="420" cy="220" r="6" />
-    <circle cx="560" cy="70" r="6" />
-  </g>
-</svg>`);
-const imgWorldMap = new Image(); imgWorldMap.src = svgWorld;
+// World map background (image file)
+const imgEuropeMap = new Image();
+imgEuropeMap.src = 'assets/world-map.png';
+const useAbstractMap = false;
+const MAP_SCALE = 2.6;
+const MAP_ASPECT = 0.5;
 
 function spawnPlane(type='civil', x=null, y=null, hdg=null){
   const angle = rand(0,Math.PI*2);
-  const r = Math.max(W,H)*2.8 + 1200; // Much larger spawn radius for bigger world
-  const px = x!==null? x : cx + Math.cos(angle)*r;
-  const py = y!==null? y : cy + Math.sin(angle)*r;
+  const {mapW, mapH} = getMapSize();
+  const px = x!==null? x : cx + rand(-0.45, 0.45) * mapW;
+  const py = y!==null? y : cy + rand(-0.45, 0.45) * mapH;
   const phd = hdg!==null? hdg : ((angle + Math.PI) % (Math.PI*2));
   const base = {id:Date.now().toString(36)+Math.floor(Math.random()*1000),call:callsign(),x:px,y:py,hdg:phd,spd:rand(80,220),alt:rand(2000,36000),selected:false,type:type};
   
@@ -604,34 +634,42 @@ function getCities(){
 // Create airports based on cities so there are more airports - more airports for larger map
 function initAirports(){
   airports.length = 0;
-  // core/central airports (major hubs)
-  spawnAirport(cx - 240, cy - 160, 'FX-ONE', 'France');
-  spawnAirport(cx + 280, cy + 120, 'FX-TWO', 'Germany');
-  spawnAirport(cx, cy, 'FX-HUB', 'United Kingdom');
-  spawnAirport(cx - 500, cy + 200, 'FX-CARGO', 'Spain');
-  // city airports
-  const cityCountries = ['Italy', 'Belgium', 'Netherlands', 'Portugal', 'Switzerland', 'Austria'];
-  let cityCountryIndex = 0;
-  for(const c of getCities()){
-    const cc = cityCountries[cityCountryIndex % cityCountries.length];
-    cityCountryIndex++;
-    spawnAirport(c.x, c.y, 'APT '+c.name.replace(/\s+/g,''), cc);
-  }
-  // ring airports around the center to enlarge the world
-  const rings = [
-    {r: 700, n: 6, p:'R1-'},
-    {r: 1100, n: 8, p:'R2-'},
-    {r: 1600, n: 10, p:'R3-'}
+  const airportDefs = [
+    {name:'Paris CDG', country:'France', lat:49.0097, lon:2.5479},
+    {name:'London Heathrow', country:'United Kingdom', lat:51.4700, lon:-0.4543},
+    {name:'Frankfurt', country:'Germany', lat:50.0379, lon:8.5622},
+    {name:'Madrid Barajas', country:'Spain', lat:40.4983, lon:-3.5676},
+    {name:'Rome Fiumicino', country:'Italy', lat:41.8003, lon:12.2389},
+    {name:'Istanbul', country:'Turkey', lat:41.2753, lon:28.7519},
+    {name:'Moscow Sheremetyevo', country:'Russia', lat:55.9726, lon:37.4146},
+    {name:'Cairo', country:'Egypt', lat:30.1219, lon:31.4056},
+    {name:'Dubai', country:'UAE', lat:25.2532, lon:55.3657},
+    {name:'Lagos', country:'Nigeria', lat:6.5774, lon:3.3212},
+    {name:'Johannesburg', country:'South Africa', lat:-26.1337, lon:28.2420},
+    {name:'Nairobi', country:'Kenya', lat:-1.3192, lon:36.9278},
+    {name:'Delhi', country:'India', lat:28.5562, lon:77.1000},
+    {name:'Mumbai', country:'India', lat:19.0896, lon:72.8656},
+    {name:'Singapore', country:'Singapore', lat:1.3644, lon:103.9915},
+    {name:'Bangkok', country:'Thailand', lat:13.6900, lon:100.7501},
+    {name:'Hong Kong', country:'China', lat:22.3080, lon:113.9185},
+    {name:'Beijing', country:'China', lat:40.0799, lon:116.6031},
+    {name:'Seoul Incheon', country:'South Korea', lat:37.4602, lon:126.4407},
+    {name:'Tokyo Haneda', country:'Japan', lat:35.5494, lon:139.7798},
+    {name:'Sydney', country:'Australia', lat:-33.9399, lon:151.1753},
+    {name:'Auckland', country:'New Zealand', lat:-37.0082, lon:174.7850},
+    {name:'Los Angeles', country:'USA', lat:33.9416, lon:-118.4085},
+    {name:'San Francisco', country:'USA', lat:37.6213, lon:-122.3790},
+    {name:'Chicago O’Hare', country:'USA', lat:41.9742, lon:-87.9073},
+    {name:'New York JFK', country:'USA', lat:40.6413, lon:-73.7781},
+    {name:'Mexico City', country:'Mexico', lat:19.4361, lon:-99.0719},
+    {name:'Bogotá', country:'Colombia', lat:4.7016, lon:-74.1469},
+    {name:'Lima', country:'Peru', lat:-12.0219, lon:-77.1143},
+    {name:'São Paulo', country:'Brazil', lat:-23.4356, lon:-46.4731},
+    {name:'Buenos Aires', country:'Argentina', lat:-34.8222, lon:-58.5358}
   ];
-  for(const ring of rings){
-    for(let i=0;i<ring.n;i++){
-      const a = i*(Math.PI*2/ring.n);
-      const ax = cx + Math.cos(a)*ring.r;
-      const ay = cy + Math.sin(a)*ring.r;
-      const ringCountries = ['USA', 'Canada', 'Brazil', 'Japan', 'South Korea', 'Australia', 'Morocco', 'Turkey', 'UAE', 'India'];
-      const cName = ringCountries[(i + ring.r) % ringCountries.length];
-      spawnAirport(ax, ay, 'FX-'+ring.p+(i+1), cName);
-    }
+  for(const a of airportDefs){
+    const pt = latLonToWorld(a.lat, a.lon);
+    spawnAirport(pt.x, pt.y, a.name, a.country);
   }
 }
 initAirports();
@@ -643,30 +681,6 @@ const waypoints = [];
 const burstEffects = [];
 function initZonesAndRoutes(){
   zones.length = 0; routes.length = 0; waypoints.length = 0;
-  // Larger control zones for bigger map
-  zones.push({x:cx, y:cy-80, r:320, name:'CTR PRINCIPAL', color:'rgba(45,212,191,0.08)'});
-  zones.push({x:cx+360, y:cy+160, r:220, name:'TMA EST', color:'rgba(255,90,90,0.06)'});
-  zones.push({x:cx-400, y:cy+200, r:200, name:'TMA CARGO', color:'rgba(255,165,0,0.06)'});
-  // add city zones for realism
-  for(const c of getCities()){ zones.push({x:c.x, y:c.y, r:120, name: c.name+' CTR', color:'rgba(200,220,255,0.05)'}); }
-  // extra sector rings to cover enlarged world
-  const ringRs = [600, 1000, 1400];
-  for(const rr of ringRs){
-    for(let i=0;i<6;i++){
-      const ang = i*(Math.PI*2/6);
-      zones.push({x:cx+Math.cos(ang)*rr, y:cy+Math.sin(ang)*rr, r:180, name:'SECT '+(i+1)+'-'+rr, color:'rgba(45,212,191,0.05)'});
-    }
-  }
-  // Flight routes (airways)
-  routes.push([{x:cx-440,y:cy+20},{x:cx-120,y:cy-80},{x:cx+80,y:cy-40},{x:cx+320,y:cy+120}]);
-  routes.push([{x:cx-500,y:cy+200},{x:cx-200,y:cy+100},{x:cx+100,y:cy+60},{x:cx+400,y:cy+180}]);
-  routes.push([{x:cx-300,y:cy-200},{x:cx,y:cy-100},{x:cx+200,y:cy-60},{x:cx+500,y:cy+40}]);
-  // Waypoints for navigation
-  waypoints.push({x:cx-300, y:cy-150, name:'WPT1'});
-  waypoints.push({x:cx+200, y:cy+100, name:'WPT2'});
-  waypoints.push({x:cx-100, y:cy+200, name:'WPT3'});
-  waypoints.push({x:cx+350, y:cy-100, name:'WPT4'});
-  waypoints.push({x:cx, y:cy, name:'WPT5'});
 }
 initZonesAndRoutes();
 
@@ -889,11 +903,17 @@ function update(dt){
         }, 3000);
       }
       
-      // Larger bounds for bigger map
-      if(p.x<-9000||p.x>W+9000||p.y<-9000||p.y>H+9000){ entities.splice(i,1); }
+      // Remove planes far outside the world map bounds
+      const {mapW, mapH} = getMapSize();
+      const left = cx - mapW/2 - 800;
+      const right = cx + mapW/2 + 800;
+      const top = cy - mapH/2 - 800;
+      const bottom = cy + mapH/2 + 800;
+      if(p.x < left || p.x > right || p.y < top || p.y > bottom){ entities.splice(i,1); }
     }
   }
   updateFollowCamera();
+  clampCamera();
   const selected = entities.find(e => e.selected);
   if(selected){
     const fuelText = Number.isFinite(selected._fuel) ? (Math.round(selected._fuel) + '%') : (selected.fuel || '—');
@@ -916,36 +936,46 @@ function drawBackgroundScreen(){
   // richer background gradient
   const grad = ctx.createLinearGradient(0,0,0,H); grad.addColorStop(0,'#04101d'); grad.addColorStop(1,'#071428');
   ctx.fillStyle = grad; ctx.fillRect(0,0,W,H);
-  // draw simple country blocks as an abstract map background
   ctx.save(); ctx.translate(-cam.x, -cam.y);
-  // draw world map image behind everything (if loaded) - larger for bigger view
+  // draw world map image behind everything (if loaded)
   try{
-    const mapW = Math.max(W,H) * 7.5; const mapH = mapW * 0.5;
-    ctx.globalAlpha = 0.9;
-    ctx.drawImage(imgWorldMap, cx - mapW/2, cy - mapH/2, mapW, mapH);
+    const {mapW, mapH} = getMapSize();
+    ctx.globalAlpha = 0.6;
+    ctx.drawImage(imgEuropeMap, cx - mapW/2, cy - mapH/2, mapW, mapH);
     ctx.globalAlpha = 1.0;
   }catch(e){}
-  for(const c of countries){
-    ctx.save();
-    ctx.translate(c.x, c.y);
-    ctx.rotate(c.rot || 0);
-    ctx.beginPath();
-    ctx.ellipse(0, 0, c.rx, c.ry, 0, 0, Math.PI*2);
-    ctx.fillStyle = c.color;
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,0.03)';
-    ctx.lineWidth = 1;
-    ctx.stroke();
-    ctx.fillStyle = 'rgba(230,242,255,0.08)';
-    ctx.font='11px system-ui';
-    ctx.fillText(c.name, -c.rx*0.25, -c.ry - 8);
-    ctx.restore();
+  if(useAbstractMap){
+    for(const c of countries){
+      ctx.save();
+      ctx.translate(c.x, c.y);
+      ctx.rotate(c.rot || 0);
+      ctx.beginPath();
+      ctx.ellipse(0, 0, c.rx, c.ry, 0, 0, Math.PI*2);
+      ctx.fillStyle = c.color;
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(230,242,255,0.08)';
+      ctx.font='11px system-ui';
+      ctx.fillText(c.name, -c.rx*0.25, -c.ry - 8);
+      ctx.restore();
+    }
+    // draw city dots
+    for(const c of getCities()){ ctx.beginPath(); ctx.fillStyle='rgba(255,230,180,0.9)'; ctx.arc(c.x, c.y, 5,0,Math.PI*2); ctx.fill(); ctx.fillStyle='rgba(230,242,255,0.9)'; ctx.font='12px system-ui'; ctx.fillText(c.name, c.x + 10, c.y + 4); }
   }
-  // draw city dots
-  for(const c of getCities()){ ctx.beginPath(); ctx.fillStyle='rgba(255,230,180,0.9)'; ctx.arc(c.x, c.y, 5,0,Math.PI*2); ctx.fill(); ctx.fillStyle='rgba(230,242,255,0.9)'; ctx.font='12px system-ui'; ctx.fillText(c.name, c.x + 10, c.y + 4); }
   ctx.restore();
+  // dark overlay to keep HUD/aircraft readable
+  ctx.fillStyle = 'rgba(3,10,18,0.35)';
+  ctx.fillRect(0,0,W,H);
+  // subtle vignette for focus
+  const vignette = ctx.createRadialGradient(cx, cy, Math.min(W,H)*0.2, cx, cy, Math.max(W,H)*0.75);
+  vignette.addColorStop(0,'rgba(0,0,0,0)');
+  vignette.addColorStop(1,'rgba(0,0,0,0.35)');
+  ctx.fillStyle = vignette;
+  ctx.fillRect(0,0,W,H);
   // subtle grid - larger spacing for bigger map
-  ctx.strokeStyle = 'rgba(255,255,255,0.02)'; ctx.lineWidth = 1;
+  ctx.strokeStyle = 'rgba(255,255,255,0.01)'; ctx.lineWidth = 1;
   const g = 60; // Larger grid spacing
   for(let x = - (cam.x % g); x < W; x += g){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
   for(let y = - (cam.y % g); y < H; y += g){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
@@ -1215,6 +1245,7 @@ canvas.addEventListener('wheel', e=>{
   const k = cam.zoom/prev;
   cam.x = cx - (cx - cam.x) * k;
   cam.y = cy - (cy - cam.y) * k;
+  clampCamera();
 });
 
 canvas.addEventListener('click', e=>{
@@ -1473,8 +1504,8 @@ const _rInc = document.getElementById('radio-inc'); if(_rInc) _rInc.addEventList
 const _rSync = document.getElementById('radio-sync'); if(_rSync) _rSync.addEventListener('click', ()=>{ const p = entities.find(x=>x.selected); if(p){ setRadio(p.freq||radioFreq); showNotification('Radio réglée sur '+formatFreq(radioFreq)+' MHz', 'info', 1200); } else { showNotification('Aucun avion sélectionné', 'warning', 1200); } });
 
 // Zoom buttons
-const _zIn = document.getElementById('zoom-in'); if(_zIn) _zIn.addEventListener('click', ()=>{ const prev = cam.zoom; cam.zoom = Math.min(2.0, cam.zoom + 0.08); const k = cam.zoom/prev; cam.x = cx - (cx - cam.x) * k; cam.y = cy - (cy - cam.y) * k; showNotification('Zoom: '+cam.zoom.toFixed(2), 'info', 800); });
-const _zOut = document.getElementById('zoom-out'); if(_zOut) _zOut.addEventListener('click', ()=>{ const prev = cam.zoom; cam.zoom = Math.max(0.35, cam.zoom - 0.08); const k = cam.zoom/prev; cam.x = cx - (cx - cam.x) * k; cam.y = cy - (cy - cam.y) * k; showNotification('Zoom: '+cam.zoom.toFixed(2), 'info', 800); });
+const _zIn = document.getElementById('zoom-in'); if(_zIn) _zIn.addEventListener('click', ()=>{ const prev = cam.zoom; cam.zoom = Math.min(2.0, cam.zoom + 0.08); const k = cam.zoom/prev; cam.x = cx - (cx - cam.x) * k; cam.y = cy - (cy - cam.y) * k; clampCamera(); showNotification('Zoom: '+cam.zoom.toFixed(2), 'info', 800); });
+const _zOut = document.getElementById('zoom-out'); if(_zOut) _zOut.addEventListener('click', ()=>{ const prev = cam.zoom; cam.zoom = Math.max(0.35, cam.zoom - 0.08); const k = cam.zoom/prev; cam.x = cx - (cx - cam.x) * k; cam.y = cy - (cy - cam.y) * k; clampCamera(); showNotification('Zoom: '+cam.zoom.toFixed(2), 'info', 800); });
 
 // Init radio display
 setRadio(radioFreq);
@@ -1509,7 +1540,7 @@ window.addEventListener('mousemove', e=>{
   if(!mouseDown) return;
   const dx = e.clientX - mouseStart.x, dy = e.clientY - mouseStart.y;
   if(!mousePanned && Math.hypot(dx,dy) > 6) mousePanned = true;
-  if(mousePanned){ cancelCameraFollow(); cam.x -= dx; cam.y -= dy; mouseStart = {x:e.clientX, y:e.clientY}; }
+  if(mousePanned){ cancelCameraFollow(); cam.x -= dx; cam.y -= dy; clampCamera(); mouseStart = {x:e.clientX, y:e.clientY}; }
 });
 window.addEventListener('mouseup', e=>{ if(mouseDown && !mousePanned){ /* let click handler run */ } mouseDown = false; mousePanned = false; });
 
@@ -1522,7 +1553,7 @@ canvas.addEventListener('touchstart', e=>{
 });
 canvas.addEventListener('touchmove', e=>{
   if(!touchState) return;
-  if(e.touches.length>=1){ const t = e.touches[0]; const dx = t.clientX - touchState.screenX, dy = t.clientY - touchState.screenY; if(Math.hypot(dx,dy)>6){ touchState.panned = true; cancelCameraFollow(); cam.x -= dx; cam.y -= dy; touchState.screenX = t.clientX; touchState.screenY = t.clientY; } }
+  if(e.touches.length>=1){ const t = e.touches[0]; const dx = t.clientX - touchState.screenX, dy = t.clientY - touchState.screenY; if(Math.hypot(dx,dy)>6){ touchState.panned = true; cancelCameraFollow(); cam.x -= dx; cam.y -= dy; clampCamera(); touchState.screenX = t.clientX; touchState.screenY = t.clientY; } }
 });
 canvas.addEventListener('touchend', e=>{
   if(!touchState) return; if(!touchState.panned){ const item = findEntityAt(touchState.x,touchState.y); selectEntity(item); }
