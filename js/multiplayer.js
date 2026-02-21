@@ -1,6 +1,6 @@
 ﻿import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
 import { getAuth, signInAnonymously, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js";
-import { getDatabase, ref, set, update, onValue, onDisconnect, runTransaction, serverTimestamp, remove, push, onChildAdded } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-database.js";
+import { getDatabase, ref, set, update, onValue, onDisconnect, runTransaction, serverTimestamp, remove, push, onChildAdded, get } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyC_kUoMvXWS7c5_NTPOBAzMWvPf6xnZw60",
@@ -92,6 +92,20 @@ async function joinRoom(){
   currentUid = uid;
   window.__mp_uid = uid;
   playerName = safeLocalStorageGet("fx_player_name") || randName(uid);
+
+  // cleanup stale slots (slots occupied but no player entry)
+  try{
+    const playersSnap = await get(ref(db, `rooms/${ROOM_ID}/players`));
+    const slotsSnap = await get(ref(db, `rooms/${ROOM_ID}/slots`));
+    const players = playersSnap.exists() ? playersSnap.val() : {};
+    const slots = slotsSnap.exists() ? slotsSnap.val() : {};
+    const activeUids = new Set(Object.keys(players || {}));
+    for(const [slotId, slotUid] of Object.entries(slots || {})){
+      if(slotUid && !activeUids.has(slotUid)){
+        await set(ref(db, `rooms/${ROOM_ID}/slots/${slotId}`), null).catch(()=>{});
+      }
+    }
+  }catch(e){}
 
   const slot = await claimSlot(uid);
   if(slot === null){
