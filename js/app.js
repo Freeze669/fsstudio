@@ -60,10 +60,15 @@ function stepRadio(delta){ setRadioFromTicks(toTicks(radioFreq) + delta); }
 function randomFreq(){ const i = Math.floor(Math.random()*(RADIO_STEPS+1)); return fromTicks(i); }
 function updateRadioLink(){ const sel = entities.find(e=>e.selected); const linkEl = document.getElementById('radio-link'); if(!linkEl){return;} if(sel && Math.abs((sel.freq||0)-radioFreq)<1e-6){ linkEl.textContent='SYNC'; linkEl.style.color='#2dd4bf'; } else { linkEl.textContent='NO LINK'; linkEl.style.color='rgba(230,242,255,0.7)'; } }
 let _miniatc_loop_started = false;
+let mpMode = 'local';
+let mpIsHost = false;
 let gamePaused = true; // Jeu en pause tant que le menu serveur est affiché
+function safeLocalStorageGet(key){
+  try{ return window.localStorage.getItem(key); }catch(e){ return null; }
+}
 const DISCORD_WEBHOOK_URL = (
   window.DISCORD_WEBHOOK_URL ||
-  window.localStorage.getItem('fx_discord_webhook') ||
+  safeLocalStorageGet('fx_discord_webhook') ||
   'https://discord.com/api/webhooks/1472984817330159736/ymoLT0fHNW97mtYqf-Pr-fsIUBi1YSnRpmCrjpQ8DdYKcHPC3MptSdl8w4IH-YNJcO2z'
 ).trim();
 let discordSessionSent = false;
@@ -784,6 +789,7 @@ resize();
 
 function update(dt){
   if(gamePaused) return;
+  if(mpMode === 'multi' && !mpIsHost) return;
   playElapsedMs += dt;
   updatePlayTimeHud();
   updateBurstEffects(dt);
@@ -975,6 +981,53 @@ function update(dt){
       statusEl.innerHTML = '<strong>Statut:</strong> ' + status;
     }
   }
+}
+
+function snapshotEntity(p){
+  return {
+    id: p.id,
+    call: p.call,
+    x: p.x, y: p.y, hdg: p.hdg,
+    spd: p.spd, alt: p.alt,
+    type: p.type, model: p.model,
+    origin: p.origin, originCountry: p.originCountry,
+    destination: p.destination, destinationCountry: p.destinationCountry,
+    passengers: p.passengers, weight: p.weight, airline: p.airline,
+    fuel: p.fuel, _fuel: p._fuel,
+    returning: p.returning, _forcedByTanker: p._forcedByTanker,
+    _alerted: p._alerted, _crashed: p._crashed,
+    _crashTime: p._crashTime, _crashReason: p._crashReason,
+    targetId: p.targetId, _mode: p._mode, _beingTracked: p._beingTracked
+  };
+}
+
+function getEntitiesSnapshot(){
+  return entities.map(snapshotEntity);
+}
+
+function applyEntitiesSnapshot(list){
+  const byId = new Map();
+  entities.forEach(e=>{ byId.set(e.id, e); });
+  entities.length = 0;
+  for(const s of (list || [])){
+    const prev = byId.get(s.id);
+    const e = prev ? prev : {history: []};
+    Object.assign(e, s);
+    if(prev && prev.selected) e.selected = true;
+    if(prev && prev.history && prev.history.length){
+      e.history = prev.history;
+      e.history.push({x: e.x, y: e.y});
+      if(e.history.length > 120) e.history.shift();
+    } else {
+      e.history = [{x: e.x, y: e.y}];
+    }
+    entities.push(e);
+  }
+}
+
+function setMultiplayerMode(isMulti, isHost){
+  mpMode = isMulti ? 'multi' : 'local';
+  mpIsHost = !!isHost;
 }
 
 function drawBackgroundScreen(){
@@ -1202,6 +1255,12 @@ function loop(now){
   ctx.restore();
   requestAnimationFrame(loop);
 }
+
+window.MP_APP = {
+  getEntitiesSnapshot,
+  applyEntitiesSnapshot,
+  setMultiplayerMode
+};
 
 // initial spawning - traffic increased, hostile traffic reduced
 for(let i=0;i<14;i++) spawnPlane('civil');

@@ -29,6 +29,10 @@ let voteUnsub = null;
 let kicksUnsub = null;
 let voteTick = null;
 let lastSelectedId = null;
+let slotsUnsub = null;
+let stateUnsub = null;
+let stateTick = null;
+let isHost = false;
 
 const ui = {
   panel: document.getElementById("mp-panel"),
@@ -50,6 +54,9 @@ function showPanel(show){
 
 function randName(uid){
   return "Joueur-" + uid.slice(0,4).toUpperCase();
+}
+function safeLocalStorageGet(key){
+  try{ return localStorage.getItem(key); }catch(e){ return null; }
 }
 
 async function claimSlot(uid){
@@ -82,7 +89,7 @@ async function joinRoom(){
   const uid = cred.user.uid;
   currentUid = uid;
   window.__mp_uid = uid;
-  playerName = localStorage.getItem("fx_player_name") || randName(uid);
+  playerName = safeLocalStorageGet("fx_player_name") || randName(uid);
 
   const slot = await claimSlot(uid);
   if(slot === null){
@@ -122,6 +129,9 @@ async function leaveRoom(){
   currentUid = null;
   currentSlot = null;
   window.__mp_uid = null;
+  if(window.MP_APP && typeof window.MP_APP.setMultiplayerMode === 'function'){
+    window.MP_APP.setMultiplayerMode(false, false);
+  }
   showPanel(false);
 }
 
@@ -129,7 +139,10 @@ function cleanupListeners(){
   if(playersUnsub){ playersUnsub(); playersUnsub = null; }
   if(voteUnsub){ voteUnsub(); voteUnsub = null; }
   if(kicksUnsub){ kicksUnsub(); kicksUnsub = null; }
+  if(slotsUnsub){ slotsUnsub(); slotsUnsub = null; }
+  if(stateUnsub){ stateUnsub(); stateUnsub = null; }
   if(voteTick){ clearInterval(voteTick); voteTick = null; }
+  if(stateTick){ clearInterval(stateTick); stateTick = null; }
 }
 
 function renderPlayers(players){
@@ -257,6 +270,49 @@ function attachPlayersListener(){
   });
 }
 
+function setHostMode(nextIsHost){
+  if(isHost === nextIsHost) return;
+  isHost = nextIsHost;
+  if(window.MP_APP && typeof window.MP_APP.setMultiplayerMode === 'function'){
+    window.MP_APP.setMultiplayerMode(true, isHost);
+  }
+
+  if(stateTick){ clearInterval(stateTick); stateTick = null; }
+  if(stateUnsub){ stateUnsub(); stateUnsub = null; }
+
+  if(isHost){
+    // host: publish world state
+    stateTick = setInterval(()=>{
+      if(!window.MP_APP || typeof window.MP_APP.getEntitiesSnapshot !== 'function') return;
+      const stateRef = ref(db, `rooms/${ROOM_ID}/state`);
+      const payload = {
+        ts: Date.now(),
+        entities: window.MP_APP.getEntitiesSnapshot()
+      };
+      set(stateRef, payload).catch(()=>{});
+    }, 350);
+  } else {
+    // client: consume world state
+    const stateRef = ref(db, `rooms/${ROOM_ID}/state`);
+    stateUnsub = onValue(stateRef, (snap)=>{
+      const data = snap.val();
+      if(!data || !data.entities) return;
+      if(window.MP_APP && typeof window.MP_APP.applyEntitiesSnapshot === 'function'){
+        window.MP_APP.applyEntitiesSnapshot(data.entities);
+      }
+    });
+  }
+}
+
+function attachSlotsListener(){
+  const slotsRef = ref(db, `rooms/${ROOM_ID}/slots`);
+  slotsUnsub = onValue(slotsRef, (snap)=>{
+    const slots = snap.val() || {};
+    const hostUid = slots[0] || null;
+    setHostMode(hostUid === currentUid);
+  });
+}
+
 function attachKicksListener(){
   const kickRef = ref(db, `rooms/${ROOM_ID}/kicks/${currentUid}`);
   kicksUnsub = onValue(kickRef, (snap)=>{
@@ -273,7 +329,11 @@ async function start(){
     showPanel(false);
     return;
   }
+  if(window.MP_APP && typeof window.MP_APP.setMultiplayerMode === 'function'){
+    window.MP_APP.setMultiplayerMode(true, false);
+  }
   attachPlayersListener();
+  attachSlotsListener();
   attachVoteListener();
   attachKicksListener();
 }
