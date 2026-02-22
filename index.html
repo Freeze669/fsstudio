@@ -52,6 +52,9 @@
         </div>
       </div>
       <div class="server-body">
+        <div class="server-warning" role="alert">
+          Attention: le mode multijoueur contient encore des bugs importants.
+        </div>
         <ul class="server-cards">
           <li class="server-card">
             <div class="card-left">
@@ -85,11 +88,35 @@
               </button>
             </div>
           </li>
+          <li class="server-card">
+            <div class="card-left">
+              <div class="card-badge">PARTENAIRE</div>
+              <div class="card-name">Serveurs Partenaires</div>
+              <div class="card-meta">
+                <span class="meta-pill"><span class="dot"></span> Aucun serveur disponible</span>
+                <span class="meta-pill">Bientot</span>
+              </div>
+            </div>
+            <div class="card-right">
+              <button id="server-partner-btn" class="server-btn-disabled" aria-disabled="true">
+                <span class="btn-icon">+</span>
+                Ajouter un serveur
+              </button>
+            </div>
+          </li>
         </ul>
         <div class="server-footer">
-          <span class="hint">Le mode multijoueur arrive prochainement avec chat vocal et contrôle partagé.</span>
+          <span class="hint">Aucun serveur partenaire n'est actif pour l'instant.</span>
         </div>
       </div>
+    </div>
+  </div>
+
+  <div id="local-cinematic" class="hidden" aria-hidden="true">
+    <video id="local-cinematic-video" preload="auto" playsinline></video>
+    <button id="skip-cinematic-btn" type="button">Passer</button>
+    <div id="cinematic-progress" aria-hidden="true">
+      <div id="cinematic-progress-fill"></div>
     </div>
   </div>
 

@@ -1282,24 +1282,112 @@ setInterval(()=>{ if(gamePaused) return; if(entities.filter(e=>e.type==='enemy')
   const panel = document.getElementById('server-select');
   const btnLocal = document.getElementById('server-local-btn');
   const btnMulti = document.getElementById('server-multi-btn');
+  const btnPartner = document.getElementById('server-partner-btn');
+  const cinematicOverlay = document.getElementById('local-cinematic');
+  const cinematicVideo = document.getElementById('local-cinematic-video');
+  const skipCinematicBtn = document.getElementById('skip-cinematic-btn');
+  const cinematicProgressFill = document.getElementById('cinematic-progress-fill');
   const openBtn = document.getElementById('btn-open-menu');
+  const LOCAL_CINEMATIC_SRC = 'Vid\u00E9o sans titre \u2010 R\u00E9alis\u00E9e avec Clipchamp.mp4';
+  let localLaunchInProgress = false;
+
+  function setCinematicProgress(value){
+    if(!cinematicProgressFill) return;
+    const clamped = Math.max(0, Math.min(1, Number(value) || 0));
+    cinematicProgressFill.style.width = String(Math.round(clamped * 1000) / 10) + '%';
+  }
+
+  function playLocalCinematic(){
+    if(!cinematicOverlay || !cinematicVideo){
+      return Promise.resolve();
+    }
+
+    return new Promise((resolve)=>{
+      let finished = false;
+      let safetyTimer = null;
+      let rafId = null;
+      let fallbackProgress = 0;
+
+      function finish(){
+        if(finished) return;
+        finished = true;
+        if(safetyTimer) clearTimeout(safetyTimer);
+        if(rafId) cancelAnimationFrame(rafId);
+        setCinematicProgress(1);
+        cinematicVideo.pause();
+        cinematicVideo.removeEventListener('ended', onEnded);
+        cinematicVideo.removeEventListener('error', onError);
+        if(skipCinematicBtn) skipCinematicBtn.removeEventListener('click', onSkip);
+        cinematicOverlay.classList.add('hidden');
+        cinematicOverlay.setAttribute('aria-hidden', 'true');
+        resolve();
+      }
+
+      function onEnded(){ finish(); }
+      function onSkip(){ finish(); }
+      function onError(){
+        showNotification('Cinematique indisponible, lancement direct.', 'warning', 1800, true);
+        finish();
+      }
+      function updateProgress(){
+        if(finished) return;
+        const duration = Number(cinematicVideo.duration);
+        const current = Number(cinematicVideo.currentTime);
+        if(Number.isFinite(duration) && duration > 0 && Number.isFinite(current)){
+          setCinematicProgress(current / duration);
+        } else {
+          fallbackProgress = Math.min(0.92, fallbackProgress + 0.0035);
+          setCinematicProgress(fallbackProgress);
+        }
+        rafId = requestAnimationFrame(updateProgress);
+      }
+
+      if(cinematicVideo.getAttribute('src') !== LOCAL_CINEMATIC_SRC){
+        cinematicVideo.setAttribute('src', LOCAL_CINEMATIC_SRC);
+      }
+
+      cinematicOverlay.classList.remove('hidden');
+      cinematicOverlay.setAttribute('aria-hidden', 'false');
+      cinematicVideo.currentTime = 0;
+      setCinematicProgress(0);
+      rafId = requestAnimationFrame(updateProgress);
+      cinematicVideo.addEventListener('ended', onEnded);
+      cinematicVideo.addEventListener('error', onError);
+      if(skipCinematicBtn) skipCinematicBtn.addEventListener('click', onSkip);
+
+      safetyTimer = setTimeout(finish, 120000);
+      const p = cinematicVideo.play();
+      if(p && typeof p.catch === 'function'){
+        p.catch(onError);
+      }
+    });
+  }
 
   function openMenu(){
     if(panel) panel.style.display='flex';
     gamePaused = true;
     showNotification('Menu serveur ouvert', 'info', 1500);
   }
-  function chooseLocal(){
-    gamePaused = false;
-    if(panel) panel.style.display='none';
-    if(playElapsedMs <= 0) playElapsedMs = 0;
-    updatePlayTimeHud();
-    sendDiscordPlayNotification();
-    if(!_miniatc_loop_started) startMainLoop();
-    showNotification('Connexion: Local', 'info', 1200);
+  async function chooseLocal(){
+    if(localLaunchInProgress) return;
+    localLaunchInProgress = true;
+    try{
+      gamePaused = true;
+      if(panel) panel.style.display='none';
+      await playLocalCinematic();
+      gamePaused = false;
+      if(playElapsedMs <= 0) playElapsedMs = 0;
+      updatePlayTimeHud();
+      sendDiscordPlayNotification();
+      if(!_miniatc_loop_started) startMainLoop();
+      showNotification('Connexion: Local', 'info', 1200);
+    } finally {
+      localLaunchInProgress = false;
+    }
   }
 
   function chooseMulti(){
+    showNotification('Attention: le mode multijoueur a encore des bugs importants.', 'warning', 3800, true);
     gamePaused = false;
     if(panel) panel.style.display='none';
     if(playElapsedMs <= 0) playElapsedMs = 0;
@@ -1313,8 +1401,13 @@ setInterval(()=>{ if(gamePaused) return; if(entities.filter(e=>e.type==='enemy')
     }
   }
 
+  function choosePartner(){
+    showNotification('Serveurs partenaires indisponibles pour l\'instant.', 'warning', 2200, true);
+  }
+
   if(btnLocal) btnLocal.addEventListener('click', chooseLocal);
   if(btnMulti) btnMulti.addEventListener('click', chooseMulti);
+  if(btnPartner) btnPartner.addEventListener('click', choosePartner);
   if(openBtn) openBtn.addEventListener('click', openMenu);
 
   // Ã€ chaque chargement, afficher le menu si disponible; sinon dÃ©marrer directement
