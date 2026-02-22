@@ -63,7 +63,7 @@ function sameFrequencyValue(p, freq){ return p && Math.abs((p.freq||0)-(freq||0)
 let _miniatc_loop_started = false;
 let mpMode = 'local';
 let mpIsHost = false;
-let gamePaused = true; // Jeu en pause tant que le menu serveur est affichÃ©
+let gamePaused = true; // Jeu en pause tant que le menu serveur est affiché
 function safeLocalStorageGet(key){
   try{ return window.localStorage.getItem(key); }catch(e){ return null; }
 }
@@ -142,7 +142,7 @@ async function sendDiscordPlayNotification(){
     console.warn('Discord webhook failed', err);
   }
 }
-function startMainLoop(){ if(!_miniatc_loop_started){ _miniatc_loop_started = true; try{ setStatus('DÃ©marrage boucle'); hideLoading(); requestAnimationFrame(loop); setStatus(''); }catch(e){ console.error(e); setStatus('Erreur au dÃ©marrage: '+(e.message||e)); } } }
+function startMainLoop(){ if(!_miniatc_loop_started){ _miniatc_loop_started = true; try{ setStatus('Démarrage boucle'); hideLoading(); requestAnimationFrame(loop); setStatus(''); }catch(e){ console.error(e); setStatus('Erreur au démarrage: '+(e.message||e)); } } }
 function resize(){
   const dpr = window.devicePixelRatio || 1;
   W = canvas.clientWidth = canvas.offsetWidth;
@@ -532,7 +532,7 @@ function spawnPlane(type='civil', x=null, y=null, hdg=null){
     base.destination = 'Patrouille';
     base.passengers = 0;
     base.weight = '12 t';
-    base.airline = 'ArmÃ©e de l\'Air';
+    base.airline = 'Armée de l\'Air';
     base.fuel = Math.round(rand(60, 100)) + '%';
   }
   else if(type==='tanker'){
@@ -676,12 +676,12 @@ function initAirports(){
     {name:'Auckland', country:'New Zealand', lat:-37.0082, lon:174.7850},
     {name:'Los Angeles', country:'USA', lat:33.9416, lon:-118.4085},
     {name:'San Francisco', country:'USA', lat:37.6213, lon:-122.3790},
-    {name:'Chicago Oâ€™Hare', country:'USA', lat:41.9742, lon:-87.9073},
+    {name:'Chicago O’Hare', country:'USA', lat:41.9742, lon:-87.9073},
     {name:'New York JFK', country:'USA', lat:40.6413, lon:-73.7781},
     {name:'Mexico City', country:'Mexico', lat:19.4361, lon:-99.0719},
-    {name:'BogotÃ¡', country:'Colombia', lat:4.7016, lon:-74.1469},
+    {name:'Bogotá', country:'Colombia', lat:4.7016, lon:-74.1469},
     {name:'Lima', country:'Peru', lat:-12.0219, lon:-77.1143},
-    {name:'SÃ£o Paulo', country:'Brazil', lat:-23.4356, lon:-46.4731},
+    {name:'São Paulo', country:'Brazil', lat:-23.4356, lon:-46.4731},
     {name:'Buenos Aires', country:'Argentina', lat:-34.8222, lon:-58.5358}
   ];
   for(const a of airportDefs){
@@ -895,8 +895,8 @@ function update(dt){
           if(!p._fuelWarned && p._fuel < 8){ p._fuelWarned=true; showNotification('URGENT: '+p.call+' carburant faible ('+Math.round(p._fuel)+'%)', 'warning', 3500); }
           if(p._fuel <= 2 && !p._tankerAssigned){
             if(p.spd > 140){
-              p._crashed = true; p._crashTime = performance.now(); p._crashReason='Panne sÃ¨che';
-              showNotification('ðŸ’¥ CRASH (panne sÃ¨che): '+p.call, 'warning', 5000);
+              p._crashed = true; p._crashTime = performance.now(); p._crashReason='Panne sèche';
+              showNotification('💥 CRASH (panne sèche): '+p.call, 'warning', 5000);
               setTimeout(()=>{ const idx = entities.indexOf(p); if(idx>=0) entities.splice(idx,1); }, 2500);
             } else {
               p.spd = Math.max(60, p.spd*0.96);
@@ -940,7 +940,7 @@ function update(dt){
           other._crashed = true;
           p._crashTime = performance.now();
           other._crashTime = performance.now();
-          showNotification('ðŸ’¥ COLLISION: ' + p.call + ' et ' + other.call, 'warning', 5000);
+          showNotification('💥 COLLISION: ' + p.call + ' et ' + other.call, 'warning', 5000);
           // Remove both planes after a short delay
           setTimeout(()=>{
             const idx1 = entities.indexOf(p); if(idx1>=0) entities.splice(idx1,1);
@@ -953,8 +953,8 @@ function update(dt){
       if(!p._crashed && Math.random() < 0.00001 && p.type !== 'fighter' && p.type !== 'enemy'){
         p._crashed = true;
         p._crashTime = performance.now();
-        p._crashReason = 'Panne mÃ©canique';
-        showNotification('âš ï¸ CRASH: ' + p.call + ' - ' + p._crashReason, 'warning', 5000);
+        p._crashReason = 'Panne mécanique';
+        showNotification('⚠️ CRASH: ' + p.call + ' - ' + p._crashReason, 'warning', 5000);
         setTimeout(()=>{
           const idx = entities.indexOf(p); if(idx>=0) entities.splice(idx,1);
         }, 3000);
@@ -973,13 +973,13 @@ function update(dt){
   clampCamera();
   const selected = entities.find(e => e.selected);
   if(selected){
-    const fuelText = Number.isFinite(selected._fuel) ? (Math.round(selected._fuel) + '%') : (selected.fuel || 'â€”');
+    const fuelText = Number.isFinite(selected._fuel) ? (Math.round(selected._fuel) + '%') : (selected.fuel || '—');
     const fuelEl = document.getElementById('info-fuel');
     if(fuelEl) fuelEl.innerHTML = '<strong>Carburant:</strong> ' + fuelText;
     const statusEl = document.getElementById('info-status');
     if(statusEl){
       let status = 'En vol';
-      if(selected.returning) status = 'Retour Ã  l\'aÃ©roport';
+      if(selected.returning) status = 'Retour à l'aéroport';
       if(selected.type === 'tanker' && selected.targetId) status = selected._mode === 'force' ? 'Mission interception' : 'Mission ravitaillement';
       if(selected._forcedByTanker) status = 'Atterrissage force';
       if(selected._alerted) status = 'Alerte';
@@ -1179,7 +1179,7 @@ function drawEntities(){
     // Draw crash indicator
     if(p._crashed){
       ctx.beginPath(); ctx.arc(dx,dy,35,0,Math.PI*2); ctx.strokeStyle='rgba(255,0,0,0.8)'; ctx.lineWidth=3; ctx.stroke();
-      ctx.fillStyle='rgba(255,0,0,0.9)'; ctx.font='12px system-ui'; ctx.fillText('ðŸ’¥ CRASH', dx-25, dy-25);
+      ctx.fillStyle='rgba(255,0,0,0.9)'; ctx.font='12px system-ui'; ctx.fillText('💥 CRASH', dx-25, dy-25);
       // Draw explosion effect
       const timeSinceCrash = performance.now() - (p._crashTime || 0);
       if(timeSinceCrash < 2000){
@@ -1212,7 +1212,7 @@ function drawEntities(){
       // Draw alert indicator if alerted
       if(p._alerted){
         ctx.beginPath(); ctx.arc(dx,dy,selectRadius + 10,0,Math.PI*2); ctx.strokeStyle='rgba(255,165,0,0.6)'; ctx.lineWidth=2; ctx.stroke();
-        ctx.fillStyle='rgba(255,165,0,0.9)'; ctx.font='10px system-ui'; ctx.fillText('âš ï¸ ALERTE', dx-20, dy-18);
+        ctx.fillStyle='rgba(255,165,0,0.9)'; ctx.font='10px system-ui'; ctx.fillText('⚠️ ALERTE', dx-20, dy-18);
       }
     } else {
       drawAircraftGlyph(p, dx, dy, render.w, render.h);
@@ -1229,7 +1229,7 @@ function drawEntities(){
     const hdgDeg = Math.round((p.hdg*180/Math.PI+360)%360);
     const fuelLabel = Number.isFinite(p._fuel) ? ('FUEL ' + Math.round(p._fuel) + '%') : '';
     const line2 = 'ALT ' + Math.round(p.alt) + ' ft  |  SPD ' + Math.round(p.spd) + ' kt';
-    const line3 = 'HDG ' + hdgDeg + 'Â°  |  ' + typeShort + (fuelLabel ? ('  |  ' + fuelLabel) : '');
+    const line3 = 'HDG ' + hdgDeg + '°  |  ' + typeShort + (fuelLabel ? ('  |  ' + fuelLabel) : '');
 
     ctx.fillStyle = p.selected? 'rgba(255,206,102,0.95)' : 'rgba(230,242,255,0.95)';
     ctx.font='12px system-ui';
@@ -1282,7 +1282,7 @@ setInterval(()=>{ if(gamePaused) return; if(entities.filter(e=>e.type==='cargo'|
 // fewer suspect aircraft
 setInterval(()=>{ if(gamePaused) return; if(entities.filter(e=>e.type==='enemy').length<1) spawnPlane('enemy'); }, 22000);
 
-// Menu serveur: toujours afficher Ã  l'ouverture, bouton de retour, et pause du jeu
+// Menu serveur: toujours afficher à l'ouverture, bouton de retour, et pause du jeu
 (function initServerSelection(){
   const panel = document.getElementById('server-select');
   const btnLocal = document.getElementById('server-local-btn');
@@ -1300,10 +1300,10 @@ setInterval(()=>{ if(gamePaused) return; if(entities.filter(e=>e.type==='enemy')
   const LOCAL_IMMERSION_LINES = [
     'ATC local: trafic stable sur le secteur principal.',
     'Tour locale: vent calme, operations nominales.',
-    'Centre radar: separation verticale confirmee.',
+    'Centre radar: separation verticale confirmée.',
     'ATC local: couloir Ouest prioritaire actif.',
     'Tour locale: surveillance carburant en cours.',
-    'Centre radar: aucun conflit detecte.'
+    'Centre radar: aucun conflit détecté.'
   ];
   let localLaunchInProgress = false;
   let ytSdkPromise = null;
@@ -1390,7 +1390,7 @@ setInterval(()=>{ if(gamePaused) return; if(entities.filter(e=>e.type==='enemy')
         if(safetyTimer) clearTimeout(safetyTimer);
         setCinematicProgress(1);
         setCinematicBuffer(1);
-        setCinematicLabel('Lecture terminee');
+        setCinematicLabel('Lecture terminée');
         if(skipCinematicBtn) skipCinematicBtn.removeEventListener('click', onSkip);
         if(ytPlayer && typeof ytPlayer.destroy === 'function'){
           try{ ytPlayer.destroy(); }catch(e){}
@@ -1506,7 +1506,7 @@ setInterval(()=>{ if(gamePaused) return; if(entities.filter(e=>e.type==='enemy')
     stopLocalImmersion();
     if(panel) panel.style.display='flex';
     showNotification('Mode multijoueur bloque temporairement (instable).', 'warning', 3200, true);
-    setStatus('Mode multijoueur desactive temporairement.');
+    setStatus('Mode multijoueur désactivé temporairement.');
     return;
   }
 
@@ -1519,12 +1519,12 @@ setInterval(()=>{ if(gamePaused) return; if(entities.filter(e=>e.type==='enemy')
     btnMulti.classList.add('server-btn-disabled');
     btnMulti.setAttribute('aria-disabled', 'true');
     btnMulti.setAttribute('disabled', 'disabled');
-    btnMulti.title = 'Mode multijoueur desactive temporairement';
+    btnMulti.title = 'Mode multijoueur désactivé temporairement';
   }
   if(btnPartner) btnPartner.addEventListener('click', choosePartner);
   if(openBtn) openBtn.addEventListener('click', openMenu);
 
-  // Ã€ chaque chargement, afficher le menu si disponible; sinon dÃ©marrer directement
+  // À chaque chargement, afficher le menu si disponible; sinon démarrer directement
   if(panel) {
     panel.style.display='flex';
     updatePlayTimeHud();
@@ -1550,7 +1550,7 @@ function selectEntity(p){
     followedEntityId = p.id;
     if(window.MP && typeof window.MP.setSelected === 'function') window.MP.setSelected(p.id);
     cam.zoom = Math.min(cam.zoom, 0.68);
-    selectedDiv.innerHTML = '<strong>'+p.call+'</strong><br>Type: '+(p.type||'civil')+' â€¢ ALT: '+Math.round(p.alt)+' ft<br>SPD: '+Math.round(p.spd)+' kt â€¢ HDG: '+Math.round((p.hdg*180/Math.PI+360)%360)+'Â°';
+    selectedDiv.innerHTML = '<strong>'+p.call+'</strong><br>Type: '+(p.type||'civil')+' • ALT: '+Math.round(p.alt)+' ft<br>SPD: '+Math.round(p.spd)+' kt • HDG: '+Math.round((p.hdg*180/Math.PI+360)%360)+'°';
     // update top-right detailed info
     try{
       const panel = document.getElementById('selected-info'); if(panel) panel.classList.remove('hidden');
@@ -1565,28 +1565,28 @@ function selectEntity(p){
       
       // Get status
       let status = 'En vol';
-      if(p.returning) status = 'Retour Ã  l\'aÃ©roport';
+      if(p.returning) status = 'Retour à l'aéroport';
       if(p.type === 'tanker' && p.targetId) status = p._mode === 'force' ? 'Mission interception' : 'Mission ravitaillement';
       if(p._forcedByTanker) status = 'Atterrissage force';
-      if(p._alerted) status = 'âš ï¸ AlertÃ©';
-      if(p._beingTracked) status = 'ðŸ›¡ï¸ Suivi par chasseur';
+      if(p._alerted) status = '⚠️ Alerté';
+      if(p._beingTracked) status = '🛡️ Suivi par chasseur';
       
-      const callsignEl = document.getElementById('info-callsign'); if(callsignEl) callsignEl.textContent = p.call || 'â€”';
+      const callsignEl = document.getElementById('info-callsign'); if(callsignEl) callsignEl.textContent = p.call || '—';
       const it = document.getElementById('info-type'); if(it) it.textContent = 'Type: ' + typeLabel;
-      const im = document.getElementById('info-model'); if(im) im.textContent = 'ModÃ¨le: ' + (p.model||'â€”');
-      const originEl = document.getElementById('info-origin'); if(originEl) originEl.innerHTML = '<strong>DÃ©part:</strong> ' + (p.origin || 'Inconnu');
+      const im = document.getElementById('info-model'); if(im) im.textContent = 'Modèle: ' + (p.model||'—');
+      const originEl = document.getElementById('info-origin'); if(originEl) originEl.innerHTML = '<strong>Départ:</strong> ' + (p.origin || 'Inconnu');
       const originCountryEl = document.getElementById('info-origin-country'); if(originCountryEl) originCountryEl.innerHTML = '<strong>Pays origine:</strong> ' + (p.originCountry || 'Inconnu');
       const destEl = document.getElementById('info-destination'); if(destEl) destEl.innerHTML = '<strong>Destination:</strong> ' + (p.destination || 'Inconnu');
       const statusEl = document.getElementById('info-status'); if(statusEl) statusEl.innerHTML = '<strong>Statut:</strong> ' + status;
       const altEl = document.getElementById('info-alt'); if(altEl) altEl.innerHTML = '<strong>Altitude:</strong> ' + Math.round(p.alt) + ' ft';
       const spdEl = document.getElementById('info-spd'); if(spdEl) spdEl.innerHTML = '<strong>Vitesse:</strong> ' + Math.round(p.spd) + ' kt';
-      const hdgEl = document.getElementById('info-hdg'); if(hdgEl) hdgEl.innerHTML = '<strong>Cap:</strong> ' + Math.round((p.hdg*180/Math.PI+360)%360) + 'Â°';
-      const passEl = document.getElementById('info-passengers'); if(passEl) passEl.innerHTML = '<strong>Passagers:</strong> ' + (p.passengers !== undefined ? p.passengers : 'â€”');
-      const weightEl = document.getElementById('info-weight'); if(weightEl) weightEl.innerHTML = '<strong>Poids:</strong> ' + (p.weight || 'â€”');
-      const airlineEl = document.getElementById('info-airline'); if(airlineEl) airlineEl.innerHTML = '<strong>Compagnie:</strong> ' + (p.airline || 'â€”');
-      const fuelText = Number.isFinite(p._fuel) ? (Math.round(p._fuel) + '%') : (p.fuel || 'â€”');
+      const hdgEl = document.getElementById('info-hdg'); if(hdgEl) hdgEl.innerHTML = '<strong>Cap:</strong> ' + Math.round((p.hdg*180/Math.PI+360)%360) + '°';
+      const passEl = document.getElementById('info-passengers'); if(passEl) passEl.innerHTML = '<strong>Passagers:</strong> ' + (p.passengers !== undefined ? p.passengers : '—');
+      const weightEl = document.getElementById('info-weight'); if(weightEl) weightEl.innerHTML = '<strong>Poids:</strong> ' + (p.weight || '—');
+      const airlineEl = document.getElementById('info-airline'); if(airlineEl) airlineEl.innerHTML = '<strong>Compagnie:</strong> ' + (p.airline || '—');
+      const fuelText = Number.isFinite(p._fuel) ? (Math.round(p._fuel) + '%') : (p.fuel || '—');
       const fuelEl = document.getElementById('info-fuel'); if(fuelEl) fuelEl.innerHTML = '<strong>Carburant:</strong> ' + fuelText;
-      const rEl = document.getElementById('info-radio'); if(rEl) rEl.innerHTML = '<strong>FrÃ©quence:</strong> ' + (p.freq ? p.freq.toFixed(3) + ' MHz' : 'â€”');
+      const rEl = document.getElementById('info-radio'); if(rEl) rEl.innerHTML = '<strong>Fréquence:</strong> ' + (p.freq ? p.freq.toFixed(3) + ' MHz' : '—');
     }catch(e){}
     const refuelBtn = document.getElementById('refuel');
     if(refuelBtn) refuelBtn.classList.toggle('hidden', p.type === 'tanker');
@@ -1597,7 +1597,7 @@ function selectEntity(p){
     controls.classList.add('hidden'); 
     const panel = document.getElementById('selected-info'); if(panel) panel.classList.add('hidden');
     const refuelBtn = document.getElementById('refuel'); if(refuelBtn) refuelBtn.classList.add('hidden');
-    info.textContent = 'Tapez un avion pour le sÃ©lectionner' 
+    info.textContent = 'Tapez un avion pour le sélectionner' 
     updateRadioLink();
     if(window.MP && typeof window.MP.clearSelected === 'function') window.MP.clearSelected();
   } }
@@ -1630,8 +1630,8 @@ canvas.addEventListener('click', e=>{
   const item = findEntityAt(x,y);
   if(item && item.airport){ // clicked airport: spawn civilian from there
     spawnPlane('civil', item.airport.x+20, item.airport.y+6, rand(0,Math.PI*2));
-    info.textContent = 'Avion lancÃ© depuis ' + item.airport.name;
-    setTimeout(()=>info.textContent='Tapez un avion pour le sÃ©lectionner',1200);
+    info.textContent = 'Avion lancé depuis ' + item.airport.name;
+    setTimeout(()=>info.textContent='Tapez un avion pour le sélectionner',1200);
     return;
   }
   selectEntity(item);
@@ -1672,7 +1672,7 @@ function dispatchTankerTo(target, source='Commande', mode='force'){
   if(!target) return false;
   if(target.type === 'tanker'){
     info.textContent = 'Impossible: deja un tanker';
-    setTimeout(()=>info.textContent='Tapez un avion pour le sÃ©lectionner',1200);
+    setTimeout(()=>info.textContent='Tapez un avion pour le sélectionner',1200);
     return false;
   }
   if(target._tankerAssigned){
@@ -1706,7 +1706,7 @@ function dispatchTankerTo(target, source='Commande', mode='force'){
     showNotification('Tanker envoye pour forcer atterrissage: ' + target.call, 'warning', 2500);
   }
   info.textContent = source + ': tanker lance depuis ' + nearest.name;
-  setTimeout(()=>info.textContent='Tapez un avion pour le sÃ©lectionner',1400);
+  setTimeout(()=>info.textContent='Tapez un avion pour le sélectionner',1400);
   return true;
 }
 function updateFuelAlertsPanel(){
@@ -1898,7 +1898,7 @@ const _elToggleNotif = document.getElementById('toggle-notifications'); if(_elTo
   notificationsEnabled = !notificationsEnabled;
   _elToggleNotif.classList.toggle('active', notificationsEnabled);
   const icon = _elToggleNotif.querySelector('.notif-icon');
-  if(icon) icon.textContent = notificationsEnabled ? 'ðŸ””' : 'ðŸ”•';
+  if(icon) icon.textContent = notificationsEnabled ? '🔔' : '🔕';
   if(!notificationsEnabled){
     clearNotifications();
   } else {
@@ -1920,7 +1920,7 @@ const _elCloseFuelAlerts = document.getElementById('close-fuel-alerts'); if(_elC
 // Radio UI buttons
 const _rDec = document.getElementById('radio-dec'); if(_rDec) _rDec.addEventListener('click', ()=> { stepRadio(-1); showNotification('Radio: '+formatFreq(radioFreq)+' MHz', 'info', 800); });
 const _rInc = document.getElementById('radio-inc'); if(_rInc) _rInc.addEventListener('click', ()=> { stepRadio(1); showNotification('Radio: '+formatFreq(radioFreq)+' MHz', 'info', 800); });
-const _rSync = document.getElementById('radio-sync'); if(_rSync) _rSync.addEventListener('click', ()=>{ const p = entities.find(x=>x.selected); if(p){ setRadio(p.freq||radioFreq); showNotification('Radio rÃ©glÃ©e sur '+formatFreq(radioFreq)+' MHz', 'info', 1200); } else { showNotification('Aucun avion sÃ©lectionnÃ©', 'warning', 1200); } });
+const _rSync = document.getElementById('radio-sync'); if(_rSync) _rSync.addEventListener('click', ()=>{ const p = entities.find(x=>x.selected); if(p){ setRadio(p.freq||radioFreq); showNotification('Radio réglée sur '+formatFreq(radioFreq)+' MHz', 'info', 1200); } else { showNotification('Aucun avion sélectionné', 'warning', 1200); } });
 
 // Zoom buttons
 const _zIn = document.getElementById('zoom-in'); if(_zIn) _zIn.addEventListener('click', ()=>{ const prev = cam.zoom; cam.zoom = Math.min(2.0, cam.zoom + 0.08); const k = cam.zoom/prev; cam.x = cx - (cx - cam.x) * k; cam.y = cy - (cy - cam.y) * k; clampCamera(); showNotification('Zoom: '+cam.zoom.toFixed(2), 'info', 800); });
@@ -1978,6 +1978,7 @@ canvas.addEventListener('touchend', e=>{
   if(!touchState) return; if(!touchState.panned){ const item = findEntityAt(touchState.x,touchState.y); selectEntity(item); }
   touchState = null;
 });
+
 
 
 
