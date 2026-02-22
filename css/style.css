@@ -87,8 +87,11 @@ main{position:fixed;top:0;left:0;right:0;bottom:0}
 #local-cinematic-frame{width:100%;height:100%;border:0;background:#000}
 #skip-cinematic-btn{position:absolute;right:14px;top:14px;padding:9px 12px;border-radius:10px;border:1px solid rgba(255,255,255,0.4);background:rgba(0,0,0,0.5);color:#fff;font-weight:700;cursor:pointer}
 #skip-cinematic-btn:active{transform:translateY(1px)}
-#cinematic-progress{position:absolute;left:0;right:0;bottom:0;height:6px;background:rgba(255,255,255,0.16)}
-#cinematic-progress-fill{height:100%;width:0%;background:linear-gradient(90deg, #2dd4bf, #3b82f6);transition:width 0.12s linear}
+#cinematic-progress{position:absolute;left:12px;right:12px;bottom:10px;padding:8px 10px;border-radius:10px;background:rgba(0,0,0,0.46);backdrop-filter:blur(4px)}
+#cinematic-progress-label{font-size:12px;color:rgba(255,255,255,0.86);margin-bottom:6px}
+#cinematic-progress-track{position:relative;height:7px;border-radius:999px;background:rgba(255,255,255,0.18);overflow:hidden}
+#cinematic-progress-buffer{position:absolute;left:0;top:0;height:100%;width:0%;background:rgba(148,163,184,0.7);transition:width 0.2s linear}
+#cinematic-progress-fill{position:absolute;left:0;top:0;height:100%;width:0%;background:linear-gradient(90deg, #2dd4bf, #3b82f6);transition:width 0.12s linear}
 .server-hero{position:relative;height:160px;background-image:linear-gradient(135deg, rgba(45,212,191,0.15), rgba(0,0,0,0.25)), url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 300"><g fill="%232dd4bf" opacity="0.06"><circle cx="120" cy="160" r="80"/><circle cx="340" cy="80" r="60"/><circle cx="620" cy="180" r="100"/></g></svg>');background-size:cover;background-position:center}
 .server-hero-overlay{position:absolute;inset:0;background:radial-gradient(600px 160px at 20% 30%, rgba(45,212,191,0.25), transparent)}
 .server-hero-content{position:absolute;left:24px;bottom:18px;display:flex;align-items:center;gap:14px}
