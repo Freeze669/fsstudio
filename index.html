@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="fr">
 <head>
   <meta charset="utf-8" />
@@ -38,7 +38,6 @@
     </div>
   </aside>
 
-  <!-- Server selection overlay (launcher style) -->
   <div id="server-select" style="display:none;">
     <div class="server-panel">
       <div class="server-hero">
@@ -78,7 +77,7 @@
               <div class="card-name">Serveur Multijoueur</div>
               <div class="card-meta">
                 <span class="meta-pill"><span class="dot"></span> Indisponible</span>
-                <span class="meta-pill">Temporairement bloque</span>
+                <span class="meta-pill">Temporairement bloqué</span>
               </div>
             </div>
             <div class="card-right">
@@ -94,7 +93,7 @@
               <div class="card-name">Serveurs Partenaires</div>
               <div class="card-meta">
                 <span class="meta-pill"><span class="dot"></span> Aucun serveur disponible</span>
-                <span class="meta-pill">Bientot</span>
+                <span class="meta-pill">Bientôt</span>
               </div>
             </div>
             <div class="card-right">
@@ -115,14 +114,14 @@
   <div id="local-cinematic" class="hidden" aria-hidden="true">
     <iframe
       id="local-cinematic-frame"
-      title="Cinematique locale"
+      title="Cinématique locale"
       src="about:blank"
       allow="autoplay; fullscreen; picture-in-picture"
       allowfullscreen
     ></iframe>
     <button id="skip-cinematic-btn" type="button">Passer</button>
     <div id="cinematic-progress" aria-hidden="true">
-      <div id="cinematic-progress-label">Chargement de la cinematique...</div>
+      <div id="cinematic-progress-label">Chargement de la cinématique...</div>
       <div id="cinematic-progress-track">
         <div id="cinematic-progress-buffer"></div>
         <div id="cinematic-progress-fill"></div>
@@ -131,7 +130,7 @@
   </div>
 
   <main id="game-main">
-    <button id="btn-open-menu" title="Retour au menu" aria-label="Retour au menu">⟲</button>
+    <button id="btn-open-menu" title="Retour au menu" aria-label="Retour au menu">↲</button>
     <canvas id="radar"></canvas>
     <div id="hud">
       <div id="notifications"></div>
@@ -157,8 +156,7 @@
           <button id="mp-vote" class="btn-small hidden">Voter</button>
         </div>
       </div>
-      
-      <!-- Interface réduite -->
+
       <div id="radio" class="control-panel compact">
         <div id="radio-status">Radio: <span id="radio-freq">121.500</span> MHz · <span id="radio-link">NO LINK</span></div>
         <div class="btn-row compact">
@@ -180,7 +178,7 @@
           </button>
         </div>
       </div>
-      
+
       <div id="controls" class="hidden compact">
         <div id="selected"></div>
         <div class="btn-row compact">

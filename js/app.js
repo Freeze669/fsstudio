@@ -1173,8 +1173,8 @@ function drawEntities(){
     const dx = p.x, dy = p.y;
     const render = getAircraftRenderInfo(p);
     const selectRadius = getAircraftSelectRadius(p);
-    // Keep a visible white trail until the aircraft is removed.
-    if(showTrajectory && p.history && p.history.length>1){ ctx.beginPath(); ctx.moveTo(p.history[0].x,p.history[0].y); for(let i=1;i<p.history.length;i++){ ctx.lineTo(p.history[i].x,p.history[i].y); } ctx.strokeStyle='rgba(255,255,255,0.88)'; ctx.lineWidth=1.5; ctx.stroke(); }
+    // White trail only for the selected (clicked) aircraft.
+    if(showTrajectory && p.selected && p.history && p.history.length>1){ ctx.beginPath(); ctx.moveTo(p.history[0].x,p.history[0].y); for(let i=1;i<p.history.length;i++){ ctx.lineTo(p.history[i].x,p.history[i].y); } ctx.strokeStyle='rgba(255,255,255,0.9)'; ctx.lineWidth=1.8; ctx.stroke(); }
 
     // Draw crash indicator
     if(p._crashed){
