@@ -1164,6 +1164,7 @@ function getOtherSelections(){
 
 function drawEntities(){
   const selectionMap = getOtherSelections();
+  const selectedPlane = entities.find(e => e.selected);
   // draw airports
   airports.forEach(a=>{
     ctx.drawImage(imgAirport, a.x-12, a.y-12, 24,24);
@@ -1173,8 +1174,8 @@ function drawEntities(){
     const dx = p.x, dy = p.y;
     const render = getAircraftRenderInfo(p);
     const selectRadius = getAircraftSelectRadius(p);
-    // White trail only for the selected (clicked) aircraft.
-    if(showTrajectory && p.selected && p.history && p.history.length>1){ ctx.beginPath(); ctx.moveTo(p.history[0].x,p.history[0].y); for(let i=1;i<p.history.length;i++){ ctx.lineTo(p.history[i].x,p.history[i].y); } ctx.strokeStyle='rgba(255,255,255,0.9)'; ctx.lineWidth=1.8; ctx.stroke(); }
+    // White trail only for the single currently selected aircraft.
+    if(showTrajectory && selectedPlane && p.id === selectedPlane.id && p.history && p.history.length>1){ ctx.beginPath(); ctx.moveTo(p.history[0].x,p.history[0].y); for(let i=1;i<p.history.length;i++){ ctx.lineTo(p.history[i].x,p.history[i].y); } ctx.strokeStyle='rgba(255,255,255,0.9)'; ctx.lineWidth=1.8; ctx.stroke(); }
 
     // Draw crash indicator
     if(p._crashed){
