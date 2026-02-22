@@ -1173,8 +1173,8 @@ function drawEntities(){
     const dx = p.x, dy = p.y;
     const render = getAircraftRenderInfo(p);
     const selectRadius = getAircraftSelectRadius(p);
-    // draw trajectory
-    if(showTrajectory && p.history && p.history.length>1){ ctx.beginPath(); ctx.moveTo(p.history[0].x,p.history[0].y); for(let i=1;i<p.history.length;i++){ ctx.lineTo(p.history[i].x,p.history[i].y); } ctx.strokeStyle=p.selected?'rgba(255,255,255,0.9)':'rgba(255,255,255,0.06)'; ctx.lineWidth=p.selected?1.8:1; ctx.stroke(); }
+    // Keep a visible white trail until the aircraft is removed.
+    if(showTrajectory && p.history && p.history.length>1){ ctx.beginPath(); ctx.moveTo(p.history[0].x,p.history[0].y); for(let i=1;i<p.history.length;i++){ ctx.lineTo(p.history[i].x,p.history[i].y); } ctx.strokeStyle='rgba(255,255,255,0.88)'; ctx.lineWidth=1.5; ctx.stroke(); }
 
     // Draw crash indicator
     if(p._crashed){
@@ -1295,11 +1295,20 @@ setInterval(()=>{ if(gamePaused) return; if(entities.filter(e=>e.type==='enemy')
   const cinematicProgressBuffer = document.getElementById('cinematic-progress-buffer');
   const cinematicProgressFill = document.getElementById('cinematic-progress-fill');
   const openBtn = document.getElementById('btn-open-menu');
-  const LOCAL_CINEMATIC_VIMEO_ID = '1167108283';
-  const LOCAL_CINEMATIC_MAX_MS = 120000;
+  const LOCAL_CINEMATIC_YT_ID = 'PbNqF4rkg8c';
+  const LOCAL_CINEMATIC_MAX_MS = 180000;
+  const LOCAL_IMMERSION_LINES = [
+    'ATC local: trafic stable sur le secteur principal.',
+    'Tour locale: vent calme, operations nominales.',
+    'Centre radar: separation verticale confirmee.',
+    'ATC local: couloir Ouest prioritaire actif.',
+    'Tour locale: surveillance carburant en cours.',
+    'Centre radar: aucun conflit detecte.'
+  ];
   let localLaunchInProgress = false;
-  let vimeoSdkPromise = null;
-  let vimeoPlayer = null;
+  let ytSdkPromise = null;
+  let ytPlayer = null;
+  let localImmersionTick = null;
 
   function setCinematicProgress(value){
     if(!cinematicProgressFill) return;
@@ -1315,139 +1324,168 @@ setInterval(()=>{ if(gamePaused) return; if(entities.filter(e=>e.type==='enemy')
     if(!cinematicProgressLabel) return;
     cinematicProgressLabel.textContent = text || '';
   }
+  function stopLocalImmersion(){
+    if(localImmersionTick){
+      clearInterval(localImmersionTick);
+      localImmersionTick = null;
+    }
+  }
+  function startLocalImmersion(){
+    if(localImmersionTick) return;
+    setStatus('Mode local immersif actif.');
+    showNotification('Mode local immersif active.', 'info', 1400, true);
+    localImmersionTick = setInterval(()=>{
+      if(gamePaused || mpMode !== 'local') return;
+      const selected = entities.find(e => e.selected && !e._crashed);
+      if(selected && Math.random() < 0.45){
+        showNotification('ATC: ' + selected.call + ' maintenez cap ' + Math.round((selected.hdg*180/Math.PI+360)%360) + '°', 'info', 2200);
+        return;
+      }
+      const line = LOCAL_IMMERSION_LINES[Math.floor(Math.random() * LOCAL_IMMERSION_LINES.length)];
+      showNotification(line, 'info', 2100);
+    }, 16000);
+  }
 
-  function loadVimeoSdk(){
-    if(window.Vimeo && window.Vimeo.Player) return Promise.resolve();
-    if(vimeoSdkPromise) return vimeoSdkPromise;
-    vimeoSdkPromise = new Promise((resolve, reject)=>{
-      const existing = document.querySelector('script[data-vimeo-sdk="1"]');
+  function loadYouTubeSdk(){
+    if(window.YT && window.YT.Player) return Promise.resolve();
+    if(ytSdkPromise) return ytSdkPromise;
+    ytSdkPromise = new Promise((resolve, reject)=>{
+      const existing = document.querySelector('script[data-yt-sdk="1"]');
+      const prevReady = window.onYouTubeIframeAPIReady;
+      window.onYouTubeIframeAPIReady = function(){
+        try{ if(typeof prevReady === 'function') prevReady(); }catch(e){}
+        resolve();
+      };
       if(existing){
-        existing.addEventListener('load', ()=>resolve(), {once:true});
-        existing.addEventListener('error', ()=>reject(new Error('Vimeo SDK load failed')), {once:true});
+        setTimeout(()=>{
+          if(window.YT && window.YT.Player) resolve();
+        }, 300);
         return;
       }
       const s = document.createElement('script');
-      s.src = 'https://player.vimeo.com/api/player.js';
+      s.src = 'https://www.youtube.com/iframe_api';
       s.async = true;
-      s.setAttribute('data-vimeo-sdk', '1');
-      s.onload = ()=>resolve();
-      s.onerror = ()=>reject(new Error('Vimeo SDK load failed'));
+      s.setAttribute('data-yt-sdk', '1');
+      s.onerror = ()=> reject(new Error('YouTube SDK load failed'));
       document.head.appendChild(s);
     });
-    return vimeoSdkPromise;
+    return ytSdkPromise;
   }
 
   function playLocalCinematic(){
-    if(!cinematicOverlay || !cinematicFrame){
+    if(!cinematicOverlay){
       return Promise.resolve();
     }
 
-    return new Promise(async (resolve)=>{
+    return new Promise((resolve)=>{
       let finished = false;
+      let tick = null;
       let safetyTimer = null;
-      let fallbackTick = null;
-      let progress = 0;
+      let fallbackProgress = 0;
 
       function finish(){
         if(finished) return;
         finished = true;
+        if(tick) clearInterval(tick);
         if(safetyTimer) clearTimeout(safetyTimer);
-        if(fallbackTick) clearInterval(fallbackTick);
         setCinematicProgress(1);
         setCinematicBuffer(1);
         setCinematicLabel('Lecture terminee');
-        if(vimeoPlayer && typeof vimeoPlayer.pause === 'function'){
-          vimeoPlayer.pause().catch(()=>{});
-        }
         if(skipCinematicBtn) skipCinematicBtn.removeEventListener('click', onSkip);
-        if(vimeoPlayer && typeof vimeoPlayer.off === 'function'){
-          vimeoPlayer.off('timeupdate', onTimeUpdate);
-          vimeoPlayer.off('progress', onBufferProgress);
-          vimeoPlayer.off('ended', onEnded);
+        if(ytPlayer && typeof ytPlayer.destroy === 'function'){
+          try{ ytPlayer.destroy(); }catch(e){}
+          ytPlayer = null;
         }
-        if(vimeoPlayer && typeof vimeoPlayer.destroy === 'function'){
-          vimeoPlayer.destroy().catch(()=>{});
-          vimeoPlayer = null;
-        }
-        cinematicFrame.setAttribute('src', 'about:blank');
+        if(cinematicFrame) cinematicFrame.setAttribute('src', 'about:blank');
         cinematicOverlay.classList.add('hidden');
         cinematicOverlay.setAttribute('aria-hidden', 'true');
         resolve();
       }
 
-      function onEnded(){ finish(); }
       function onSkip(){ finish(); }
-      function onError(){
-        showNotification('Cinematique indisponible, lancement direct.', 'warning', 1800, true);
-        setCinematicLabel('Cinematique indisponible');
+      function onPlayerError(){
+        showNotification('Video YouTube indisponible, lancement direct.', 'warning', 1800, true);
         finish();
       }
-      function onTimeUpdate(data){
-        if(!data) return;
-        const frac = Number(data.percent);
-        if(Number.isFinite(frac)){
-          progress = Math.max(progress, frac);
-          setCinematicProgress(progress);
-          setCinematicLabel('Lecture ' + Math.round(progress * 100) + '%');
+      function onPlayerStateChange(ev){
+        if(!window.YT || !ev) return;
+        if(ev.data === window.YT.PlayerState.ENDED){
+          finish();
         }
       }
-      function onBufferProgress(data){
-        if(!data) return;
-        const frac = Number(data.percent);
-        if(Number.isFinite(frac)){
-          setCinematicBuffer(frac);
-        }
+      function startProgressLoop(){
+        tick = setInterval(()=>{
+          if(finished) return;
+          let duration = 0;
+          let current = 0;
+          let buffered = 0;
+          try{
+            if(ytPlayer){
+              duration = Number(ytPlayer.getDuration?.() || 0);
+              current = Number(ytPlayer.getCurrentTime?.() || 0);
+              buffered = Number(ytPlayer.getVideoLoadedFraction?.() || 0);
+            }
+          }catch(e){}
+
+          if(duration > 0 && current >= 0){
+            const frac = Math.max(0, Math.min(1, current / duration));
+            setCinematicProgress(frac);
+            setCinematicBuffer(Math.max(frac, Math.max(0, Math.min(1, buffered))));
+            setCinematicLabel('Lecture ' + Math.round(frac * 100) + '%');
+          } else {
+            fallbackProgress = Math.min(0.94, fallbackProgress + 0.01);
+            setCinematicProgress(fallbackProgress);
+            setCinematicBuffer(Math.max(fallbackProgress, 0.22));
+            setCinematicLabel('Chargement video YouTube...');
+          }
+        }, 120);
       }
-      function startFallbackProgress(){
-        fallbackTick = setInterval(()=>{
-          progress = Math.min(0.96, progress + 0.0125);
-          setCinematicProgress(progress);
-          setCinematicBuffer(Math.max(progress, 0.2));
-        }, 250);
+      function attachYouTube(){
+        if(!cinematicFrame) return;
+        const src = 'https://www.youtube.com/embed/' + LOCAL_CINEMATIC_YT_ID + '?enablejsapi=1&autoplay=1&playsinline=1&rel=0&modestbranding=1';
+        cinematicFrame.setAttribute('src', src);
+        ytPlayer = new window.YT.Player(cinematicFrame, {
+          events: {
+            onReady: (ev)=>{ try{ ev.target.playVideo(); }catch(e){} },
+            onStateChange: onPlayerStateChange,
+            onError: onPlayerError
+          }
+        });
       }
 
       cinematicOverlay.classList.remove('hidden');
       cinematicOverlay.setAttribute('aria-hidden', 'false');
+      if(cinematicFrame) cinematicFrame.setAttribute('src', 'about:blank');
       setCinematicProgress(0);
       setCinematicBuffer(0);
-      setCinematicLabel('Chargement de la cinematique...');
+      setCinematicLabel('Chargement video YouTube...');
       if(skipCinematicBtn) skipCinematicBtn.addEventListener('click', onSkip);
       safetyTimer = setTimeout(finish, LOCAL_CINEMATIC_MAX_MS);
-      startFallbackProgress();
+      startProgressLoop();
 
-      try{
-        await loadVimeoSdk();
-        if(!window.Vimeo || !window.Vimeo.Player){
-          onError();
-          return;
-        }
-        if(vimeoPlayer && typeof vimeoPlayer.destroy === 'function'){
-          await vimeoPlayer.destroy().catch(()=>{});
-          vimeoPlayer = null;
-        }
-        const src = 'https://player.vimeo.com/video/' + LOCAL_CINEMATIC_VIMEO_ID + '?autoplay=1&title=0&byline=0&portrait=0&dnt=1';
-        cinematicFrame.setAttribute('src', src);
-        vimeoPlayer = new window.Vimeo.Player(cinematicFrame);
-        vimeoPlayer.on('timeupdate', onTimeUpdate);
-        vimeoPlayer.on('progress', onBufferProgress);
-        vimeoPlayer.on('ended', onEnded);
-        await vimeoPlayer.setCurrentTime(0).catch(()=>{});
-        await vimeoPlayer.play().catch(()=>{});
-      } catch(e){
-        onError();
-      }
+      loadYouTubeSdk()
+        .then(()=>{
+          if(!window.YT || !window.YT.Player){
+            onPlayerError();
+            return;
+          }
+          attachYouTube();
+        })
+        .catch(()=> onPlayerError());
     });
   }
 
   function openMenu(){
     if(panel) panel.style.display='flex';
     gamePaused = true;
+    stopLocalImmersion();
     showNotification('Menu serveur ouvert', 'info', 1500);
   }
   async function chooseLocal(){
     if(localLaunchInProgress) return;
     localLaunchInProgress = true;
     try{
+      setMultiplayerMode(false, false);
       gamePaused = true;
       if(panel) panel.style.display='none';
       await playLocalCinematic();
@@ -1457,24 +1495,19 @@ setInterval(()=>{ if(gamePaused) return; if(entities.filter(e=>e.type==='enemy')
       sendDiscordPlayNotification();
       if(!_miniatc_loop_started) startMainLoop();
       showNotification('Connexion: Local', 'info', 1200);
+      startLocalImmersion();
     } finally {
       localLaunchInProgress = false;
     }
   }
 
   function chooseMulti(){
-    showNotification('Attention: le mode multijoueur a encore des bugs importants.', 'warning', 3800, true);
-    gamePaused = false;
-    if(panel) panel.style.display='none';
-    if(playElapsedMs <= 0) playElapsedMs = 0;
-    updatePlayTimeHud();
-    if(!_miniatc_loop_started) startMainLoop();
-    showNotification('Connexion: Multijoueur', 'info', 1200);
-    if(window.MP && typeof window.MP.start === 'function'){
-      window.MP.start();
-    } else {
-      showNotification('Multijoueur indisponible', 'warning', 2000);
-    }
+    gamePaused = true;
+    stopLocalImmersion();
+    if(panel) panel.style.display='flex';
+    showNotification('Mode multijoueur bloque temporairement (instable).', 'warning', 3200, true);
+    setStatus('Mode multijoueur desactive temporairement.');
+    return;
   }
 
   function choosePartner(){
@@ -1482,7 +1515,12 @@ setInterval(()=>{ if(gamePaused) return; if(entities.filter(e=>e.type==='enemy')
   }
 
   if(btnLocal) btnLocal.addEventListener('click', chooseLocal);
-  if(btnMulti) btnMulti.addEventListener('click', chooseMulti);
+  if(btnMulti){
+    btnMulti.classList.add('server-btn-disabled');
+    btnMulti.setAttribute('aria-disabled', 'true');
+    btnMulti.setAttribute('disabled', 'disabled');
+    btnMulti.title = 'Mode multijoueur desactive temporairement';
+  }
   if(btnPartner) btnPartner.addEventListener('click', choosePartner);
   if(openBtn) openBtn.addEventListener('click', openMenu);
 
@@ -1492,9 +1530,11 @@ setInterval(()=>{ if(gamePaused) return; if(entities.filter(e=>e.type==='enemy')
     updatePlayTimeHud();
   } else {
     gamePaused = false;
+    setMultiplayerMode(false, false);
     updatePlayTimeHud();
     sendDiscordPlayNotification();
     startMainLoop();
+    startLocalImmersion();
   }
 })();
 
