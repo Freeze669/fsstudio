@@ -485,7 +485,7 @@ imgEuropeMap.src = 'assets/world-map.png';
 const useAbstractMap = false;
 const MAP_SCALE = 2.6;
 const MAP_ASPECT = 0.5;
-const MAP_LAT_MIN = -60;
+const MAP_LAT_MIN = -85;
 const MAP_LAT_MAX = 85;
 const MAP_LON_MIN = -180;
 const MAP_LON_MAX = 180;
@@ -1041,7 +1041,12 @@ function drawBackgroundScreen(){
   // richer background gradient
   const grad = ctx.createLinearGradient(0,0,0,H); grad.addColorStop(0,'#04101d'); grad.addColorStop(1,'#071428');
   ctx.fillStyle = grad; ctx.fillRect(0,0,W,H);
-  ctx.save(); ctx.translate(-cam.x, -cam.y);
+  ctx.save();
+  // Keep background map in the exact same world transform as entities/airports.
+  ctx.translate(-cam.x, -cam.y);
+  ctx.translate(cx, cy);
+  ctx.scale(cam.zoom, cam.zoom);
+  ctx.translate(-cx, -cy);
   // draw world map image behind everything (if loaded)
   try{
     const {mapW, mapH} = getMapSize();
