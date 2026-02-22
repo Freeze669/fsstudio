@@ -1284,12 +1284,15 @@ setInterval(()=>{ if(gamePaused) return; if(entities.filter(e=>e.type==='enemy')
   const btnMulti = document.getElementById('server-multi-btn');
   const btnPartner = document.getElementById('server-partner-btn');
   const cinematicOverlay = document.getElementById('local-cinematic');
-  const cinematicVideo = document.getElementById('local-cinematic-video');
+  const cinematicFrame = document.getElementById('local-cinematic-frame');
   const skipCinematicBtn = document.getElementById('skip-cinematic-btn');
   const cinematicProgressFill = document.getElementById('cinematic-progress-fill');
   const openBtn = document.getElementById('btn-open-menu');
-  const LOCAL_CINEMATIC_SRC = 'Vid\u00E9o sans titre \u2010 R\u00E9alis\u00E9e avec Clipchamp.mp4';
+  const LOCAL_CINEMATIC_VIMEO_ID = '1167108283';
+  const LOCAL_CINEMATIC_MAX_MS = 120000;
   let localLaunchInProgress = false;
+  let vimeoSdkPromise = null;
+  let vimeoPlayer = null;
 
   function setCinematicProgress(value){
     if(!cinematicProgressFill) return;
@@ -1297,27 +1300,53 @@ setInterval(()=>{ if(gamePaused) return; if(entities.filter(e=>e.type==='enemy')
     cinematicProgressFill.style.width = String(Math.round(clamped * 1000) / 10) + '%';
   }
 
+  function loadVimeoSdk(){
+    if(window.Vimeo && window.Vimeo.Player) return Promise.resolve();
+    if(vimeoSdkPromise) return vimeoSdkPromise;
+    vimeoSdkPromise = new Promise((resolve, reject)=>{
+      const existing = document.querySelector('script[data-vimeo-sdk="1"]');
+      if(existing){
+        existing.addEventListener('load', ()=>resolve(), {once:true});
+        existing.addEventListener('error', ()=>reject(new Error('Vimeo SDK load failed')), {once:true});
+        return;
+      }
+      const s = document.createElement('script');
+      s.src = 'https://player.vimeo.com/api/player.js';
+      s.async = true;
+      s.setAttribute('data-vimeo-sdk', '1');
+      s.onload = ()=>resolve();
+      s.onerror = ()=>reject(new Error('Vimeo SDK load failed'));
+      document.head.appendChild(s);
+    });
+    return vimeoSdkPromise;
+  }
+
   function playLocalCinematic(){
-    if(!cinematicOverlay || !cinematicVideo){
+    if(!cinematicOverlay || !cinematicFrame){
       return Promise.resolve();
     }
 
-    return new Promise((resolve)=>{
+    return new Promise(async (resolve)=>{
       let finished = false;
       let safetyTimer = null;
-      let rafId = null;
-      let fallbackProgress = 0;
+      let fallbackTick = null;
+      let progress = 0;
 
       function finish(){
         if(finished) return;
         finished = true;
         if(safetyTimer) clearTimeout(safetyTimer);
-        if(rafId) cancelAnimationFrame(rafId);
+        if(fallbackTick) clearInterval(fallbackTick);
         setCinematicProgress(1);
-        cinematicVideo.pause();
-        cinematicVideo.removeEventListener('ended', onEnded);
-        cinematicVideo.removeEventListener('error', onError);
+        if(vimeoPlayer && typeof vimeoPlayer.pause === 'function'){
+          vimeoPlayer.pause().catch(()=>{});
+        }
         if(skipCinematicBtn) skipCinematicBtn.removeEventListener('click', onSkip);
+        if(vimeoPlayer && typeof vimeoPlayer.off === 'function'){
+          vimeoPlayer.off('timeupdate', onTimeUpdate);
+          vimeoPlayer.off('ended', onEnded);
+        }
+        cinematicFrame.setAttribute('src', 'about:blank');
         cinematicOverlay.classList.add('hidden');
         cinematicOverlay.setAttribute('aria-hidden', 'true');
         resolve();
@@ -1329,36 +1358,46 @@ setInterval(()=>{ if(gamePaused) return; if(entities.filter(e=>e.type==='enemy')
         showNotification('Cinematique indisponible, lancement direct.', 'warning', 1800, true);
         finish();
       }
-      function updateProgress(){
-        if(finished) return;
-        const duration = Number(cinematicVideo.duration);
-        const current = Number(cinematicVideo.currentTime);
-        if(Number.isFinite(duration) && duration > 0 && Number.isFinite(current)){
-          setCinematicProgress(current / duration);
-        } else {
-          fallbackProgress = Math.min(0.92, fallbackProgress + 0.0035);
-          setCinematicProgress(fallbackProgress);
+      function onTimeUpdate(data){
+        if(!data) return;
+        const frac = Number(data.percent);
+        if(Number.isFinite(frac)){
+          progress = Math.max(progress, frac);
+          setCinematicProgress(progress);
         }
-        rafId = requestAnimationFrame(updateProgress);
       }
-
-      if(cinematicVideo.getAttribute('src') !== LOCAL_CINEMATIC_SRC){
-        cinematicVideo.setAttribute('src', LOCAL_CINEMATIC_SRC);
+      function startFallbackProgress(){
+        fallbackTick = setInterval(()=>{
+          progress = Math.min(0.96, progress + 0.0125);
+          setCinematicProgress(progress);
+        }, 250);
       }
 
       cinematicOverlay.classList.remove('hidden');
       cinematicOverlay.setAttribute('aria-hidden', 'false');
-      cinematicVideo.currentTime = 0;
       setCinematicProgress(0);
-      rafId = requestAnimationFrame(updateProgress);
-      cinematicVideo.addEventListener('ended', onEnded);
-      cinematicVideo.addEventListener('error', onError);
       if(skipCinematicBtn) skipCinematicBtn.addEventListener('click', onSkip);
+      safetyTimer = setTimeout(finish, LOCAL_CINEMATIC_MAX_MS);
+      startFallbackProgress();
 
-      safetyTimer = setTimeout(finish, 120000);
-      const p = cinematicVideo.play();
-      if(p && typeof p.catch === 'function'){
-        p.catch(onError);
+      try{
+        await loadVimeoSdk();
+        if(!window.Vimeo || !window.Vimeo.Player){
+          onError();
+          return;
+        }
+        if(vimeoPlayer && typeof vimeoPlayer.destroy === 'function'){
+          await vimeoPlayer.destroy().catch(()=>{});
+          vimeoPlayer = null;
+        }
+        const src = 'https://player.vimeo.com/video/' + LOCAL_CINEMATIC_VIMEO_ID + '?autoplay=1&title=0&byline=0&portrait=0&dnt=1';
+        cinematicFrame.setAttribute('src', src);
+        vimeoPlayer = new window.Vimeo.Player(cinematicFrame);
+        vimeoPlayer.on('timeupdate', onTimeUpdate);
+        vimeoPlayer.on('ended', onEnded);
+        await vimeoPlayer.play().catch(()=>{});
+      } catch(e){
+        onError();
       }
     });
   }

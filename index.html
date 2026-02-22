@@ -113,7 +113,13 @@
   </div>
 
   <div id="local-cinematic" class="hidden" aria-hidden="true">
-    <video id="local-cinematic-video" preload="auto" playsinline></video>
+    <iframe
+      id="local-cinematic-frame"
+      title="Cinematique locale"
+      src="about:blank"
+      allow="autoplay; fullscreen; picture-in-picture"
+      allowfullscreen
+    ></iframe>
     <button id="skip-cinematic-btn" type="button">Passer</button>
     <div id="cinematic-progress" aria-hidden="true">
       <div id="cinematic-progress-fill"></div>

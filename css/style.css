@@ -84,7 +84,7 @@ main{position:fixed;top:0;left:0;right:0;bottom:0}
 #server-select .server-panel{width:min(880px,92vw);max-height:88vh;display:flex;flex-direction:column;background:linear-gradient(180deg, rgba(0,0,0,0.65), rgba(10,20,34,0.88));border-radius:18px;overflow:hidden;box-shadow:0 24px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(45,212,191,0.15);border:1px solid rgba(45,212,191,0.15)}
 #local-cinematic{position:fixed;inset:0;z-index:59;background:#000;display:flex;align-items:center;justify-content:center}
 #local-cinematic.hidden{display:none}
-#local-cinematic-video{width:100%;height:100%;object-fit:cover;background:#000}
+#local-cinematic-frame{width:100%;height:100%;border:0;background:#000}
 #skip-cinematic-btn{position:absolute;right:14px;top:14px;padding:9px 12px;border-radius:10px;border:1px solid rgba(255,255,255,0.4);background:rgba(0,0,0,0.5);color:#fff;font-weight:700;cursor:pointer}
 #skip-cinematic-btn:active{transform:translateY(1px)}
 #cinematic-progress{position:absolute;left:0;right:0;bottom:0;height:6px;background:rgba(255,255,255,0.16)}
